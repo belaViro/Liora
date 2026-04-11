@@ -171,7 +171,7 @@ Liora/
 
 ## 📄 许可证
 
-[MIT License](LICENSE)
+[GNU General Public License v2.0](LICENSE)
 
 ## 🙏 致谢
 
