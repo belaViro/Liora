@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/Flask-3.0+-green.svg" alt="Flask">
   <img src="https://img.shields.io/badge/D3.js-v7-orange.svg" alt="D3.js">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+  <img src="https://img.shields.io/badge/License-GPLv2-blue.svg" alt="License">
 </p>
 
 ## ✨ 功能特性
