@@ -1,0 +1,13 @@
+# Web框架
+Flask==3.0.0
+Flask-SocketIO==5.3.0
+
+# 大模型API
+openai>=1.0.0
+
+# 工具库
+python-dotenv==1.0.0
+loguru==0.7.0
+
+# 可选：生产环境部署
+gunicorn==21.2.0
