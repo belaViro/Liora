@@ -29,33 +29,13 @@
 
 
 
-.logo {
+.logo-img {
 
-    font-size: 16px;
+    height: 32px;
 
-    font-weight: 600;
+    width: auto;
 
-    letter-spacing: 0.5px;
-
-    white-space: nowrap;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-}
-
-
-
-.logo::before {
-
-    content: '◆;
-
-    color: var(--color-memory);
-
-    font-size: 18px;
+    display: block;
 
 }
 
