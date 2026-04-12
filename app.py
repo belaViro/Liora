@@ -666,6 +666,27 @@ def delete_edge(edge_id):
         return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
 
 
+@app.route('/api/graph/node/<node_id>', methods=['DELETE'])
+def delete_node(node_id):
+    """
+    删除实体节点（同时删除所有相关边）
+    """
+    try:
+        success = graph_service.delete_node(node_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '实体已删除'
+            })
+        else:
+            return jsonify({'success': False, 'message': '实体不存在'})
+            
+    except Exception as e:
+        logger.exception(f"删除实体失败: {e}")
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+
 @app.route('/api/graph/nodes/merge', methods=['POST'])
 def merge_nodes():
     """

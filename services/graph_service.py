@@ -513,6 +513,24 @@ class GraphService:
             是否成功
         """
         initial_count = len(self.edges)
+        
+        # 找到要删除的边，更新节点的关系计数
+        edge_to_remove = None
+        for edge in self.edges:
+            if (edge.get('id') or edge.get('uuid')) == edge_id:
+                edge_to_remove = edge
+                break
+        
+        if edge_to_remove:
+            source_id = edge_to_remove.get('source')
+            target_id = edge_to_remove.get('target')
+            
+            # 更新节点关系计数
+            if source_id in self.nodes:
+                self.nodes[source_id]['relation_count'] = max(0, self.nodes[source_id].get('relation_count', 0) - 1)
+            if target_id in self.nodes:
+                self.nodes[target_id]['relation_count'] = max(0, self.nodes[target_id].get('relation_count', 0) - 1)
+        
         self.edges = [e for e in self.edges if (e.get('id') or e.get('uuid')) != edge_id]
         
         if len(self.edges) < initial_count:
@@ -520,6 +538,30 @@ class GraphService:
             logger.info(f"关系边已删除: {edge_id}")
             return True
         return False
+    
+    def delete_node(self, node_id: str) -> bool:
+        """
+        删除实体节点（同时删除所有相关边）
+        
+        Args:
+            node_id: 节点ID
+            
+        Returns:
+            是否成功
+        """
+        if node_id not in self.nodes:
+            return False
+        
+        # 删除节点
+        del self.nodes[node_id]
+        
+        # 删除所有与该节点相关的边
+        initial_edge_count = len(self.edges)
+        self.edges = [e for e in self.edges if e.get('source') != node_id and e.get('target') != node_id]
+        
+        self._save_graph()
+        logger.info(f"实体节点已删除: {node_id}, 同时删除 {initial_edge_count - len(self.edges)} 条关系边")
+        return True
     
     def merge_nodes(self, keep_id: str, remove_id: str) -> bool:
         """

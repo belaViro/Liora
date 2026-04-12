@@ -125,7 +125,12 @@ function showPredictionPanel(predictions) {
                         <div class="prediction-marker" style="background: ${getConfidenceColor(p.confidence)}"></div>
                         <div class="prediction-info">
                             <div class="prediction-name">${p.name}</div>
-                            <div class="prediction-meta-line">${p.type} · ${p.relation}</div>
+                            <div class="prediction-meta-line">
+                                ${p.type} · ${p.relation}
+                                <span class="prediction-confidence" style="color: ${getConfidenceColor(p.confidence)}">
+                                    概率 ${Math.round(p.confidence * 100)}%
+                                </span>
+                            </div>
                             <div class="prediction-reason">${p.reason}</div>
                         </div>
                         <button class="btn-adopt" onclick="event.stopPropagation(); adoptPrediction(${idx})">

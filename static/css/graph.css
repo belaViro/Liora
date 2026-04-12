@@ -789,6 +789,58 @@ input:checked + .slider:before {
 
 
 
+.btn-header-delete {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 28px;
+
+    height: 28px;
+
+    border: 1px solid var(--color-border-light);
+
+    background: var(--color-bg);
+
+    color: var(--color-text-secondary);
+
+    cursor: pointer;
+
+    border-radius: 4px;
+
+    transition: all 0.2s;
+
+    padding: 0;
+
+}
+
+
+
+.btn-header-delete:hover {
+
+    border-color: #e74c3c;
+
+    color: #e74c3c;
+
+    background: #fdf2f2;
+
+}
+
+
+
+.btn-header-delete svg {
+
+    width: 14px;
+
+    height: 14px;
+
+}
+
+
+
 .detail-title {
 
     font-weight: 600;

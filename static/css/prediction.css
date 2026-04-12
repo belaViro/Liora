@@ -39,6 +39,10 @@
     flex-shrink: 0;
 }
 
+.predict-dots {
+    animation: dots 1.4s infinite;
+}
+
 .predict-icon.spinning {
     opacity: 0.5;
 }
@@ -188,6 +192,21 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.prediction-confidence {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.04);
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .prediction-reason {

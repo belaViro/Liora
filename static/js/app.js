@@ -2494,13 +2494,19 @@ function showNodeDetail(nodeData) {
     badge.style.background = colorMap[nodeData.type] || '#999';
     badge.style.display = 'inline-block';
 
-    // 在头部添加编辑按钮
+    // 在头部添加编辑和删除按钮
     if (headerActions) {
         headerActions.innerHTML = `
-            <button class="btn-header-edit" onclick="enableNodeEdit('${nodeData.id}')" title="修改信息">
+            <button class="btn-header-edit" onclick="enableNodeEdit('${nodeData.id}')" title="修改">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+            <button class="btn-header-delete" onclick="deleteNode('${nodeData.id}', '${nodeData.name || '未知'}')" title="删除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
             </button>
         `;
@@ -2793,6 +2799,74 @@ function cancelEdit() {
         showEdgeDetail(currentSelectedEdge);
     } else {
         closeDetailPanel();
+    }
+}
+
+// ==================== 删除功能 ====================
+
+// 删除实体节点
+async function deleteNode(nodeId, nodeName) {
+    // 确认对话框
+    if (!confirm(`确定要删除实体 "${nodeName}" 吗？\n\n注意：这将同时删除所有与该实体相关的关系。`)) {
+        return;
+    }
+    
+    try {
+        showToast(`正在删除 "${nodeName}"...`, 'info');
+        
+        const response = await fetch(`/api/graph/node/${nodeId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(`"${nodeName}" 已删除`, 'success');
+            // 关闭详情面板
+            closeDetailPanel();
+            // 清除当前选中状态
+            currentSelectedNode = null;
+            // 刷新图谱数据
+            await loadGraphData();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除实体失败:', error);
+        showToast('删除失败，请重试', 'error');
+    }
+}
+
+// 删除关系边
+async function deleteEdge(edgeId, sourceName, targetName) {
+    // 确认对话框
+    if (!confirm(`确定要删除这条关系吗？\n\n${sourceName} → ${targetName}`)) {
+        return;
+    }
+    
+    try {
+        showToast('正在删除关系...', 'info');
+        
+        const response = await fetch(`/api/graph/edge/${edgeId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('关系已删除', 'success');
+            // 关闭详情面板
+            closeDetailPanel();
+            // 清除当前选中状态
+            currentSelectedEdge = null;
+            // 刷新图谱数据
+            await loadGraphData();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除关系失败:', error);
+        showToast('删除失败，请重试', 'error');
     }
 }
 
@@ -3102,14 +3176,22 @@ function showEdgeDetail(edgeData) {
     title.textContent = '关系详情';
     badge.style.display = 'none';
 
-    // 在头部添加编辑按钮
+    // 在头部添加编辑和删除按钮
     const edgeId = edgeData.id || edgeData.uuid || '';
+    const sourceName = edgeData.source_name || '未知';
+    const targetName = edgeData.target_name || '未知';
     if (headerActions && edgeId) {
         headerActions.innerHTML = `
             <button class="btn-header-edit" onclick="enableEdgeEdit('${edgeId}', '${edgeData.source}', '${edgeData.target}')" title="修改关系">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+            <button class="btn-header-delete" onclick="deleteEdge('${edgeId}', '${sourceName}', '${targetName}')" title="删除关系">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
             </button>
         `;
