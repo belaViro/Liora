@@ -20,9 +20,9 @@
 
            Liora Design System
 
-           åé´ MiroFish æç®ç´çº¿é£æ ¼
+           借鉴 MiroFish 极简直线风格
 
-           è入Lioraç¹æ的æè²ç¹缀
+           融入Liora特有的暖色点缀
 
            ============================================ */
 
@@ -30,7 +30,7 @@
 
         :root {
 
-            /* æ ¸心è²板 - é»ç½ç*/
+            /* 核心色板 - 黑白灰*/
 
             --color-bg: #ffffff;
 
@@ -50,11 +50,11 @@
 
             
 
-            /* Liora ç¹è²è°*/
+            /* Liora 特色色*/
 
-            --color-memory: #7B2D8E;        /* ç´«ç½å?- 记忆主è?*/
+            --color-memory: #7B2D8E;        /* 紫罗兰- 记忆主色*/
 
-            --color-memory-light: #e3d4f7;  /* æ·¡ç´« */
+            --color-memory-light: #e3d4f7;  /* 淡紫 */
 
             
 
@@ -66,7 +66,7 @@
 
             
 
-            /* 间è·?*/
+            /* 间距*/
 
             --space-xs: 4px;
 
@@ -80,7 +80,7 @@
 
             
 
-            /* é´å½± */
+            /* 阴影 */
 
             --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
 
@@ -140,7 +140,7 @@
 
         /* ============================================
 
-           顶部系统æ ?- åé´终端é£æ ¼
+           顶部系统æ 忆- 借鉴终端风格
 
            ============================================ */
 
@@ -186,7 +186,7 @@
 
         .logo::before {
 
-            content: 'â?;
+            content: '◆;
 
             color: var(--color-memory);
 
@@ -358,7 +358,7 @@
 
         /* ============================================
 
-           Liora æ§制面?- 开åè工具é£æ ?           ============================================ */
+           Liora æ§制面忆- 开åè工具é£æ 忆           ============================================ */
 
         .memory-network-controls {
 
@@ -432,7 +432,7 @@
 
         /* ============================================
 
-           主内容å?- åæ å¸å±
+           主内容区- åæ å¸å±
 
            ============================================ */
 
@@ -450,7 +450,7 @@
 
         /* ============================================
 
-           左ä¾§ï¼ç¥è¯图è°?- ç¹éµ网æ ¼èæ?
+           左侧：知识图谱- 点éµ网æ ¼èæ忆
 
            ============================================ */
 
@@ -594,7 +594,7 @@
 
 
 
-        /* å¸å±选择å?*/
+        /* å¸å±选择å忆*/
 
         .layout-selector {
 
@@ -660,7 +660,7 @@
 
         /* ============================================
 
-           图例 - 左下è§å¡片ï¼å¯折å ãå¯æ»动ï?           ============================================ */
+           图例 - 左下è§单¡片ï¼å¯折å ãå¯æ»动ï忆           ============================================ */
 
         .graph-legend {
 
@@ -960,7 +960,7 @@
 
 
 
-        /* è¾¹æ ç­¾开å?- 右上è§?*/
+        /* 边标签开关- 右上è§忆*/
 
         .edge-labels-toggle {
 
@@ -1090,7 +1090,7 @@
 
 
 
-        /* è¯¦情面?- 右ä¾?*/
+        /* 详情面板- 右ä¾忆*/
 
         .detail-panel {
 
@@ -1428,7 +1428,7 @@
 
 
 
-        /* è¾¹关系头é?*/
+        /* è¾¹关系头é忆*/
 
         .edge-relation-header {
 
@@ -1454,7 +1454,7 @@
 
 
 
-        /* 关系å¼ºåº¦æ?*/
+        /* 关系å¼ºåº¦æ忆*/
 
         .strength-bar {
 
@@ -1482,7 +1482,7 @@
 
 
 
-        /* 关系è¯¦情中的实体åç§°é«äº?*/
+        /* 关系è¯¦情中的实体åç§°é«äº忆*/
 
         .entity-name-highlight {
 
@@ -1514,7 +1514,7 @@
 
 
 
-        /* 关系è¯¦情时间è½´æ ·å?*/
+        /* 关系è¯¦情时间è½´æ ·å忆*/
 
         .relation-timeline {
 
@@ -1704,7 +1704,7 @@
 
 
 
-        /* 关联记忆å?*/
+        /* 关联记忆列表*/
 
         .related-memory-item {
 
@@ -1766,7 +1766,7 @@
 
         /* ============================================
 
-           右ä¾§ï¼æä½面æ?- 终端é£æ ¼ä¾§è¾¹æ ?           ============================================ */
+           右侧：操作面板- 终端风格ä¾§è¾¹æ 忆           ============================================ */
 
         .sidebar {
 
@@ -1792,7 +1792,7 @@
 
 
 
-        /* 选项å?- 类终端æ ç?*/
+        /* 选项卡- 类终端æ ç忆*/
 
         .tabs {
 
@@ -1912,7 +1912,7 @@
 
         /* ============================================
 
-           探索面板 - èç¹交äº?
+           探索面板 - è点交äº忆
 
            ============================================ */
 
@@ -2432,7 +2432,7 @@
 
 
 
-        /* 关系路径ä¾¦?*/
+                        <!-- 关系路径探索 -->
 
         .explore-path-finder {
 
@@ -2453,6 +2453,28 @@
             flex-direction: column;
 
             gap: 10px;
+
+        }
+
+
+
+        .path-finder-box {
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            gap: 12px;
+
+            padding: 16px;
+
+            border: 1px solid var(--color-border-light);
+
+            border-radius: 8px;
+
+            background: var(--color-bg);
 
         }
 
@@ -2624,7 +2646,7 @@
 
         /* ============================================
 
-           输入表单 - æç®工ä¸é?           ============================================ */
+           输入表单 - 极简工ä¸é忆           ============================================ */
 
         .form-group {
 
@@ -2852,7 +2874,7 @@
 
         /* ============================================
 
-           文件上ä¼?- ææ½åºå
+           文件上ä¼忆- ææ½åºå
 
            ============================================ */
 
@@ -3022,7 +3044,7 @@
 
         /* ============================================
 
-           ç¶æ提ç?- 终端é£æ ¼
+           ç¶æ提ç忆- 终端风格
 
            ============================================ */
 
@@ -3094,7 +3116,7 @@
 
         /* ============================================
 
-           记忆å?- å¡片å表
+           记忆列表- 单¡片å表
 
            ============================================ */
 
@@ -3670,7 +3692,7 @@
 
         /* ============================================
 
-           统计信息 - 数据å¡?
+           统计信息 - 数据单¡忆
 
            ============================================ */
 
@@ -3754,7 +3776,7 @@
 
 
 
-        /* 统计分å?*/
+        /* 统计分区*/
 
         .stats-section {
 
@@ -3868,7 +3890,7 @@
 
 
 
-        /* 情感条å½¢å?*/
+        /* 情感条å½¢å忆*/
 
         .emotion-bars {
 
@@ -4134,7 +4156,7 @@
 
 
 
-        /* ç­åå?*/
+        /* ç­åå忆*/
 
         .section-icon {
 
@@ -4576,7 +4598,7 @@
 
 
 
-        /* 记忆å¡片导出æ¨¡æ?- ç²¾ç®复å¤é?*/
+        /* 记忆单¡片导出æ¨¡æ忆- ç²¾ç®复å¤é忆*/
 
         .memory-card-modal {
 
@@ -4680,7 +4702,7 @@
 
 
 
-        /* ç®单è¾¹框è£é¥?*/
+        /* ç®单è¾¹框è£é¥忆*/
 
         .card-border-frame {
 
@@ -4704,7 +4726,7 @@
 
 
 
-        /* 顶部è£é¥°çº?*/
+        /* 顶部è£é¥°çº忆*/
 
         .card-top-line {
 
@@ -4728,7 +4750,7 @@
 
 
 
-        /* 底部è£é¥°çº?*/
+        /* 底部è£é¥°çº忆*/
 
         .card-bottom-line {
 
@@ -4772,7 +4794,7 @@
 
 
 
-        /* 顶部æ é¢è¡?*/
+        /* 顶部æ é¢è¡忆*/
 
         .card-header-row {
 
@@ -4820,7 +4842,7 @@
 
 
 
-        /* æ­£文åºå?*/
+        /* æ­£文åºå忆*/
 
         .memory-card-body {
 
@@ -5036,7 +5058,7 @@
 
 
 
-        /* 编辑功能æ ·?*/
+        /* 编辑功能æ ·忆*/
 
         .edit-section {
 
@@ -5212,7 +5234,7 @@
 
 
 
-        /* 关联记忆å?*/
+        /* 关联记忆列表*/
 
         .linked-memories-list {
 
@@ -5380,7 +5402,7 @@
 
 
 
-        /* 合并实体æ ·?*/
+        /* 合并实体æ ·忆*/
 
         .merge-section {
 
@@ -5476,7 +5498,7 @@
 
 
 
-        /* 记忆æ´å¯å¡?*/
+        /* 记忆æ´å¯单¡忆*/
 
         .insight-card {
 
@@ -5608,7 +5630,7 @@
 
 
 
-        /* 情感值显ç¤?*/
+        /* 情感值显ç¤忆*/
 
         .mood-score {
 
@@ -5656,7 +5678,7 @@
 
 
 
-        /* 人ç©网络展?*/
+        /* 人ç©网络展忆*/
 
         .people-network {
 
@@ -5752,7 +5774,7 @@
 
 
 
-        /* ç­åå?*/
+        /* ç­åå忆*/
 
         .heatmap-container {
 
@@ -5956,7 +5978,7 @@
 
         /* ============================================
 
-           å è½½动ç?
+           å è½½动ç忆
 
            ============================================ */
 
@@ -6058,7 +6080,7 @@
 
         /* ============================================
 
-           æ»动æ?- æçªé»?
+           滚动条- 极窄黑框
 
            ============================================ */
 
@@ -6100,7 +6122,7 @@
 
         /* ============================================
 
-           图è°±Tooltipæ ·?
+           图è°±Tooltipæ ·忆
 
            ============================================ */
 
@@ -6126,7 +6148,7 @@
 
 
 
-        /* 图è°±èç¹文?*/
+        /* 图è°±è点文忆*/
 
         #graph-svg text {
 
@@ -6140,7 +6162,7 @@
 
         /* ============================================
 
-           移动端菜å?           ============================================ */
+           移动端菜单           ============================================ */
 
         .mobile-menu-btn {
 
@@ -6234,7 +6256,7 @@
 
         
 
-        /* 平板åä»¥ä¸?*/
+        /* 平板åä»¥ä¸忆*/
 
         @media (max-width: 1024px) {
 
@@ -6258,7 +6280,7 @@
 
 
 
-        /* å°平æ?*/
+        /* å°平æ忆*/
 
         @media (max-width: 900px) {
 
@@ -6610,8 +6632,7 @@
 
             .btn {
 
-                min-height: 44px; /* iOSæ¨è的æå°è§¦æ§åºå?*/
-
+                min-height: 44px;
             }
 
             
@@ -6646,15 +6667,15 @@
 
     <div class="container">
 
-        <!-- 顶部搜索æ ?-->
+        <!-- 顶部搜索记忆-->
 
         <div class="header">
 
-            <div class="logo">â?Liora</div>
+            <div class="logo">◆Liora</div>
 
             <div class="search-box">
 
-                <input type="text" class="search-input" id="searchInput" placeholder="搜索ä½ 的记?..">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索你的记忆..">
 
                 <button class="search-button" onclick="searchMemories()">搜索</button>
 
@@ -6662,33 +6683,30 @@
 
 
 
-            <!-- 历å²上的ä»å¤©入?-->
+            <!-- 历史上的今天入口-->
 
-            <button class="time-travel-btn" onclick="openTimeTravelPanel()" title="历å²上的ä»å¤?>
+            <button class="time-travel-btn" onclick="openTimeTravelPanel()" title="历史上的今天"
 
-                <span class="time-travel-icon">â?/span>
+                <span class="time-travel-icon">⏱</span>
 
-                <span class="time-travel-text">时å?/span>
+                <span class="time-travel-text">时光</span>
 
             </button>
 
 
 
-            <!-- 移动端菜单按é?-->
+            <!-- 移动端菜单按钮-->
 
             <button class="mobile-menu-btn" onclick="toggleMobileMenu()" title="菜单">
 
-                <span></span>
 
-                <span></span>
 
-                <span></span>
 
             </button>
 
         </div>
 
-        <!-- 移动端菜å?-->
+        <!-- 移动端菜单-->
 
         <div class="mobile-menu" id="mobileMenu">
 
@@ -6696,25 +6714,25 @@
 
 
 
-        <!-- 主内容å?-->
+        <!-- 主内容区-->
 
         <div class="main-content">
 
-            <!-- 左ä¾§ï¼ç¥è¯图è°?-->
+            <!-- 左侧：知识图谱-->
 
             <div class="graph-section">
 
                 <div class="graph-header">
 
-                    <span class="graph-title">ç¥è¯图è°?/span>
+                    <span class="graph-title">知识图谱</span>
 
                     <div class="graph-controls">
 
-                        <button class="control-btn active" onclick="filterGraph('all')">å¨?/button>
+                        <button class="control-btn active" onclick="filterGraph('all')">全部</button>
 
-                        <button class="control-btn" onclick="filterGraph('PERSON')">人ç?/button>
+                        <button class="control-btn" onclick="filterGraph('PERSON')">人物</button>
 
-                        <button class="control-btn" onclick="filterGraph('LOCATION')">å°ç¹</button>
+                        <button class="control-btn" onclick="filterGraph('LOCATION')">地点</button>
 
                         <button class="control-btn" onclick="filterGraph('EVENT')">事件</button>
 
@@ -6740,7 +6758,7 @@
 
                         <span class="legend-title">图例</span>
 
-                        <span class="legend-toggle">â?/span>
+                        <span class="legend-toggle">▼</span>
 
                     </div>
 
@@ -6750,25 +6768,25 @@
 
 
 
-                <!-- è¾¹æ ç­¾开å?-->
+                <!-- 边标签开关-->
 
                 <div class="edge-labels-toggle">
 
                     <label class="toggle-switch">
 
-                        <input type="checkbox" id="showEdgeLabels">  <!-- MiroFish: 默认ä¸å¾é?-->
+                        <input type="checkbox" id="showEdgeLabels">  <!-- MiroFish: 默认不勾选-->
 
                         <span class="slider"></span>
 
                     </label>
 
-                    <span class="toggle-label">显示è¾¹æ ç­?/span>
+                    <span class="toggle-label">显示边标签</span>
 
                 </div>
 
 
 
-                <!-- è¯¦情面?-->
+                <!-- 详情面板-->
 
                 <div class="detail-panel" id="detailPanel">
 
@@ -6776,7 +6794,7 @@
 
                         <div class="detail-header-left">
 
-                            <span class="detail-title" id="detailTitle">è¯¦?/span>
+                            <span class="detail-title" id="detailTitle">详情</span>
 
                             <span class="detail-type-badge" id="detailTypeBadge" style="display: none;"></span>
 
@@ -6784,11 +6802,11 @@
 
                         <div class="detail-header-actions" id="detailHeaderActions">
 
-                            <!-- 动ææ入编辑按é?-->
+                            <!-- 动态插入编辑按钮-->
 
                         </div>
 
-                        <button class="detail-close" onclick="closeDetailPanel()">Ã</button>
+                        <button class="detail-close" onclick="closeDetailPanel()">×</button>
 
                     </div>
 
@@ -6800,17 +6818,17 @@
 
 
 
-            <!-- 右ä¾§ï¼æä½面æ?-->
+            <!-- 右侧：操作面板-->
 
             <div class="sidebar">
 
-                <!-- 选项å?-->
+                <!-- 选项卡-->
 
                 <div class="tabs">
 
                     <button class="tab active" onclick="switchTab('create')">录入记忆</button>
 
-                    <button class="tab" onclick="switchTab('memories')">记忆å?/button>
+                    <button class="tab" onclick="switchTab('memories')">记忆列表</button>
 
                     <button class="tab" onclick="switchTab('stats')">统计</button>
 
@@ -6854,11 +6872,11 @@
 
                             <div class="form-group">
 
-                                <label class="form-label">内容æè¿° <span class="char-count" id="charCount">0 å­?/span></label>
+                                <label class="form-label">内容描述 <span class="char-count" id="charCount">0 字</span></label>
 
                                 <div class="textarea-wrapper">
 
-                                    <textarea class="form-textarea" id="memoryContent" placeholder="记录ä½ 的æ³法ã感åæ事?..&#10;输入 @ å¯提取人ç©ï¼? å¯æ 记主é¢? oninput="onContentInput(this)" onkeydown="onContentKeydown(event, this)"></textarea>
+                                    <textarea class="form-textarea" id="memoryContent" placeholder="记录你的想法、感受或事件..&#10;输入 @ 可提取人物，# 可标记主题 oninput="onContentInput(this)" onkeydown="onContentKeydown(event, this)"></textarea>
 
                                     <div class="mention-popup" id="mentionPopup"></div>
 
@@ -6868,19 +6886,19 @@
 
 
 
-                            <!-- 快捷情感æ ?-->
+                            <!-- 快捷情感标记-->
 
                             <div class="form-group">
 
-                                <label class="form-label">情感è²å½©</label>
+                                <label class="form-label">情感色彩</label>
 
                                 <div class="emotion-quick-select">
 
-                                    <button type="button" class="emotion-btn" data-emotion="positive" data-valence="0.8" onclick="selectEmotion(this)">ð ç§¯æ</button>
+                                    <button type="button" class="emotion-btn" data-emotion="positive" data-valence="0.8" onclick="selectEmotion(this)">😊 积极</button>
 
-                                    <button type="button" class="emotion-btn" data-emotion="neutral" data-valence="0" onclick="selectEmotion(this)">ð 平é?/button>
+                                    <button type="button" class="emotion-btn" data-emotion="neutral" data-valence="0" onclick="selectEmotion(this)">😐 平静</button>
 
-                                    <button type="button" class="emotion-btn" data-emotion="negative" data-valence="-0.8" onclick="selectEmotion(this)">ð¢ 消æ?/button>
+                                    <button type="button" class="emotion-btn" data-emotion="negative" data-valence="-0.8" onclick="selectEmotion(this)">😢 消极</button>
 
                                 </div>
 
@@ -6894,13 +6912,13 @@
 
                             <div class="form-group" id="fileUploadGroup" style="display: none;">
 
-                                <label class="form-label">上ä¼ 文?/label>
+                                <label class="form-label">上传文件</label>
 
                                 <label class="file-upload">
 
                                     <input type="file" id="memoryFile" onchange="onFileSelect(event)">
 
-                                    <span>ç¹å»æææ½文件å°æ­¤?/span>
+                                    <span class="file-upload-hint">点击或拖拽文件到这里</span>
 
                                 </label>
 
@@ -6922,7 +6940,7 @@
 
 
 
-                    <!-- 记忆å表面?-->
+                    <!-- 记忆列表面板-->
 
                     <div class="panel" id="panel-memories">
 
@@ -6932,15 +6950,15 @@
 
                             <input type="text" id="memorySearchInput" placeholder="搜索记忆..." oninput="filterMemories(this.value)">
 
-                            <button onclick="clearMemorySearch()">Ã</button>
+                            <button onclick="clearMemorySearch()">×</button>
 
                         </div>
 
-                        <!-- 记忆å?-->
+                        <!-- 记忆列表-->
 
                         <div class="memory-list" id="memoryList">
 
-                            <!-- 记忆å表å°å¨è¿é动æ生æ?-->
+                            <!-- 记忆å表å°å¨è¿é动æ生æ忆-->
 
                         </div>
 
@@ -6956,9 +6974,9 @@
 
                             <div class="memory-modal-header">
 
-                                <span class="memory-modal-title">记忆è¯¦?/span>
+                                <span class="memory-modal-title">记忆详情</span>
 
-                                <button class="memory-modal-close" onclick="closeMemoryModal()">Ã</button>
+                                <button class="memory-modal-close" onclick="closeMemoryModal()">×</button>
 
                             </div>
 
@@ -6974,7 +6992,7 @@
 
                     <div class="panel" id="panel-stats">
 
-                        <!-- æ ¸心ææ ?-->
+                        <!-- 核心ææ 忆-->
 
                         <div class="stats-grid">
 
@@ -6982,7 +7000,7 @@
 
                                 <div class="stat-number" id="statMemories">0</div>
 
-                                <div class="stat-label">记忆æ»?/div>
+                                <div class="stat-label">记忆总数</div>
 
                             </div>
 
@@ -7006,7 +7024,7 @@
 
                                 <div class="stat-number" id="statToday">0</div>
 
-                                <div class="stat-label">ä»日新?/div>
+                                <div class="stat-label">今日新记忆</div>
 
                             </div>
 
@@ -7014,31 +7032,31 @@
 
 
 
-                        <!-- 记忆æ´»è·åº?-->
+                        <!-- 记忆活动热力忆-->
 
                         <div class="stats-section">
 
                             <div class="stats-section-title">
 
-                                <span class="section-icon">ð¥</span>记忆æ´»è·åº?                            </div>
+                                <span class="section-icon">🔥</span>记忆活动热力                            </div>
 
                             <div class="heatmap-header">
 
-                                <span class="heatmap-count" id="heatmapTotal">0 å¤©æ记忆</span>
+                                <span class="heatmap-count" id="heatmapTotal">0 天有记忆</span>
 
-                                <span class="heatmap-streak" id="heatmapStreak">连续记录 0 å¤?/span>
+                                <span class="heatmap-streak" id="heatmapStreak">连续记录 0 天</span>
 
                             </div>
 
                             <div class="heatmap-container" id="memoryHeatmap">
 
-                                <!-- 动æ生æ?-->
+                                <!-- 动æ生æ忆-->
 
                             </div>
 
                             <div class="heatmap-legend">
 
-                                <span class="legend-label">å°?/span>
+                                <span class="legend-label">少</span>
 
                                 <span class="legend-cell level-0"></span>
 
@@ -7050,7 +7068,7 @@
 
                                 <span class="legend-cell level-4"></span>
 
-                                <span class="legend-label">å¤?/span>
+                                <span class="legend-label">多</span>
 
                             </div>
 
@@ -7058,15 +7076,15 @@
 
 
 
-                        <!-- 实体分å¸?-->
+                        <!-- 实体分布 -->
 
                         <div class="stats-section">
 
-                            <div class="stats-section-title">实体类型分å¸?/div>
+                            <div class="stats-section-title">实体类型分布</div>
 
                             <div class="entity-type-chart" id="entityTypeChart">
 
-                                <div class="chart-placeholder">å è½½ä¸?..</div>
+                                <div class="chart-placeholder">加载中...</div>
 
                             </div>
 
@@ -7074,17 +7092,17 @@
 
 
 
-                        <!-- 情感分å¸?-->
+                        <!-- 情感分布 -->
 
                         <div class="stats-section">
 
-                            <div class="stats-section-title">情感分å¸?/div>
+                            <div class="stats-section-title">情感分布</div>
 
                             <div class="emotion-bars" id="emotionBars">
 
                                 <div class="emotion-bar-item">
 
-                                    <span class="emotion-label">ð ç§¯æ</span>
+                                    <span class="emotion-label">😊 积极</span>
 
                                     <div class="emotion-bar">
 
@@ -7098,7 +7116,7 @@
 
                                 <div class="emotion-bar-item">
 
-                                    <span class="emotion-label">ð 中æ?/span>
+                                    <span class="emotion-label">😐 中性</span>
 
                                     <div class="emotion-bar">
 
@@ -7112,7 +7130,7 @@
 
                                 <div class="emotion-bar-item">
 
-                                    <span class="emotion-label">ð 消æ?/span>
+                                    <span class="emotion-label">😔 消极</span>
 
                                     <div class="emotion-bar">
 
@@ -7138,7 +7156,7 @@
 
                             <div class="relation-tags" id="relationTags">
 
-                                <span class="relation-tag-placeholder">å è½½ä¸?..</span>
+                                <span class="relation-tag-placeholder">加载中..</span>
 
                             </div>
 
@@ -7170,7 +7188,7 @@
 
                         <div class="timetravel-quote" id="timetravelQuote">
 
-                            æ­£å¨å¤éæ²ç¡的记å¿?..
+                            æ­£å¨å¤éæ²ç¡的记å¿忆..
 
                         </div>
 
@@ -7178,7 +7196,7 @@
 
                         <div class="timetravel-list" id="timetravelList">
 
-                            <!-- 动æ生æ?-->
+                            <!-- 动æ生æ忆-->
 
                         </div>
 
@@ -7188,9 +7206,9 @@
 
                             <div class="empty-icon">ð­</div>
 
-                            <div class="empty-text">还æ²¡æ记å¿?/div>
+                            <div class="empty-text">还没有记忆</div>
 
-                            <div class="empty-hint">开始记录ä½ 的ç¬¬ä¸条记忆å?/div>
+                            <div class="empty-hint">开始记录你的第一条记忆</div>
 
                         </div>
 
@@ -7198,7 +7216,7 @@
 
 
 
-                    <!-- 记忆å¡片导出æ¨¡æ?- ç²¾ç®复å¤é?-->
+                    <!-- 记忆单¡片导出æ¨¡æ忆- ç²¾ç®复å¤é忆-->
 
                     <div class="memory-card-modal" id="memoryCardModal">
 
@@ -7206,11 +7224,11 @@
 
                         <div class="memory-card-container">
 
-                            <!-- 导出的å¡片内å?-->
+                            <!-- 导出的单¡片内å忆-->
 
                             <div class="memory-card-export" id="memoryCardExport">
 
-                                <!-- è¾¹框è£é¥?-->
+                                <!-- è¾¹框è£é¥忆-->
 
                                 <div class="card-border-frame"></div>
 
@@ -7222,7 +7240,7 @@
 
                                 <div class="memory-card-content">
 
-                                    <!-- 顶部åçå日æ?-->
+                                    <!-- 顶部åçå日æ忆-->
 
                                     <div class="card-header-row">
 
@@ -7234,7 +7252,7 @@
 
                                     
 
-                                    <!-- æ­£文内?-->
+                                    <!-- æ­£文内忆-->
 
                                     <div class="memory-card-body">
 
@@ -7248,7 +7266,7 @@
 
                                     <div class="memory-card-note">
 
-                                        <div class="note-author">â?æ´?/div>
+                                        <div class="note-author">洛忆</div>
 
                                         <div class="note-content" id="cardAIQuote"></div>
 
@@ -7256,7 +7274,7 @@
 
                                     
 
-                                    <!-- 底部情感åç­¾å?-->
+                                    <!-- 底部情感åç­¾å忆-->
 
                                     <div class="memory-card-footer">
 
@@ -7294,7 +7312,7 @@
 
                                 <button class="btn-card-action btn-close" onclick="closeMemoryCardModal()">
 
-                                    关é?
+                                    关闭
 
                                 </button>
 
@@ -7306,21 +7324,21 @@
 
 
 
-                    <!-- 探索面板 - èç¹交äº?-->
+                    <!-- 探索面板 - è点交äº忆-->
 
                     <div class="panel" id="panel-explore">
 
-                        <!-- èç¹信息å¡?-->
+                        <!-- 节点信息卡 -->
 
                         <div class="explore-node-card" id="exploreNodeCard">
 
                             <div class="node-card-header">
 
-                                <div class="node-card-avatar" id="exploreNodeAvatar">äº?/div>
+                                <div class="node-card-avatar" id="exploreNodeAvatar">节点</div>
 
                                 <div class="node-card-info">
 
-                                    <div class="node-card-name" id="exploreNodeName">选中èç¹</div>
+                                    <div class="node-card-name" id="exploreNodeName">选中节点</div>
 
                                     <div class="node-card-type" id="exploreNodeType">PERSON</div>
 
@@ -7340,7 +7358,7 @@
 
                                 <div class="node-meta-row">
 
-                                    <span class="meta-label">连接èç¹</span>
+                                    <span class="meta-label">连接节点</span>
 
                                     <span class="meta-value" id="exploreNodeConnectionCount">0</span>
 
@@ -7355,7 +7373,7 @@
                         <!-- é®ç­åºå -->
 
                         <div class="explore-chat-section">
-
+                    <!-- 问答区域 -->
                             <div class="chat-header">
 
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -7364,7 +7382,7 @@
 
                                 </svg>
 
-                                <span>é®ç­探索</span>
+                                <span>问答探索</span>
 
                             </div>
 
@@ -7386,7 +7404,7 @@
 
                                     </div>
 
-                                    <p class="empty-text">é®关于æ­¤èç¹的ä»»ä½é®é?br>AI å°åº于记忆网络回ç­?/p>
+                                    <p class="empty-text">问关于此节点的任何问题<br>AI 将基于记忆网络回答</p>
 
                                 </div>
 
@@ -7394,19 +7412,9 @@
 
                             <div class="chat-input-area">
 
-                                <textarea 
+                                <textarea id="exploreChatInput" placeholder="问一个问题..." rows="2"></textarea>
 
-                                    id="exploreChatInput"
-
-                                    class="chat-input"
-
-                                    placeholder="é®ä¸个é®é?.."
-
-                                    rows="2"
-
-                                ></textarea>
-
-                                <button class="send-btn" onclick="sendExploreQuestion()">
+                                <button class="btn-send" onclick="sendExploreQuestion()">
 
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
 
@@ -7420,6 +7428,7 @@
 
                             </div>
 
+
                         </div>
 
 
@@ -7428,17 +7437,17 @@
 
                         <div class="explore-quick-prompts">
 
-                            <div class="quick-title">快捷提é?/div>
+                            <div class="quick-title">快捷提示</div>
 
                             <div class="quick-tags">
 
-                                <button class="quick-tag" onclick="setExploreQuestion('è¿æ¯è°ï¼')">è¿æ¯è°ï¼</button>
+                                <button class="quick-tag" onclick="setExploreQuestion('这是谁？')">这是谁？</button>
 
-                                <button class="quick-tag" onclick="setExploreQuestion('è¿æ¯è°的记忆ï?)">记忆æ¥æº</button>
+                                <button class="quick-tag" onclick="setExploreQuestion('记忆来源')">记忆来源</button>
 
-                                <button class="quick-tag" onclick="setExploreQuestion('ç¸关的事件æåªäºï¼?)">ç¸关事?/button>
+                                <button class="quick-tag" onclick="setExploreQuestion('相关的事件有哪些？')">相关事件</button>
 
-                                <button class="quick-tag" onclick="setExploreQuestion('æ»结ä¸下è¿个人ç?)">æ»?/button>
+                                <button class="quick-tag" onclick="setExploreQuestion('总结一下这个人')">总结此人</button>
 
                             </div>
 
@@ -7446,21 +7455,21 @@
 
 
 
-                        <!-- 关系路径ä¾¦?-->
+                        <!-- 关系路径探索 -->
 
                         <div class="explore-path-finder" id="pathFinder" style="margin-top: 20px; display: none;">
 
-                            <div class="quick-title">ðµï¸?关系路径ä¾¦?/div>
+                            <div class="quick-title">🔍 关系路径探索</div>
 
-                            <div class="path-finder-body">
+                            <div class="path-finder-box">
 
                                 <div class="path-from-to">
 
-                                    <span id="pathFrom">èµ·ç¹</span>
+                                    <span id="pathFrom">起点</span>
 
-                                    <span class="path-arrow">â?/span>
+                                    <span class="path-arrow">→</span>
 
-                                    <span id="pathTo">终ç?/span>
+                                    <span id="pathTo">终点</span>
 
                                 </div>
 
@@ -7476,17 +7485,19 @@
 
                         </div>
 
+                        </div>
+
 
 
                         <!-- 记忆故事生成 -->
 
-                        <div class="explore-story-gen" style="margin-top: 20px;">
+                        <div class="explore-story-gen" style="margin-top: 20px; display: none;">
 
-                            <div class="quick-title">âï¸ 记忆故事</div>
+                            <div class="quick-title">记忆故事</div>
 
                             <button class="btn-story" onclick="generateMemoryStory()">
 
-                                生成关于æ­¤èç¹的记忆故?
+                                生成关于此节点的记忆故事
 
                             </button>
 

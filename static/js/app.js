@@ -386,6 +386,14 @@ function switchTab(tab, event, skipLoad) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(`panel-${tab}`).classList.add('active');
 
+    // 离开探索面板时隐藏探索特有区域
+    if (tab !== 'explore') {
+        const pathFinder = document.getElementById('pathFinder');
+        if (pathFinder) pathFinder.style.display = 'none';
+        const storyGen = document.querySelector('.explore-story-gen');
+        if (storyGen) storyGen.style.display = 'none';
+    }
+
     // 加载对应数据（skipLoad=true时跳过）
     if (!skipLoad) {
         if (tab === 'memories') {
@@ -3471,16 +3479,18 @@ async function generateMemoryStory() {
         });
         
         const result = await response.json();
-        
+
         if (result.success && result.data) {
-            resultDiv.innerHTML = result.data.answer;
+            const html = `<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">📖 记忆故事</div>
+                <div style="line-height: 1.8; font-style: italic;">${result.data.answer}</div>`;
+            resultDiv.innerHTML = html;
             resultDiv.classList.add('show');
         } else {
             throw new Error(result.error || '生成失败');
         }
         
     } catch (error) {
-        resultDiv.innerHTML = '<div style="color: #c62828;">创作失败: ' + error.message + '</div>';
+        resultDiv.innerHTML = '<div style="color: #c62828; font-weight: 600; margin-bottom: 10px;">创作失败</div><div>' + error.message + '</div>';
         resultDiv.classList.add('show');
     }
     
