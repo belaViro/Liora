@@ -7,13 +7,13 @@ let currentTab = 'create';
 let graphData = { nodes: [], edges: [] };
 let simulation = null;
 let socket = null;
-let showEdgeLabels = true;
+let showEdgeLabels = false;  // MiroFish: 默认隐藏边标签，更简洁
 let linkLabelsRef = null;
 let linkLabelBgRef = null;
 let highlightedNodeIds = new Set(); // 搜索时高亮的节点ID
 let expandedSelfLoops = new Set();  // 自环展开状态
-let currentLayout = 'force';        // 当前布局类型
 let graphZoom = null;               // D3 zoom 行为引用
+let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set, edgeIds: Set}
 
 // ==================== 移动端菜单 ====================
 
@@ -35,6 +35,31 @@ document.addEventListener('click', (e) => {
 
 // ==================== Liora 功能函数 ====================
 
+// 根据情感值获取图标
+function getEmotionIcon(valence) {
+    if (valence > 0.3) return '😊';
+    if (valence < -0.3) return '😔';
+    return '😐';
+}
+
+// 格式化相对时间
+function formatTimeAgo(days) {
+    if (days < 30) {
+        return `${days} 天前`;
+    } else if (days < 365) {
+        const months = Math.floor(days / 30);
+        return `${months} 个月前`;
+    } else {
+        const years = Math.floor(days / 365);
+        const remainingMonths = Math.floor((days % 365) / 30);
+        if (remainingMonths === 0) {
+            return `${years} 年前`;
+        } else {
+            return `${years} 年 ${remainingMonths} 个月前`;
+        }
+    }
+}
+
 // 显示提示消息
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
@@ -46,6 +71,64 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
+}
+
+// 渲染关联记忆列表
+function renderLinkedMemories(memoryIds) {
+    // 如果记忆数据未加载，先显示占位符并异步加载
+    if (allMemories.length === 0) {
+        // 异步加载记忆并刷新显示
+        loadMemories().then(() => {
+            const content = document.getElementById('detailContent');
+            if (content && currentSelectedNode) {
+                showNodeDetail(currentSelectedNode);
+            }
+        });
+        
+        return `
+            <div class="detail-section">
+                <div class="section-title">关联记忆 (${memoryIds.length})</div>
+                <div style="font-size: 12px; color: #999; padding: 10px; text-align: center;">
+                    加载中...
+                </div>
+            </div>
+        `;
+    }
+    
+    // 从已加载的记忆中查找关联记忆
+    const linkedMemories = allMemories.filter(m => memoryIds.includes(m.id));
+    
+    if (linkedMemories.length === 0) {
+        return `
+            <div class="detail-section">
+                <div class="section-title">关联记忆 (${memoryIds.length})</div>
+                <div style="font-size: 12px; color: #999; padding: 10px;">
+                    暂无记忆详情
+                </div>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="detail-section">
+            <div class="section-title">关联记忆 (${linkedMemories.length})</div>
+            <div class="linked-memories-list">
+                ${linkedMemories.slice(0, 5).map(m => {
+                    const preview = (m.understanding?.description || m.content || '').substring(0, 60);
+                    const date = m.created_at ? new Date(m.created_at).toLocaleDateString('zh-CN', {month: 'short', day: 'numeric'}) : '';
+                    const hasEmotion = m.emotion?.label;
+                    const emotionIcon = hasEmotion ? getEmotionIcon(m.emotion.valence) : '';
+                    return `
+                        <div class="linked-memory-item" onclick="viewMemory('${m.id}')">
+                            <div class="linked-memory-date">${date}</div>
+                            <div class="linked-memory-preview">${emotionIcon} ${preview}${preview.length >= 60 ? '...' : ''}</div>
+                        </div>
+                    `;
+                }).join('')}
+                ${linkedMemories.length > 5 ? `<div class="linked-memory-more">还有 ${linkedMemories.length - 5} 条记忆...</div>` : ''}
+            </div>
+        </div>
+    `;
 }
 
 // 节点颜色映射
@@ -238,10 +321,34 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadStats();
 
     // 边标签开关事件
-    document.getElementById('showEdgeLabels').addEventListener('change', function(e) {
-        showEdgeLabels = e.target.checked;
-        toggleEdgeLabels(showEdgeLabels);
-    });
+    const edgeLabelsToggle = document.getElementById('showEdgeLabels');
+    if (edgeLabelsToggle) {
+        edgeLabelsToggle.addEventListener('change', function(e) {
+            showEdgeLabels = e.target.checked;
+            toggleEdgeLabels(showEdgeLabels);
+        });
+    }
+    
+    // 探索面板回车发送
+    const exploreInput = document.getElementById('exploreChatInput');
+    if (exploreInput) {
+        exploreInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendExploreQuestion();
+            }
+        });
+    }
+    
+    // 记忆弹窗点击外部关闭
+    const memoryModal = document.getElementById('memoryModal');
+    if (memoryModal) {
+        memoryModal.addEventListener('click', function(e) {
+            if (e.target === memoryModal) {
+                closeMemoryModal();
+            }
+        });
+    }
 });
 
 // Socket.IO 连接
@@ -285,11 +392,345 @@ function switchTab(tab, event, skipLoad) {
             loadMemories();
         } else if (tab === 'stats') {
             loadStats();
+        } else if (tab === 'timetravel') {
+            loadTimeTravelMemories();
         }
     }
 }
 
+// ==================== 时光旅行 - 历史上的今天 ====================
+
+function openTimeTravelPanel() {
+    // 切换到时光面板
+    switchTab('timetravel', null, true);
+    // 显示时光选项卡
+    document.querySelectorAll('.tab').forEach(t => {
+        if (t.textContent.includes('录入')) {
+            t.classList.remove('active');
+        }
+    });
+    loadTimeTravelMemories();
+}
+
+// 显示记忆卡片模态框
+async function showMemoryCard(memoryId, daysDiff) {
+    const memory = allMemories.find(m => m.id === memoryId);
+    if (!memory) return;
+    
+    const modal = document.getElementById('memoryCardModal');
+    
+    // 填充卡片内容
+    const content = memory.understanding?.description || memory.content || '';
+    const date = new Date(memory.created_at);
+    const dateStr = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+    
+    // 情感图标
+    const emotionIcon = memory.emotion ? getEmotionIcon(memory.emotion.valence) : '😐';
+    
+    // 填充卡片元素
+    document.getElementById('cardDate').textContent = dateStr;
+    document.getElementById('cardEmotion').textContent = emotionIcon;
+    
+    // 短内容直接显示，长内容等AI摘要
+    const contentEl = document.getElementById('cardContent');
+    if (content.length <= 80) {
+        contentEl.textContent = content;
+    } else {
+        contentEl.textContent = "正在生成摘要...";
+    }
+    
+    // 获取AI评价和摘要
+    const aiQuoteEl = document.getElementById('cardAIQuote');
+    aiQuoteEl.textContent = "...";
+    
+    modal.classList.add('show');
+    
+    try {
+        const response = await fetch('/api/memories/ai-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: content,
+                days_ago: daysDiff,
+                emotion: memory.emotion
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            // 如果是长内容，显示AI生成的摘要
+            if (content.length > 80) {
+                contentEl.textContent = result.data.summary || content.substring(0, 80) + '...';
+            }
+            aiQuoteEl.textContent = result.data.quote || "这个细节我还记得。";
+        } else {
+            contentEl.textContent = content.length > 80 ? content.substring(0, 80) + '...' : content;
+            aiQuoteEl.textContent = "这个细节我还记得。";
+        }
+    } catch (error) {
+        console.error('获取AI评价失败:', error);
+        contentEl.textContent = content.length > 80 ? content.substring(0, 80) + '...' : content;
+        aiQuoteEl.textContent = "挺好的。";
+    }
+}
+
+// 关闭记忆卡片模态框
+function closeMemoryCardModal() {
+    const modal = document.getElementById('memoryCardModal');
+    modal.classList.remove('show');
+}
+
+// 下载记忆卡片
+async function downloadMemoryCard() {
+    const exportCard = document.getElementById('memoryCardExport');
+    
+    // 使用html2canvas库导出图片
+    if (typeof html2canvas === 'undefined') {
+        // 动态加载html2canvas
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    }
+    
+    try {
+        showToast('正在生成卡片...', 'info');
+        
+        const canvas = await html2canvas(exportCard, {
+            scale: 3,
+            backgroundColor: '#f5f0e6',
+            logging: false,
+            useCORS: true,
+            allowTaint: false,
+            foreignObjectRendering: false,
+            onclone: (clonedDoc) => {
+                const clonedCard = clonedDoc.getElementById('memoryCardExport');
+                if (clonedCard) {
+                    clonedCard.style.transform = 'none';
+                    clonedCard.style.height = 'auto';
+                    clonedCard.style.boxShadow = 'none';
+                }
+            }
+        });
+        
+        // 下载图片
+        const link = document.createElement('a');
+        link.download = `liora-memory-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        showToast('卡片已保存', 'success');
+    } catch (error) {
+        console.error('导出卡片失败:', error);
+        showToast('导出失败，请重试', 'error');
+    }
+}
+
+// 动态加载外部脚本
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+async function loadTimeTravelMemories() {
+    const listEl = document.getElementById('timetravelList');
+    const emptyEl = document.getElementById('timetravelEmpty');
+    const quoteEl = document.getElementById('timetravelQuote');
+    const dateEl = document.getElementById('timetravelDate');
+    
+    if (!listEl) return;
+    
+    // 显示加载状态
+    listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载中...</div>';
+    
+    try {
+        const response = await fetch('/api/memories/on-this-day');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            // 更新日期和感悟
+            if (dateEl) dateEl.textContent = data.today;
+            if (quoteEl) quoteEl.textContent = data.quote;
+            
+            if (data.memories.length === 0) {
+                listEl.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = 'block';
+            } else {
+                listEl.style.display = 'flex';
+                if (emptyEl) emptyEl.style.display = 'none';
+                
+                // 渲染记忆列表
+                listEl.innerHTML = data.memories.map(item => {
+                    const memory = item.memory;
+                    const content = memory.understanding?.description || memory.content || '';
+                    const emotion = memory.emotion;
+                    const emotionIcon = emotion ? getEmotionIcon(emotion.valence) : '';
+                    const emotionLabel = emotion?.label || '';
+                    
+                    // 优化时间显示
+                    let timeDisplay;
+                    if (data.has_on_this_day) {
+                        // 往年今日显示相对时间
+                        timeDisplay = formatTimeAgo(item.days_diff);
+                    } else {
+                        // 随机记忆显示具体日期
+                        timeDisplay = item.date;
+                    }
+                    
+                    return `
+                        <div class="timetravel-item">
+                            <div class="timetravel-year">
+                                ${timeDisplay}
+                                <button class="btn-card-share" onclick="event.stopPropagation(); showMemoryCard('${memory.id}', ${item.days_diff})" title="生成精美卡片">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                        <polyline points="21 15 16 10 5 21"></polyline>
+                                    </svg>
+                                    分享卡片
+                                </button>
+                            </div>
+                            <div class="timetravel-content" onclick="viewMemory('${memory.id}')">${content.substring(0, 120)}${content.length > 120 ? '...' : ''}</div>
+                            <div class="timetravel-meta" onclick="viewMemory('${memory.id}')">
+                                <span class="timetravel-emotion">${emotionIcon}</span>
+                                ${emotionLabel ? `<span>${emotionLabel}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } else {
+            listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载失败</div>';
+        }
+    } catch (error) {
+        console.error('加载往年今日记忆失败:', error);
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载失败</div>';
+    }
+}
+
 // ==================== 记忆录入 ====================
+
+// 内容输入处理
+function onContentInput(textarea) {
+    // 字数统计
+    const count = textarea.value.length;
+    document.getElementById('charCount').textContent = count + ' 字';
+    
+    // 检测 @ / # 触发
+    checkForMentions(textarea);
+}
+
+function onContentKeydown(event, textarea) {
+    const popup = document.getElementById('mentionPopup');
+    if (!popup.classList.contains('show')) return;
+    
+    const items = popup.querySelectorAll('.mention-item');
+    let selected = popup.querySelector('.mention-item.selected');
+    
+    switch(event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            if (!selected) {
+                items[0]?.classList.add('selected');
+            } else {
+                selected.classList.remove('selected');
+                const next = selected.nextElementSibling;
+                if (next) next.classList.add('selected');
+                else items[0]?.classList.add('selected');
+            }
+            break;
+        case 'ArrowUp':
+            event.preventDefault();
+            if (!selected) {
+                items[items.length - 1]?.classList.add('selected');
+            } else {
+                selected.classList.remove('selected');
+                const prev = selected.previousElementSibling;
+                if (prev) prev.classList.add('selected');
+                else items[items.length - 1]?.classList.add('selected');
+            }
+            break;
+        case 'Enter':
+        case 'Tab':
+            if (selected) {
+                event.preventDefault();
+                insertMention(textarea, selected.textContent);
+            }
+            break;
+        case 'Escape':
+            popup.classList.remove('show');
+            break;
+    }
+}
+
+// 检测并显示提示
+function checkForMentions(textarea) {
+    const popup = document.getElementById('mentionPopup');
+    const cursorPosition = textarea.selectionStart;
+    const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+    
+    // 匹配 @ 或 # 后面的文字
+    const mentionMatch = textBeforeCursor.match(/[@#](\w*)$/);
+    
+    if (mentionMatch) {
+        const trigger = mentionMatch[0][0]; // @ 或 #
+        const query = mentionMatch[1].toLowerCase();
+        
+        // 获取建议列表
+        let suggestions = [];
+        if (trigger === '@' && graphData.nodes) {
+            // 提示人物节点
+            suggestions = graphData.nodes
+                .filter(n => n.type === 'PERSON' && n.name.toLowerCase().includes(query))
+                .map(n => n.name)
+                .slice(0, 5);
+        } else if (trigger === '#') {
+            // 常见主题
+            const commonTopics = ['工作', '学习', '生活', '旅行', '阅读', '思考', '灵感'];
+            suggestions = commonTopics.filter(t => t.toLowerCase().includes(query));
+        }
+        
+        if (suggestions.length > 0) {
+            popup.innerHTML = suggestions.map(s => 
+                `<div class="mention-item" onclick="insertMention(document.getElementById('memoryContent'), '${s}')">${s}</div>`
+            ).join('');
+            popup.classList.add('show');
+        } else {
+            popup.classList.remove('show');
+        }
+    } else {
+        popup.classList.remove('show');
+    }
+}
+
+// 插入提取
+function insertMention(textarea, value) {
+    const cursorPosition = textarea.selectionStart;
+    const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+    const textAfterCursor = textarea.value.substring(cursorPosition);
+    
+    // 替换 @ 或 # 及其后的文字
+    const newTextBefore = textBeforeCursor.replace(/[@#]\w*$/, '@' + value + ' ');
+    
+    textarea.value = newTextBefore + textAfterCursor;
+    textarea.focus();
+    textarea.setSelectionRange(newTextBefore.length, newTextBefore.length);
+    
+    document.getElementById('mentionPopup').classList.remove('show');
+    onContentInput(textarea);
+}
+
+// 选择情感
+function selectEmotion(btn) {
+    document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('selectedEmotion').value = btn.dataset.emotion;
+    document.getElementById('selectedValence').value = btn.dataset.valence;
+}
 
 function onTypeChange() {
     const type = document.getElementById('memoryType').value;
@@ -354,6 +795,14 @@ async function submitMemory(event) {
     if (fileInput.files[0]) {
         formData.append('file', fileInput.files[0]);
     }
+    
+    // 添加情感数据
+    const emotion = document.getElementById('selectedEmotion').value;
+    const valence = document.getElementById('selectedValence').value;
+    if (emotion) {
+        formData.append('emotion', emotion);
+        formData.append('valence', valence);
+    }
 
     // 禁用按钮
     submitBtn.disabled = true;
@@ -374,6 +823,10 @@ async function submitMemory(event) {
             document.getElementById('memoryForm').reset();
             document.getElementById('filePreview').style.display = 'none';
             document.getElementById('fileUploadGroup').style.display = 'none';
+            document.getElementById('charCount').textContent = '0 字';
+            document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('selectedEmotion').value = '';
+            document.getElementById('selectedValence').value = '';
 
             // 刷新图谱和列表
             loadGraphData();
@@ -399,7 +852,8 @@ async function searchMemories() {
     if (!query) {
         loadMemories();
         highlightedNodeIds.clear();
-        renderGraph();
+        highlightedPath = null;
+        updateGraphStyles();
         return;
     }
 
@@ -526,60 +980,18 @@ function highlightNodesFromMemories(memories) {
         });
     });
 
-    // 如果图谱已加载，重新渲染以应用高亮
+    // 如果图谱已加载，更新样式以应用高亮（不重新渲染）
     if (graphData.nodes && graphData.nodes.length > 0) {
-        renderGraph();
+        updateGraphStyles();
         // 聚焦到高亮节点
         focusOnHighlightedNodes();
     }
 }
 
-// 聚焦到高亮节点中心
+// 聚焦到高亮节点中心（暂时禁用，避免干扰用户缩放）
 function focusOnHighlightedNodes() {
-    if (highlightedNodeIds.size === 0 || !graphZoom) return;
-    
-    // 获取高亮节点的位置
-    const highlightedNodes = graphData.nodes.filter(n => highlightedNodeIds.has(n.id));
-    if (highlightedNodes.length === 0) return;
-    
-    // 计算边界框
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    highlightedNodes.forEach(node => {
-        minX = Math.min(minX, node.x);
-        minY = Math.min(minY, node.y);
-        maxX = Math.max(maxX, node.x);
-        maxY = Math.max(maxY, node.y);
-    });
-    
-    // 计算中心点和合适的缩放级别
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    
-    const svg = d3.select('#graph-svg');
-    const container = svg.node().parentElement;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    
-    // 计算合适的缩放级别（留一些边距）
-    const padding = 100;
-    const nodesWidth = maxX - minX + padding * 2;
-    const nodesHeight = maxY - minY + padding * 2;
-    const scale = Math.min(
-        width / nodesWidth,
-        height / nodesHeight,
-        1.5  // 最大缩放级别
-    );
-    
-    // 计算 transform
-    const transform = d3.zoomIdentity
-        .translate(width / 2, height / 2)
-        .scale(Math.max(0.3, Math.min(scale, 1.5)))
-        .translate(-centerX, -centerY);
-    
-    // 应用平滑过渡动画
-    svg.transition()
-        .duration(750)
-        .call(graphZoom.transform, transform);
+    // 暂时禁用自动聚焦，确保用户缩放不受影响
+    return;
 }
 
 // ==================== 记忆列表 ====================
@@ -597,40 +1009,128 @@ async function loadMemories() {
     }
 }
 
+// 全局存储记忆列表用于搜索
+let allMemories = [];
+
 function renderMemoryList(memories) {
     const listEl = document.getElementById('memoryList');
+    allMemories = memories; // 保存原始列表
 
     if (memories.length === 0) {
         listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">暂无记忆</div>';
         return;
     }
 
-    listEl.innerHTML = memories.map(memory => {
-        const typeLabels = {
-            'text': '文字',
-            'image': '图片',
-            'audio': '音频'
-        };
+    // 按时间分组
+    const groups = groupMemoriesByDate(memories);
+    
+    listEl.innerHTML = groups.map(group => `
+        <div class="memory-group">
+            <div class="memory-group-title">${group.title}</div>
+            ${group.memories.map(memory => renderMemoryItem(memory)).join('')}
+        </div>
+    `).join('');
+}
 
-        const date = new Date(memory.created_at).toLocaleString('zh-CN');
-        const content = memory.understanding?.description || memory.content || '无内容';
-        const entities = memory.entities || [];
+// 按日期分组
+function groupMemoriesByDate(memories) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const groups = {
+        'today': { title: '今天', memories: [] },
+        'yesterday': { title: '昨天', memories: [] },
+        'week': { title: '本周', memories: [] },
+        'month': { title: '本月', memories: [] },
+        'earlier': { title: '更早', memories: [] }
+    };
+    
+    memories.forEach(memory => {
+        const date = new Date(memory.created_at);
+        const memoryDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        
+        if (memoryDay.getTime() === today.getTime()) {
+            groups.today.memories.push(memory);
+        } else if (memoryDay.getTime() === yesterday.getTime()) {
+            groups.yesterday.memories.push(memory);
+        } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+            groups.week.memories.push(memory);
+        } else if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
+            groups.month.memories.push(memory);
+        } else {
+            groups.earlier.memories.push(memory);
+        }
+    });
+    
+    // 返回非空组
+    return Object.values(groups).filter(g => g.memories.length > 0);
+}
 
-        return `
-            <div class="memory-item">
-                <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="删除记忆">×</button>
-                <div class="memory-item-header" onclick="viewMemory('${memory.id}')">
-                    <span class="memory-type">${typeLabels[memory.type] || memory.type}</span>
-                    <span class="memory-date">${date}</span>
-                </div>
-                <div class="memory-content" onclick="viewMemory('${memory.id}')">${content}</div>
-                <div class="memory-entities" onclick="viewMemory('${memory.id}')">
-                    ${entities.slice(0, 3).map(e => `<span class="entity-tag">${e.name}</span>`).join('')}
-                    ${entities.length > 3 ? `<span class="entity-tag">+${entities.length - 3}</span>` : ''}
-                </div>
+// 渲染单个记忆项
+function renderMemoryItem(memory) {
+    const typeLabels = {
+        'text': '文字',
+        'image': '图片',
+        'audio': '音频'
+    };
+
+    const date = new Date(memory.created_at);
+    const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const content = memory.understanding?.description || memory.content || '无内容';
+    const entities = memory.entities || [];
+    
+    // 情感颜色
+    const emotion = memory.emotion || {};
+    const emotionColor = getEmotionColor(emotion.valence);
+
+    return `
+        <div class="memory-item">
+            <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="删除记忆">×</button>
+            <div class="memory-item-header" onclick="viewMemory('${memory.id}')">
+                <span class="memory-type">${typeLabels[memory.type] || memory.type}</span>
+                <span class="memory-date">${timeStr}</span>
             </div>
-        `;
-    }).join('');
+            <div class="memory-content" onclick="viewMemory('${memory.id}')">${content}</div>
+            <div class="memory-entities">
+                ${entities.slice(0, 3).map(e => `<span class="entity-tag" onclick="event.stopPropagation(); jumpToEntity(event, '${e.name}')">${e.name}</span>`).join('')}
+                ${entities.length > 3 ? `<span class="entity-tag" onclick="event.stopPropagation()">+${entities.length - 3}</span>` : ''}
+                ${emotion.dominant_emotion ? `<span class="entity-tag" style="border-color: ${emotionColor}; color: ${emotionColor};" onclick="event.stopPropagation()">${emotion.dominant_emotion}</span>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// 根据情感值获取颜色
+function getEmotionColor(valence) {
+    if (valence === undefined) return '#999';
+    if (valence > 0.3) return '#27ae60'; // 积极 - 绿
+    if (valence < -0.3) return '#e74c3c'; // 消极 - 红
+    return '#f39c12'; // 中性 - 黄
+}
+
+// 搜索记忆
+function filterMemories(query) {
+    if (!query.trim()) {
+        renderMemoryList(allMemories);
+        return;
+    }
+    
+    const filtered = allMemories.filter(m => {
+        const content = m.understanding?.description || m.content || '';
+        const entities = (m.entities || []).map(e => e.name).join(' ');
+        const searchText = (content + ' ' + entities).toLowerCase();
+        return searchText.includes(query.toLowerCase());
+    });
+    
+    renderMemoryList(filtered);
+}
+
+// 清除搜索
+function clearMemorySearch() {
+    document.getElementById('memorySearchInput').value = '';
+    renderMemoryList(allMemories);
 }
 
 async function viewMemory(memoryId) {
@@ -639,10 +1139,101 @@ async function viewMemory(memoryId) {
         const result = await response.json();
 
         if (result.success) {
-            console.log('记忆详情:', result.data);
+            showMemoryModal(result.data);
         }
     } catch (error) {
         console.error('获取记忆详情失败:', error);
+    }
+}
+
+// 显示记忆详情弹窗
+function showMemoryModal(memory) {
+    const modal = document.getElementById('memoryModal');
+    const body = document.getElementById('memoryModalBody');
+    
+    const typeLabels = {
+        'text': '文字',
+        'image': '图片',
+        'audio': '音频'
+    };
+    
+    const date = new Date(memory.created_at).toLocaleString('zh-CN');
+    const content = memory.content || '无内容';
+    const understanding = memory.understanding || {};
+    const entities = memory.entities || [];
+    const emotion = memory.emotion || {};
+    
+    // 情感颜色
+    const emotionColor = getEmotionColor(emotion.valence);
+    
+    body.innerHTML = `
+        <div class="memory-modal-meta">
+            <span>${typeLabels[memory.type] || memory.type}</span>
+            <span>${date}</span>
+        </div>
+        
+        <div class="memory-modal-content-text">${content}</div>
+        
+        ${understanding.summary ? `
+            <div class="memory-modal-section">
+                <div class="memory-modal-section-title">摘要</div>
+                <div>${understanding.summary}</div>
+            </div>
+        ` : ''}
+        
+        ${understanding.keywords?.length ? `
+            <div class="memory-modal-section">
+                <div class="memory-modal-section-title">关键词</div>
+                <div class="memory-modal-entities">
+                    ${understanding.keywords.map(k => `<span class="entity-tag">${k}</span>`).join('')}
+                </div>
+            </div>
+        ` : ''}
+        
+        ${entities.length ? `
+            <div class="memory-modal-section">
+                <div class="memory-modal-section-title">识别实体 (${entities.length})</div>
+                <div class="memory-modal-entities">
+                    ${entities.map(e => `<span class="entity-tag" onclick="jumpToEntity(event, '${e.name}'); closeMemoryModal();">${e.name} (${e.type})</span>`).join('')}
+                </div>
+            </div>
+        ` : ''}
+        
+        ${emotion.dominant_emotion ? `
+            <div class="memory-modal-section">
+                <div class="memory-modal-section-title">情感</div>
+                <div class="memory-modal-emotion">
+                    <span class="emotion-indicator" style="background: ${emotionColor};"></span>
+                    <span>${emotion.dominant_emotion}</span>
+                </div>
+            </div>
+        ` : ''}
+    `;
+    
+    modal.classList.add('show');
+}
+
+// 关闭记忆弹窗
+function closeMemoryModal() {
+    const modal = document.getElementById('memoryModal');
+    modal.classList.remove('show');
+}
+
+// 跳转到实体
+function jumpToEntity(event, entityName) {
+    event.stopPropagation();
+    
+    // 在图谱中查找实体
+    const node = graphData.nodes.find(n => n.name === entityName || (n.aliases && n.aliases.includes(entityName)));
+    if (node) {
+        // 切换到图谱视图
+        closeMemoryModal();
+        showNodeDetail(node);
+        // 高亮节点
+        highlightedNodeIds.add(node.id);
+        updateGraphStyles();
+    } else {
+        showToast('未找到该实体', 'warning');
     }
 }
 
@@ -679,40 +1270,311 @@ async function deleteMemory(memoryId) {
 
 async function loadStats() {
     try {
-        // 获取图谱统计
-        const graphResponse = await fetch('/api/graph/data');
-        const graphResult = await graphResponse.json();
+        // 获取详细统计数据
+        const response = await fetch('/api/stats');
+        const result = await response.json();
 
-        if (graphResult.success) {
-            const data = graphResult.data;
-            document.getElementById('statEntities').textContent = data.total_nodes;
-            document.getElementById('statRelations').textContent = data.total_edges;
+        if (!result.success) {
+            console.error('获取统计失败:', result.message);
+            return;
         }
 
-        // 获取记忆统计
-        const timelineResponse = await fetch('/api/memories/timeline');
-        const timelineResult = await timelineResponse.json();
+        const data = result.data;
 
-        if (timelineResult.success) {
-            const memories = timelineResult.memories;
-            document.getElementById('statMemories').textContent = memories.length;
+        // 更新基础指标
+        document.getElementById('statMemories').textContent = data.total_memories;
+        document.getElementById('statEntities').textContent = data.total_nodes;
+        document.getElementById('statRelations').textContent = data.total_edges;
 
-            // 计算今日新增
-            const today = new Date().toDateString();
-            const todayCount = memories.filter(m =>
-                new Date(m.created_at).toDateString() === today
-            ).length;
-            document.getElementById('statToday').textContent = todayCount;
-        }
+        // 计算今日新增
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('statToday').textContent = data.daily_stats[today] || 0;
+
+        // 渲染记忆热力图
+        renderMemoryHeatmap(data.daily_stats);
+
+        // 渲染实体类型分布
+        renderEntityTypeChart(data.entity_types);
+
+        // 渲染情感分布
+        renderEmotionBars(data.emotion_stats, data.total_memories);
+
+        // 渲染关系类型
+        renderRelationTags(data.relation_types);
+
     } catch (error) {
         console.error('加载统计失败:', error);
     }
 }
 
+// 渲染实体类型图表
+function renderEntityTypeChart(entityTypes) {
+    const container = document.getElementById('entityTypeChart');
+    if (!container) return;
+
+    const typeColors = {
+        'PERSON': '#7B2D8E',
+        'LOCATION': '#3498db',
+        'EVENT': '#e74c3c',
+        'ENTITY': '#95a5a6'
+    };
+
+    const typeNames = {
+        'PERSON': '人物',
+        'LOCATION': '地点',
+        'EVENT': '事件',
+        'ENTITY': '其他'
+    };
+
+    const total = Object.values(entityTypes).reduce((a, b) => a + b, 0);
+    
+    if (total === 0) {
+        container.innerHTML = '<div class="chart-placeholder">暂无数据</div>';
+        return;
+    }
+
+    const sortedTypes = Object.entries(entityTypes).sort((a, b) => b[1] - a[1]);
+    
+    let html = '';
+    sortedTypes.forEach(([type, count]) => {
+        const percentage = (count / total * 100).toFixed(1);
+        const color = typeColors[type] || '#999';
+        const name = typeNames[type] || type;
+        
+        html += `
+            <div class="type-bar-item">
+                <span class="type-bar-label">${name}</span>
+                <div class="type-bar-track">
+                    <div class="type-bar-fill" style="width: ${percentage}%; background: ${color};"></div>
+                </div>
+                <span class="type-bar-count">${count}</span>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 渲染情感条形图
+function renderEmotionBars(emotionStats, total) {
+    if (total === 0) return;
+
+    const positive = emotionStats.positive || 0;
+    const neutral = emotionStats.neutral || 0;
+    const negative = emotionStats.negative || 0;
+
+    const positivePct = (positive / total * 100).toFixed(1);
+    const neutralPct = (neutral / total * 100).toFixed(1);
+    const negativePct = (negative / total * 100).toFixed(1);
+
+    const posFill = document.getElementById('emotionPositive');
+    const neuFill = document.getElementById('emotionNeutral');
+    const negFill = document.getElementById('emotionNegative');
+    
+    const posCount = document.getElementById('emotionPositiveCount');
+    const neuCount = document.getElementById('emotionNeutralCount');
+    const negCount = document.getElementById('emotionNegativeCount');
+
+    if (posFill) posFill.style.width = `${positivePct}%`;
+    if (neuFill) neuFill.style.width = `${neutralPct}%`;
+    if (negFill) negFill.style.width = `${negativePct}%`;
+
+    if (posCount) posCount.textContent = positive;
+    if (neuCount) neuCount.textContent = neutral;
+    if (negCount) negCount.textContent = negative;
+}
+
+// 渲染最活跃实体
+function renderTopEntities(topEntities) {
+    const container = document.getElementById('topEntities');
+    if (!container) return;
+
+    if (!topEntities || topEntities.length === 0) {
+        container.innerHTML = '<div class="top-entity-item placeholder">暂无数据</div>';
+        return;
+    }
+
+    const typeColors = {
+        'PERSON': '#7B2D8E',
+        'LOCATION': '#3498db',
+        'EVENT': '#e74c3c',
+        'ENTITY': '#95a5a6'
+    };
+
+    const typeIcons = {
+        'PERSON': '人',
+        'LOCATION': '地',
+        'EVENT': '事',
+        'ENTITY': '实'
+    };
+
+    let html = '';
+    topEntities.forEach((entity, index) => {
+        const color = typeColors[entity.type] || '#999';
+        const icon = typeIcons[entity.type] || '实';
+        
+        html += `
+            <div class="top-entity-item">
+                <span class="entity-rank">${index + 1}</span>
+                <div class="entity-avatar" style="background: ${color};">${icon}</div>
+                <span class="entity-name">${entity.name}</span>
+                <span class="entity-count">${entity.memory_count} 条</span>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 渲染记忆热力图
+function renderMemoryHeatmap(dailyStats) {
+    const container = document.getElementById('memoryHeatmap');
+    if (!container) return;
+
+    // 计算连续记录天数
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let tempStreak = 0;
+    let hasToday = false;
+    
+    const dates = Object.keys(dailyStats).sort();
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 从今天往回数连续天数
+    for (let i = dates.length - 1; i >= 0; i--) {
+        if (dailyStats[dates[i]] > 0) {
+            tempStreak++;
+            if (dates[i] === today) hasToday = true;
+        } else {
+            if (dates[i] < today) break;
+        }
+    }
+    currentStreak = tempStreak;
+    
+    // 计算最大连续天数
+    tempStreak = 0;
+    dates.forEach(date => {
+        if (dailyStats[date] > 0) {
+            tempStreak++;
+            maxStreak = Math.max(maxStreak, tempStreak);
+        } else {
+            tempStreak = 0;
+        }
+    });
+
+    // 计算有记忆的天数
+    const activeDays = Object.values(dailyStats).filter(c => c > 0).length;
+
+    // 更新头部信息
+    const totalEl = document.getElementById('heatmapTotal');
+    const streakEl = document.getElementById('heatmapStreak');
+    if (totalEl) totalEl.textContent = `${activeDays} 天有记忆`;
+    if (streakEl) streakEl.textContent = currentStreak > 0 ? `连续记录 ${currentStreak} 天 🔥` : '今天还没记忆哦';
+
+    // 计算每天的强度等级 (0-4)
+    const counts = Object.values(dailyStats).filter(c => c > 0);
+    const maxCount = counts.length > 0 ? Math.max(...counts) : 1;
+    
+    const getLevel = (count) => {
+        if (count === 0) return 0;
+        if (count <= maxCount * 0.25) return 1;
+        if (count <= maxCount * 0.5) return 2;
+        if (count <= maxCount * 0.75) return 3;
+        return 4;
+    };
+
+    // 生成热力图 HTML（按周分组，每行代表一天）
+    let html = '';
+    const days = ['日', '一', '二', '三', '四', '五', '六'];
+    
+    // 显示最近13周（91天）的数据
+    const recentDates = dates.slice(-91);
+    
+    // 按周分组
+    const weeks = [];
+    let currentWeek = [];
+    
+    recentDates.forEach(date => {
+        const dayOfWeek = new Date(date).getDay();
+        currentWeek.push({ date, dayOfWeek, count: dailyStats[date] });
+        if (dayOfWeek === 6 || date === recentDates[recentDates.length - 1]) {
+            weeks.push(currentWeek);
+            currentWeek = [];
+        }
+    });
+
+    // 生成每行（每天一行，从周日到周六）
+    for (let day = 0; day < 7; day++) {
+        html += '<div class="heatmap-row">';
+        weeks.forEach(week => {
+            const dayData = week.find(d => d.dayOfWeek === day);
+            if (dayData) {
+                const level = getLevel(dayData.count);
+                const dateStr = new Date(dayData.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                const title = dayData.count > 0 ? `${dateStr}: ${dayData.count} 条记忆` : dateStr;
+                html += `<div class="heatmap-cell level-${level}" title="${title}"></div>`;
+            } else {
+                html += '<div class="heatmap-cell level-0"></div>';
+            }
+        });
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// 渲染关系类型标签
+function renderRelationTags(relationTypes) {
+    const container = document.getElementById('relationTags');
+    if (!container) return;
+
+    const sortedRelations = Object.entries(relationTypes)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8); // 只显示前8个
+
+    if (sortedRelations.length === 0) {
+        container.innerHTML = '<span class="relation-tag-placeholder">暂无数据</span>';
+        return;
+    }
+
+    const relationNames = {
+        'FRIEND': '朋友',
+        'FAMILY': '家人',
+        'COLLEAGUE': '同事',
+        'PARTNER': '伴侣',
+        'WORK_AT': '工作于',
+        'LIVE_IN': '居住在',
+        'BORN_IN': '出生在',
+        'STUDY_AT': '就读于',
+        'PARTICIPATE': '参与',
+        'ORGANIZE': '组织',
+        'RELATED': '相关'
+    };
+
+    let html = '';
+    sortedRelations.forEach(([type, count]) => {
+        const name = relationNames[type] || type;
+        html += `
+            <span class="relation-tag">
+                ${name}
+                <span class="relation-tag-count">${count}</span>
+            </span>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
 // ==================== 知识图谱 D3.js 增强版 ====================
 
+let graphInitialized = false;
+
 function initGraph() {
+    if (graphInitialized) return; // 确保只初始化一次
+    
     const svg = d3.select('#graph-svg');
+    if (svg.empty()) return;
+    
     const container = svg.node().parentElement;
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -724,7 +1586,10 @@ function initGraph() {
     graphZoom = d3.zoom()
         .scaleExtent([0.1, 4])
         .on('zoom', (event) => {
-            g.attr('transform', event.transform);
+            const g = svg.select('.graph-main-group');
+            if (!g.empty()) {
+                g.attr('transform', event.transform);
+            }
         });
 
     svg.call(graphZoom);
@@ -735,6 +1600,8 @@ function initGraph() {
 
     // 存储引用
     svg.node().graphG = g;
+    
+    graphInitialized = true;
 }
 
 async function loadGraphData(entityTypes = null) {
@@ -881,246 +1748,15 @@ function updateLegend() {
     legendEl.style.display = 'block';
 }
 
-// ========== 布局切换函数 ==========
-function changeLayout(layoutType) {
-    currentLayout = layoutType;
-    renderGraph();
-    showToast('已切换布局: ' + getLayoutName(layoutType), 'success');
-}
-
-function getLayoutName(layout) {
-    const names = {
-        'force': '力导向',
-        'circular': '圆环布局',
-        'hierarchical': '层次树',
-        'grid': '网格布局',
-        'concentric': '同心圆'
-    };
-    return names[layout] || layout;
-}
-
-// 不同布局的初始位置计算函数
-function calculateLayoutPositions(nodes, edges, width, height) {
-    const layout = currentLayout;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    
-    if (layout === 'force') {
-        // 力导向布局 - 使用随机初始位置，让物理模拟自然分布
-        return nodes.map(node => ({
-            id: node.id,
-            x: centerX + (Math.random() - 0.5) * width * 0.6,
-            y: centerY + (Math.random() - 0.5) * height * 0.6
-        }));
-    }
-    
-    if (layout === 'circular') {
-        // 圆环布局
-        const radius = Math.min(width, height) * 0.35;
-        const angleStep = (2 * Math.PI) / nodes.length;
-        return nodes.map((node, i) => ({
-            id: node.id,
-            x: centerX + radius * Math.cos(i * angleStep - Math.PI / 2),
-            y: centerY + radius * Math.sin(i * angleStep - Math.PI / 2)
-        }));
-    }
-    
-    if (layout === 'concentric') {
-        // 同心圆布局 - 按度数分层
-        return calculateConcentricPositions(nodes, centerX, centerY, 3);
-    }
-    
-    if (layout === 'hierarchical') {
-        // 层次树布局 - 按度数排序分层
-        return calculateHierarchicalPositions(nodes, edges, width, height);
-    }
-    
-    if (layout === 'grid') {
-        // 网格布局
-        return calculateGridPositions(nodes, width, height);
-    }
-    
-    return nodes.map(n => ({ id: n.id, x: centerX, y: centerY }));
-}
-
-// 同心圆位置计算
-function calculateConcentricPositions(nodes, centerX, centerY, layers = 4) {
-    // 计算节点度数
-    const nodeDegree = {};
-    nodes.forEach(n => nodeDegree[n.id] = 0);
-    graphData.edges.forEach(e => {
-        const sourceId = typeof e.source === 'object' ? e.source.id : e.source;
-        const targetId = typeof e.target === 'object' ? e.target.id : e.target;
-        nodeDegree[sourceId] = (nodeDegree[sourceId] || 0) + 1;
-        nodeDegree[targetId] = (nodeDegree[targetId] || 0) + 1;
-    });
-
-    // 找出最大度数用于归一化
-    let maxDegree = 1;
-    nodes.forEach(n => {
-        if (nodeDegree[n.id] > maxDegree) maxDegree = nodeDegree[n.id];
-    });
-
-    // 按度数分层：度数高的在内层，低的在外层
-    const degreeGroups = {};
-    nodes.forEach(node => {
-        const degree = nodeDegree[node.id] || 0;
-        // 归一化度数到 [0, layers-1]，度数高的映射到高层（内层）
-        const normalizedDegree = maxDegree > 1 ? degree / maxDegree : 0;
-        const layer = Math.min(Math.floor((1 - normalizedDegree) * (layers - 1)), layers - 1);
-        if (!degreeGroups[layer]) degreeGroups[layer] = [];
-        degreeGroups[layer].push(node);
-    });
-
-    // 计算位置
-    const positions = {};
-    const maxRadius = Math.min(centerX, centerY) * 0.8;
-
-    for (let layer = 0; layer < layers; layer++) {
-        const layerNodes = degreeGroups[layer] || [];
-        const radius = maxRadius * (layer + 1) / layers;
-        // 关键修复：处理单节点情况，避免 angleStep = 2π 导致所有单节点堆叠
-        const angleStep = layerNodes.length > 1 ? (2 * Math.PI) / layerNodes.length : 0;
-        const startAngle = -Math.PI / 2; // 从顶部开始
-
-        layerNodes.forEach((node, i) => {
-            const angle = angleStep > 0 ? startAngle + i * angleStep : startAngle;
-            positions[node.id] = {
-                x: centerX + radius * Math.cos(angle),
-                y: centerY + radius * Math.sin(angle)
-            };
-        });
-    }
-
-    return nodes.map(n => positions[n.id] || { x: centerX, y: centerY });
-}
-
-// 层次树位置计算
-function calculateHierarchicalPositions(nodes, edges, width, height) {
-    const centerX = width / 2;
-    const topMargin = height * 0.12;
-    const bottomMargin = height * 0.12;
-    const availableHeight = height - topMargin - bottomMargin;
-    
-    // 计算度数和找出根节点（度数最大的）
-    const nodeDegree = {};
-    const nodeChildren = {};
-    nodes.forEach(n => {
-        nodeDegree[n.id] = 0;
-        nodeChildren[n.id] = [];
-    });
-    
-    edges.forEach(e => {
-        if (e.source !== e.target) {
-            nodeDegree[e.source] = (nodeDegree[e.source] || 0) + 1;
-            nodeDegree[e.target] = (nodeDegree[e.target] || 0) + 1;
-            nodeChildren[e.source].push(e.target);
-        }
-    });
-    
-    // 按度数排序分层
-    const sortedNodes = [...nodes].sort((a, b) => (nodeDegree[b.id] || 0) - (nodeDegree[a.id] || 0));
-    const layers = 4;
-    const nodesPerLayer = Math.ceil(sortedNodes.length / layers);
-    
-    const positions = {};
-    sortedNodes.forEach((node, i) => {
-        const layer = Math.floor(i / nodesPerLayer);
-        const indexInLayer = i % nodesPerLayer;
-        const layerCount = Math.min(nodesPerLayer, sortedNodes.length - layer * nodesPerLayer);
-        
-        const y = topMargin + (layer / (layers - 1 || 1)) * availableHeight;
-        const layerWidth = width * 0.7;
-        const xStep = layerCount > 1 ? layerWidth / (layerCount - 1) : 0;
-        const x = centerX - layerWidth / 2 + indexInLayer * xStep;
-        
-        positions[node.id] = { x, y };
-    });
-    
-    return nodes.map(n => positions[n.id] || { x: centerX, y: height / 2 });
-}
-
-// 网格布局
-function calculateGridPositions(nodes, width, height) {
-    const cols = Math.ceil(Math.sqrt(nodes.length * width / height));
-    const rows = Math.ceil(nodes.length / cols);
-    
-    const cellWidth = width * 0.8 / cols;
-    const cellHeight = height * 0.8 / rows;
-    const marginX = width * 0.1;
-    const marginY = height * 0.1;
-    
-    return nodes.map((node, i) => ({
-        id: node.id,
-        x: marginX + (i % cols) * cellWidth + cellWidth / 2,
-        y: marginY + Math.floor(i / cols) * cellHeight + cellHeight / 2
-    }));
-}
-
-// 获取当前布局的力导向参数
-// 核心原则：所有布局都使用力模拟，通过初始位置 + 力参数来保持各自特性
-// 参考 MiroFish: 所有布局都用 force simulation，只是参数不同
-function getLayoutForces() {
-    switch (currentLayout) {
-        case 'circular':
-            // 圆形布局：保持圆形分布，仅用微弱力防止完全重叠
-            return {
-                linkDistance: 0,
-                chargeStrength: -80,    // 微弱排斥，防止节点完全重叠
-                collideRadius: 30,
-                centerStrength: 0.02,   // 极弱中心引力，维持大致圆形
-                alphaDecay: 0.04,       // 较快稳定，保留初始圆形结构
-                velocityDecay: 0.4
-            };
-        case 'concentric':
-            // 同心圆布局：保持层次结构，仅用微弱力微调
-            return {
-                linkDistance: 0,
-                chargeStrength: -60,    // 很弱的排斥，避免节点重叠
-                collideRadius: 25,
-                centerStrength: 0,      // 无中心引力，保持层次
-                alphaDecay: 0.03,        // 缓慢稳定
-                velocityDecay: 0.3
-            };
-        case 'hierarchical':
-            // 层次布局：需要Y轴约束保持层级
-            return {
-                linkDistance: 120,
-                chargeStrength: -150,
-                collideRadius: 30,
-                centerStrength: 0.01,
-                yStrength: 0.5,         // 强Y轴约束保持层级
-                alphaDecay: 0.03,
-                velocityDecay: 0.4
-            };
-        case 'grid':
-            // 网格布局：微弱力仅用于避免重叠
-            return {
-                linkDistance: 0,
-                chargeStrength: -50,
-                collideRadius: 35,
-                centerStrength: 0,
-                alphaDecay: 0.08,       // 快速稳定
-                velocityDecay: 0.5
-            };
-        default: // force - 力导向布局
-            return {
-                linkDistance: 150,       // 参照 MiroFish: 150
-                chargeStrength: -400,    // 参照 MiroFish: -400
-                collideRadius: 50,        // 参照 MiroFish: 50
-                centerStrength: 0.04,    // 参照 MiroFish: 0.04
-                alphaDecay: 0.02,
-                velocityDecay: 0.3
-            };
-    }
-}
-
 function renderGraph() {
     const svg = d3.select('#graph-svg');
+    if (svg.empty()) return;
+    
     const container = svg.node().parentElement;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    const g = svg.node().graphG;
+    const g = svg.select('.graph-main-group');
+    if (g.empty()) return;
 
     // 清空现有内容
     g.selectAll('*').remove();
@@ -1257,74 +1893,44 @@ function renderGraph() {
         return degB - degA;  // 度数高的排前面
     });
 
-    // 根据当前布局计算节点初始位置
-    const layoutPositions = calculateLayoutPositions(sortedNodes, edges, width, height);
-    
-    // 初始化节点位置
-    const nodes = sortedNodes.map((n, i) => {
-        const pos = layoutPositions[i] || { x: width / 2, y: height / 2 };
-        return {
-            id: n.id,
-            name: n.name || 'Unnamed',
-            type: n.type || 'Entity',
-            rawData: n,
-            x: pos.x,
-            y: pos.y
-        };
-    });
+    // 初始化节点位置 - 随机分布在中心周围
+    const nodes = sortedNodes.map((n, i) => ({
+        id: n.id,
+        name: n.name || 'Unnamed',
+        type: n.type || 'Entity',
+        rawData: n,
+        x: width / 2 + (Math.random() - 0.5) * width * 0.6,
+        y: height / 2 + (Math.random() - 0.5) * height * 0.6
+    }));
 
-    // 获取当前布局的力导向参数
-    const forces = getLayoutForces();
-    
-    // 创建力导向模拟
-    simulation = d3.forceSimulation(nodes);
-    
-    // 动态布局（力导向、同心圆、层次）- 启用完整物理模拟
-    if (!forces.fixed) {
-        simulation
-            .force('link', d3.forceLink(edges).id(d => d.id).distance(d => {
-                const baseDistance = forces.linkDistance;
-                const edgeCount = d.pairTotal || 1;
-                return baseDistance + (edgeCount - 1) * 50;  // MiroFish: 50
-            }))
-            .force('charge', d3.forceManyBody()
-                .strength(-400)  // MiroFish: 固定 -400
-                .distanceMax(800)
-            )
-            .force('center', d3.forceCenter(width / 2, height / 2).strength(forces.centerStrength || 0.04))
-            .force('collide', d3.forceCollide()
-                .radius(50)  // MiroFish: 固定 50
-                .strength(0.8)
-                .iterations(3)
-            )
-            .force('x', d3.forceX(width / 2).strength(0.04))  // MiroFish: 0.04
-            .force('y', d3.forceY(height / 2).strength(forces.yStrength || 0.04));  // MiroFish: 0.04
-        
-        // 层次布局冷却更快以保持结构
-        if (currentLayout === 'hierarchical') {
-            simulation.alphaDecay(0.04).velocityDecay(0.4);
-        } else {
-            simulation.alphaDecay(0.02).velocityDecay(0.3);
-        }
-    } else {
-        // 固定布局（圆环、网格）- 只保留轻微碰撞检测，禁用其他物理力
-        simulation
-            .force('collide', d3.forceCollide()
-                .radius(forces.collideRadius)
-                .strength(0.2)
-                .iterations(1)
-            )
-            .alphaDecay(0.9)
-            .velocityDecay(0.9);
-    }
+    // 创建力导向模拟 - MiroFish 风格参数
+    simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(edges).id(d => d.id).distance(d => {
+            const edgeCount = d.pairTotal || 1;
+            return 150 + (edgeCount - 1) * 50;  // MiroFish: 基础150，每多一条边+50
+        }))
+        .force('charge', d3.forceManyBody()
+            .strength(-400)  // MiroFish: -400
+            .distanceMax(800)
+        )
+        .force('center', d3.forceCenter(width / 2, height / 2).strength(0.04))  // MiroFish: 0.04
+        .force('collide', d3.forceCollide()
+            .radius(50)  // MiroFish: 50
+            .strength(0.8)
+            .iterations(3)
+        )
+        .force('x', d3.forceX(width / 2).strength(0.04))  // MiroFish: 0.04
+        .force('y', d3.forceY(height / 2).strength(0.04))  // MiroFish: 0.04
+        .alphaDecay(0.02)
+        .velocityDecay(0.3);
 
-    // 创建节点映射用于快速查找（处理固定布局时 source/target 是字符串 ID 的情况）
+    // 创建节点映射用于快速查找
     const nodeMapById = {};
     nodes.forEach(n => nodeMapById[n.id] = n);
     
     // 计算曲线路径（支持自环）
     function getLinkPath(d) {
-        // 处理 source/target 可能是字符串 ID 的情况（固定布局）
+        // 处理 source/target 可能是字符串 ID 的情况
         const sourceNode = typeof d.source === 'object' ? d.source : nodeMapById[d.source];
         const targetNode = typeof d.target === 'object' ? d.target : nodeMapById[d.target];
         
@@ -1411,8 +2017,27 @@ function renderGraph() {
     const link = linkGroup.selectAll('path')
         .data(edges)
         .enter().append('path')
-        .attr('stroke', d => d.isSelfLoop ? '#E91E63' : (edgeColorMap[d.type] || '#C0C0C0'))
-        .attr('stroke-width', d => d.isSelfLoop ? 2 : 1.5)
+        .attr('stroke', d => {
+            // 路径高亮 - 使用排序后的 ID 匹配
+            const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+            const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+            const edgeKey = [sourceId, targetId].sort().join('_');
+            if (highlightedPath?.edgeIds.has(d.id) || highlightedPath?.edgeIds.has(edgeKey)) {
+                return '#E91E63';  // 路径边用红色
+            }
+            if (d.isSelfLoop) return '#E91E63';
+            return edgeColorMap[d.type] || '#C0C0C0';
+        })
+        .attr('stroke-width', d => {
+            const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+            const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+            const edgeKey = [sourceId, targetId].sort().join('_');
+            if (highlightedPath?.edgeIds.has(d.id) || highlightedPath?.edgeIds.has(edgeKey)) {
+                return 4;  // 路径边加粗
+            }
+            if (d.isSelfLoop) return 2;
+            return 1.5;
+        })
         .attr('stroke-dasharray', d => d.isSelfLoop ? '3,2' : 'none')  // 自环用虚线
         .attr('fill', 'none')
         .style('cursor', 'pointer')
@@ -1478,10 +2103,23 @@ function renderGraph() {
     const node = nodeGroup.selectAll('circle')
         .data(nodes)
         .enter().append('circle')
-        .attr('r', d => highlightedNodeIds.has(d.id) ? 14 : 10)  // MiroFish: 固定 10，高亮 14
+        .attr('r', d => {
+            // 路径高亮优先级最高
+            if (highlightedPath?.nodeIds.has(d.id)) return 16;
+            if (highlightedNodeIds.has(d.id)) return 14;
+            return 10;
+        })
         .attr('fill', d => colorMap[d.type] || '#999')
-        .attr('stroke', d => highlightedNodeIds.has(d.id) ? '#FFD700' : '#fff')
-        .attr('stroke-width', d => highlightedNodeIds.has(d.id) ? 4 : 2.5)
+        .attr('stroke', d => {
+            if (highlightedPath?.nodeIds.has(d.id)) return '#E91E63';  // 路径节点用红色
+            if (highlightedNodeIds.has(d.id)) return '#FFD700';
+            return '#fff';
+        })
+        .attr('stroke-width', d => {
+            if (highlightedPath?.nodeIds.has(d.id)) return 5;
+            if (highlightedNodeIds.has(d.id)) return 4;
+            return 2.5;
+        })
         .style('cursor', 'pointer')
         .call(d3.drag()
             .on('start', dragstarted)
@@ -1490,31 +2128,68 @@ function renderGraph() {
         )
         .on('click', (event, d) => {
             event.stopPropagation();
-            node.attr('stroke', d => highlightedNodeIds.has(d.id) ? '#FFD700' : '#fff').attr('stroke-width', d => highlightedNodeIds.has(d.id) ? 4 : 2.5);
-            link.attr('stroke', e => e.isSelfLoop ? '#E91E63' : '#C0C0C0').attr('stroke-width', e => e.isSelfLoop ? 2 : 1.5);
+            
+            // Shift+点击设置路径终点
+            if (event.shiftKey && currentSelectedNode && currentSelectedNode.id !== d.id) {
+                pathTargetNode = d.rawData;
+                showToast(`已设置终点: ${d.name}，点击"探索关联路径"`, 'info');
+                updatePathFinder();
+                return;
+            }
+            
+            node.attr('stroke', d => {
+                if (highlightedPath?.nodeIds.has(d.id)) return '#E91E63';
+                if (highlightedNodeIds.has(d.id)) return '#FFD700';
+                return '#fff';
+            }).attr('stroke-width', d => {
+                if (highlightedPath?.nodeIds.has(d.id)) return 5;
+                if (highlightedNodeIds.has(d.id)) return 4;
+                return 2.5;
+            });
+            link.attr('stroke', e => {
+                const sId = typeof e.source === 'object' ? e.source.id : e.source;
+                const tId = typeof e.target === 'object' ? e.target.id : e.target;
+                const edgeKey = [sId, tId].sort().join('_');
+                if (highlightedPath?.edgeIds.has(e.id) || highlightedPath?.edgeIds.has(edgeKey)) return '#E91E63';
+                if (e.isSelfLoop) return '#E91E63';
+                return '#C0C0C0';
+            }).attr('stroke-width', e => {
+                const sId = typeof e.source === 'object' ? e.source.id : e.source;
+                const tId = typeof e.target === 'object' ? e.target.id : e.target;
+                const edgeKey = [sId, tId].sort().join('_');
+                if (highlightedPath?.edgeIds.has(e.id) || highlightedPath?.edgeIds.has(edgeKey)) return 4;
+                if (e.isSelfLoop) return 2;
+                return 1.5;
+            });
             d3.select(event.target).attr('stroke', '#E91E63').attr('stroke-width', 4);
             link.filter(l => l.source.id === d.id || l.target.id === d.id)
                 .attr('stroke', '#E91E63')
                 .attr('stroke-width', 2.5);
             showNodeDetail(d.rawData);
+            updatePathFinder();
         })
         .on('mouseenter', (event, d) => {
             d3.select(event.target).attr('stroke', '#333').attr('stroke-width', 3);
         })
         .on('mouseleave', (event, d) => {
-            d3.select(event.target).attr('stroke', highlightedNodeIds.has(d.id) ? '#FFD700' : '#fff').attr('stroke-width', highlightedNodeIds.has(d.id) ? 4 : 2.5);
+            const isPathNode = highlightedPath?.nodeIds.has(d.id);
+            const isHighlighted = highlightedNodeIds.has(d.id);
+            d3.select(event.target)
+                .attr('stroke', isPathNode ? '#E91E63' : (isHighlighted ? '#FFD700' : '#fff'))
+                .attr('stroke-width', isPathNode ? 5 : (isHighlighted ? 4 : 2.5));
         });
 
     // 节点标签
     const nodeLabels = nodeGroup.selectAll('text')
         .data(nodes)
         .enter().append('text')
-        .text(d => d.name.length > 8 ? d.name.substring(0, 8) + '…' : d.name)
-        .attr('font-size', d => highlightedNodeIds.has(d.id) ? '14px' : '11px')
-        .attr('fill', d => highlightedNodeIds.has(d.id) ? '#E91E63' : '#333')
-        .attr('font-weight', d => highlightedNodeIds.has(d.id) ? '700' : '500')
-        .attr('dx', 14)
-        .attr('dy', 4)
+        .text(d => d.name.length > 6 ? d.name.substring(0, 6) + '…' : d.name)  // MiroFish: 6字符截断
+        .attr('font-size', d => highlightedNodeIds.has(d.id) ? '13px' : '11px')  // MiroFish: 更小字号
+        .attr('fill', d => highlightedNodeIds.has(d.id) ? '#E91E63' : '#555')    // MiroFish: 稍浅颜色
+        .attr('font-weight', d => highlightedNodeIds.has(d.id) ? '600' : '400')  // MiroFish: 正常字重
+        .attr('dx', 0)      // MiroFish: 标签在节点正下方
+        .attr('dy', 18)     // MiroFish: 垂直偏移
+        .attr('text-anchor', 'middle')  // MiroFish: 居中对齐
         .style('pointer-events', 'none')
         .style('font-family', 'system-ui, sans-serif');
 
@@ -1548,84 +2223,78 @@ function renderGraph() {
         nodeLabels.attr('x', d => d.x).attr('y', d => d.y);
     });
     
-    // 固定布局：运行足够多次迭代让节点正确分布
-    if (forces.fixed) {
-        simulation.tick(100);  // 增加迭代次数确保固定布局正确渲染
-        simulation.stop();
-    }
-
     // 点击空白关闭详情面板
     svg.on('click', () => {
         closeDetailPanel();
         expandedSelfLoops.clear();  // 重置自环展开状态
-        node.attr('stroke', '#fff').attr('stroke-width', 2.5);
-        link.attr('stroke', d => d.isSelfLoop ? '#E91E63' : (edgeColorMap[d.type] || '#C0C0C0')).attr('stroke-width', d => d.isSelfLoop ? 2 : 1.5);
+        highlightedPath = null;  // 清除路径高亮
+        node.attr('stroke', d => highlightedNodeIds.has(d.id) ? '#FFD700' : '#fff')
+            .attr('stroke-width', d => highlightedNodeIds.has(d.id) ? 4 : 2.5);
+        link.attr('stroke', d => {
+            if (d.isSelfLoop) return '#E91E63';
+            return edgeColorMap[d.type] || '#C0C0C0';
+        }).attr('stroke-width', d => d.isSelfLoop ? 2 : 1.5);
         linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)');
         linkLabels.attr('fill', d => d.isSelfLoop ? '#E91E63' : '#666');
     });
 }
 
-// MiroFish 风格拖拽：3px 阈值区分点击和拖拽
+// 拖拽功能
 function dragstarted(event, d) {
-    // 只记录位置，不重启仿真（区分点击和拖拽）
+    console.log('dragstarted', d.id);
+    if (!event.active && simulation) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
     d.fy = d.y;
-    d._dragStartX = event.x;
-    d._dragStartY = event.y;
-    d._isDragging = false;
 }
 
 function dragged(event, d) {
-    // 检测是否真正开始拖拽（移动超过阈值）
-    const dx = event.x - d._dragStartX;
-    const dy = event.y - d._dragStartY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (!d._isDragging && distance > 3) {
-        // 首次检测到真正拖拽，才重启仿真
-        d._isDragging = true;
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-    }
-    
-    if (d._isDragging) {
-        d.fx = event.x;
-        d.fy = event.y;
-    }
+    console.log('dragged', d.id, event.x, event.y);
+    d.fx = event.x;
+    d.fy = event.y;
 }
 
 function dragended(event, d) {
-    // 只有真正拖拽过才让仿真逐渐停止
-    if (d._isDragging) {
-        if (!event.active) simulation.alphaTarget(0);
-    }
+    console.log('dragended', d.id);
+    if (!event.active && simulation) simulation.alphaTarget(0);
     d.fx = null;
     d.fy = null;
-    d._isDragging = false;
-    delete d._dragStartX;
-    delete d._dragStartY;
 }
 
 // ==================== 详情面板 ====================
+
+// 当前选中的节点数据（用于探索面板）
+let currentSelectedNode = null;
+let currentSelectedEdge = null;
+let exploreChatHistory = []; // 探索面板的聊天历史
 
 function showNodeDetail(nodeData) {
     const panel = document.getElementById('detailPanel');
     const title = document.getElementById('detailTitle');
     const badge = document.getElementById('detailTypeBadge');
     const content = document.getElementById('detailContent');
+    const headerActions = document.getElementById('detailHeaderActions');
 
     title.textContent = '节点详情';
     badge.textContent = nodeData.type || 'Entity';
     badge.style.background = colorMap[nodeData.type] || '#999';
     badge.style.display = 'inline-block';
 
+    // 在头部添加编辑按钮
+    if (headerActions) {
+        headerActions.innerHTML = `
+            <button class="btn-header-edit" onclick="enableNodeEdit('${nodeData.id}')" title="修改信息">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+        `;
+    }
+
     let html = `
         <div class="detail-row">
             <span class="detail-label">名称:</span>
             <span class="detail-value">${nodeData.name || '未知'}</span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">ID:</span>
-            <span class="detail-value uuid-text">${nodeData.id || '-'}</span>
         </div>
     `;
 
@@ -1665,19 +2334,536 @@ function showNodeDetail(nodeData) {
     }
 
     if (nodeData.memory_ids && nodeData.memory_ids.length > 0) {
-        html += `
-            <div class="detail-section">
-                <div class="section-title">关联记忆 (${nodeData.memory_ids.length})</div>
-                <div style="font-size: 12px; color: #666;">
-                    ${nodeData.memory_ids.slice(0, 5).map(id => `<div style="margin-bottom: 4px;">📝 ${id.substring(0, 20)}...</div>`).join('')}
-                    ${nodeData.memory_ids.length > 5 ? `<div>... 共 ${nodeData.memory_ids.length} 条</div>` : ''}
-                </div>
-            </div>
-        `;
+        html += renderLinkedMemories(nodeData.memory_ids);
     }
 
     content.innerHTML = html;
     panel.classList.add('show');
+
+    // 更新探索面板
+    updateExplorePanel(nodeData);
+}
+
+// ==================== 详情面板编辑功能 ====================
+
+// 当前编辑状态
+let editingNodeId = null;
+let editingEdgeId = null;
+
+// 启用节点编辑
+function enableNodeEdit(nodeId) {
+    editingNodeId = nodeId;
+    const node = graphData.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const content = document.getElementById('detailContent');
+    
+    // 将属性转换为键值字符串
+    const attrs = node.attributes || {};
+    const attrText = Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join('\n');
+    
+    // 编辑表单
+    let html = `
+        <div class="edit-form">
+            <div class="form-group">
+                <label>名称</label>
+                <input type="text" id="editNodeName" value="${node.name || ''}" placeholder="实体名称">
+            </div>
+            <div class="form-group">
+                <label>类型</label>
+                <select id="editNodeType">
+                    <option value="PERSON" ${node.type === 'PERSON' ? 'selected' : ''}>人物</option>
+                    <option value="LOCATION" ${node.type === 'LOCATION' ? 'selected' : ''}>地点</option>
+                    <option value="EVENT" ${node.type === 'EVENT' ? 'selected' : ''}>事件</option>
+                    <option value="ENTITY" ${node.type === 'ENTITY' ? 'selected' : ''}>其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="editNodeDesc" rows="3" placeholder="描述这个实体...">${node.description || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>属性（每行一个，格式：键: 值）</label>
+                <textarea id="editNodeAttrs" rows="3" placeholder="例如：\n职业: 程序员\n城市: 北京">${attrText}</textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn-save" onclick="saveNodeEdit()">保存</button>
+                <button class="btn-cancel" onclick="cancelEdit()">取消</button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+}
+
+// 保存节点编辑
+async function saveNodeEdit() {
+    if (!editingNodeId) return;
+    
+    const name = document.getElementById('editNodeName').value.trim();
+    const type = document.getElementById('editNodeType').value;
+    const description = document.getElementById('editNodeDesc')?.value.trim() || '';
+    const attrText = document.getElementById('editNodeAttrs')?.value.trim() || '';
+    
+    if (!name) {
+        showToast('名称不能为空', 'warning');
+        return;
+    }
+    
+    // 解析属性文本
+    const attributes = {};
+    attrText.split('\n').forEach(line => {
+        const match = line.match(/^(.+?)[:：]\s*(.+)$/);
+        if (match) {
+            attributes[match[1].trim()] = match[2].trim();
+        }
+    });
+    
+    const updates = { name, type };
+    if (description) updates.description = description;
+    if (Object.keys(attributes).length > 0) updates.attributes = attributes;
+    
+    try {
+        const response = await fetch(`/api/graph/node/${editingNodeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('实体已更新', 'success');
+            // 刷新图谱数据
+            await loadGraphData();
+            // 重新显示详情
+            const node = graphData.nodes.find(n => n.id === editingNodeId);
+            if (node) showNodeDetail(node);
+        } else {
+            showToast(result.message || '更新失败', 'error');
+        }
+    } catch (error) {
+        console.error('更新实体失败:', error);
+        showToast('更新失败', 'error');
+    }
+    
+    editingNodeId = null;
+}
+
+// 启用边编辑
+function enableEdgeEdit(edgeId, sourceId, targetId) {
+    editingEdgeId = edgeId;
+    const edge = graphData.edges.find(e => (e.id || e.uuid) === edgeId);
+    if (!edge) return;
+
+    const content = document.getElementById('detailContent');
+    const sourceNode = graphData.nodes.find(n => n.id === sourceId);
+    const targetNode = graphData.nodes.find(n => n.id === targetId);
+    
+    // 关系类型选项
+    const relationTypes = ['FRIEND', 'FAMILY', 'COLLEAGUE', 'PARTNER', 'WORK_AT', 'LIVE_IN', 'BORN_IN', 'STUDY_AT', 'PARTICIPATE', 'ORGANIZE', 'RELATED'];
+    
+    let html = `
+        <div class="edit-form">
+            <div class="form-group">
+                <label>源节点</label>
+                <input type="text" value="${sourceNode?.name || '未知'}" disabled>
+            </div>
+            <div class="form-group">
+                <label>目标节点</label>
+                <input type="text" value="${targetNode?.name || '未知'}" disabled>
+            </div>
+            <div class="form-group">
+                <label>关系类型</label>
+                <select id="editEdgeType">
+                    ${relationTypes.map(t => `<option value="${t}" ${edge.type === t ? 'selected' : ''}>${getRelationTypeName(t)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>关系陈述（可选）</label>
+                <textarea id="editEdgeFact" rows="3" placeholder="描述这个关系...">${edge.fact || ''}</textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn-save" onclick="saveEdgeEdit()">保存</button>
+                <button class="btn-cancel" onclick="cancelEdit()">取消</button>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+}
+
+// 保存边编辑
+async function saveEdgeEdit() {
+    if (!editingEdgeId) return;
+    
+    const type = document.getElementById('editEdgeType').value;
+    const fact = document.getElementById('editEdgeFact').value.trim();
+    
+    try {
+        const response = await fetch(`/api/graph/edge/${editingEdgeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, fact })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('关系已更新', 'success');
+            // 刷新图谱数据
+            await loadGraphData();
+            // 关闭详情面板
+            closeDetailPanel();
+        } else {
+            showToast(result.message || '更新失败', 'error');
+        }
+    } catch (error) {
+        console.error('更新关系失败:', error);
+        showToast('更新失败', 'error');
+    }
+    
+    editingEdgeId = null;
+}
+
+// 删除边
+async function deleteEdge(edgeId) {
+    if (!edgeId) {
+        showToast('无效的关系ID', 'warning');
+        return;
+    }
+    
+    if (!confirm('确定要删除这个关系吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/graph/edge/${edgeId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('关系已删除', 'success');
+            // 刷新图谱
+            await loadGraphData();
+            // 关闭详情面板
+            closeDetailPanel();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        console.error('删除关系失败:', error);
+        showToast('删除失败', 'error');
+    }
+}
+
+// 取消编辑
+function cancelEdit() {
+    editingNodeId = null;
+    editingEdgeId = null;
+    // 重新加载当前选中的节点或边
+    if (currentSelectedNode) {
+        showNodeDetail(currentSelectedNode);
+    } else if (currentSelectedEdge) {
+        showEdgeDetail(currentSelectedEdge);
+    } else {
+        closeDetailPanel();
+    }
+}
+
+// 查找重复实体
+function findDuplicateNodes(nodeId) {
+    const currentNode = graphData.nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+
+    // 查找同名或相似名称的实体
+    const duplicates = [];
+    const currentName = currentNode.name.toLowerCase();
+    
+    graphData.nodes.forEach(node => {
+        if (node.id === nodeId) return;
+        
+        const nodeName = node.name.toLowerCase();
+        // 简单的相似度检查：完全匹配或包含关系
+        if (nodeName === currentName || 
+            nodeName.includes(currentName) || 
+            currentName.includes(nodeName) ||
+            getSimilarity(nodeName, currentName) > 0.6) {
+            duplicates.push(node);
+        }
+    });
+    
+    if (duplicates.length === 0) {
+        showToast('未发现重复实体', 'info');
+        return;
+    }
+    
+    // 显示重复实体列表供选择
+    showMergeDialog(currentNode, duplicates);
+}
+
+// 简单的字符串相似度计算（Levenshtein距离的简化版本）
+function getSimilarity(str1, str2) {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    const maxLen = Math.max(len1, len2);
+    
+    if (maxLen === 0) return 1;
+    
+    // 计算相同字符数
+    let same = 0;
+    const minLen = Math.min(len1, len2);
+    for (let i = 0; i < minLen; i++) {
+        if (str1[i] === str2[i]) same++;
+    }
+    
+    return same / maxLen;
+}
+
+// 显示合并对话框
+function showMergeDialog(keepNode, duplicates) {
+    const content = document.getElementById('detailContent');
+    
+    let html = `
+        <div class="edit-form">
+            <div class="merge-section">
+                <div class="merge-title">⚠️ 发现 ${duplicates.length} 个可能重复的实体</div>
+                <div class="merge-desc">
+                    选择要与 "${keepNode.name}" 合并的实体。合并后，选中的实体将被删除，其记忆和关系将转移到 "${keepNode.name}" 。
+                </div>
+    `;
+    
+    duplicates.forEach((dup, idx) => {
+        html += `
+            <div class="top-entity-item" style="margin-bottom: 8px;">
+                <span class="entity-rank">${idx + 1}</span>
+                <div class="entity-avatar" style="background: ${colorMap[dup.type] || '#999'};">${dup.type === 'PERSON' ? '人' : dup.type === 'LOCATION' ? '地' : '实'}</div>
+                <span class="entity-name">${dup.name}</span>
+                <span class="entity-count">${dup.memory_ids?.length || 0} 条记忆</span>
+                <button class="btn-edit" style="margin-left: auto;" onclick="confirmMergeNodes('${keepNode.id}', '${dup.id}', '${dup.name}')">
+                    合并
+                </button>
+            </div>
+        `;
+    });
+    
+    html += `
+                <div class="merge-actions" style="margin-top: 16px;">
+                    <button class="btn-cancel" onclick="cancelEdit()" style="flex: 1;">取消</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+}
+
+// 确认合并实体
+async function confirmMergeNodes(keepId, removeId, removeName) {
+    if (!confirm(`确定要将 "${removeName}" 合并到当前实体吗？\n\n此操作不可恢复。`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/graph/nodes/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keep_id: keepId, remove_id: removeId })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(`已合并，共 ${result.data.merged_memory_count} 条记忆`, 'success');
+            // 刷新图谱
+            await loadGraphData();
+            // 重新显示保留的节点
+            const keepNode = graphData.nodes.find(n => n.id === keepId);
+            if (keepNode) showNodeDetail(keepNode);
+        } else {
+            showToast(result.message || '合并失败', 'error');
+        }
+    } catch (error) {
+        console.error('合并实体失败:', error);
+        showToast('合并失败', 'error');
+    }
+}
+
+// 更新探索面板
+function updateExplorePanel(nodeData) {
+    currentSelectedNode = nodeData;
+    currentSelectedEdge = null;
+    
+    // 显示探索选项卡
+    const exploreTab = document.getElementById('tab-explore');
+    if (exploreTab) {
+        exploreTab.style.display = 'block';
+    }
+    
+    // 更新节点卡片
+    const nameEl = document.getElementById('exploreNodeName');
+    const typeEl = document.getElementById('exploreNodeType');
+    const avatarEl = document.getElementById('exploreNodeAvatar');
+    const memoryCountEl = document.getElementById('exploreNodeMemoryCount');
+    const connectionCountEl = document.getElementById('exploreNodeConnectionCount');
+    
+    if (nameEl) nameEl.textContent = nodeData.name || '未知';
+    if (typeEl) typeEl.textContent = (nodeData.type || 'ENTITY').toUpperCase();
+    if (avatarEl) {
+        // 根据类型设置不同的头像文字
+        const typeIcons = {
+            'PERSON': '人',
+            'LOCATION': '地',
+            'EVENT': '事',
+            'ENTITY': '实'
+        };
+        avatarEl.textContent = typeIcons[nodeData.type] || '实';
+        avatarEl.style.background = colorMap[nodeData.type] || '#999';
+    }
+    if (memoryCountEl) memoryCountEl.textContent = nodeData.memory_ids?.length || 0;
+    
+    // 计算连接节点数量
+    let connectionCount = 0;
+    if (graphData.edges) {
+        connectionCount = graphData.edges.filter(e => 
+            e.source === nodeData.id || e.target === nodeData.id
+        ).length;
+    }
+    if (connectionCountEl) connectionCountEl.textContent = connectionCount;
+    
+    // 显示"生成此节点的记忆故事"按钮（节点详情专属）
+    const storyGenSection = document.querySelector('.explore-story-gen');
+    if (storyGenSection) {
+        storyGenSection.style.display = 'block';
+    }
+    
+    // 清空聊天历史
+    exploreChatHistory = [];
+    renderExploreChat();
+    
+    // 自动切换到探索面板
+    switchTab('explore');
+}
+
+// 渲染探索面板聊天
+function renderExploreChat() {
+    const container = document.getElementById('exploreChatMessages');
+    if (!container) return;
+    
+    if (exploreChatHistory.length === 0) {
+        container.innerHTML = `
+            <div class="chat-empty">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <p class="empty-text">问关于此节点的任何问题<br>AI 将基于记忆网络回答</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = exploreChatHistory.map(msg => `
+        <div class="chat-message ${msg.role}">
+            <div class="message-avatar">${msg.role === 'user' ? '我' : 'AI'}</div>
+            <div class="message-content">${escapeHtml(msg.content)}</div>
+        </div>
+    `).join('');
+    
+    // 滚动到底部
+    container.scrollTop = container.scrollHeight;
+}
+
+// 设置探索问题
+function setExploreQuestion(question) {
+    const input = document.getElementById('exploreChatInput');
+    if (input) {
+        input.value = question;
+        input.focus();
+    }
+}
+
+// 发送探索问题
+async function sendExploreQuestion() {
+    const input = document.getElementById('exploreChatInput');
+    if (!input) return;
+    
+    const question = input.value.trim();
+    if (!question) return;
+    if (!currentSelectedNode && !currentSelectedEdge) {
+        showToast('请先选择一个节点或关系', 'warning');
+        return;
+    }
+    
+    // 添加用户消息
+    exploreChatHistory.push({
+        role: 'user',
+        content: question,
+        timestamp: new Date().toISOString()
+    });
+    renderExploreChat();
+    input.value = '';
+    
+    // 显示加载状态
+    const container = document.getElementById('exploreChatMessages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat-message assistant';
+    loadingDiv.innerHTML = `
+        <div class="message-avatar">AI</div>
+        <div class="message-content">
+            <div class="typing-indicator">思考中...</div>
+        </div>
+    `;
+    container.appendChild(loadingDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    try {
+        // 调用后端 API
+        const response = await fetch('/api/graph/explore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                question: question,
+                node: currentSelectedNode,
+                edge: currentSelectedEdge,
+                history: exploreChatHistory
+            })
+        });
+        
+        const result = await response.json();
+        
+        // 移除加载状态
+        loadingDiv.remove();
+        
+        if (result.success && result.data) {
+            exploreChatHistory.push({
+                role: 'assistant',
+                content: result.data.answer,
+                timestamp: result.data.timestamp || new Date().toISOString()
+            });
+            renderExploreChat();
+        } else {
+            throw new Error(result.error || '未知错误');
+        }
+        
+    } catch (error) {
+        loadingDiv.remove();
+        showToast('请求失败: ' + error.message, 'error');
+    }
+}
+
+// HTML 转义
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function showEdgeDetail(edgeData) {
@@ -1685,66 +2871,45 @@ function showEdgeDetail(edgeData) {
     const title = document.getElementById('detailTitle');
     const badge = document.getElementById('detailTypeBadge');
     const content = document.getElementById('detailContent');
+    const headerActions = document.getElementById('detailHeaderActions');
 
     title.textContent = '关系详情';
     badge.style.display = 'none';
 
+    // 在头部添加编辑按钮
+    const edgeId = edgeData.id || edgeData.uuid || '';
+    if (headerActions && edgeId) {
+        headerActions.innerHTML = `
+            <button class="btn-header-edit" onclick="enableEdgeEdit('${edgeId}', '${edgeData.source}', '${edgeData.target}')" title="修改关系">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+        `;
+    }
+
     let html = '';
 
-    // ========== MiroFish 风格：自环组详情 ==========
+    // ========== 自环组详情 ==========
     if (edgeData.isSelfLoopGroup) {
-        html += `
-            <div class="edge-relation-header self-loop-header" style="background: linear-gradient(135deg, #fce4ec 0%, #fff 100%); border-left: 3px solid #E91E63;">
-                <span style="font-weight: 600; color: #333;">${edgeData.source_name}</span>
-                <span style="color: #E91E63; margin: 0 8px;">↻</span>
-                <span style="font-size: 12px; color: #666;">自环关系</span>
-                <span class="self-loop-count" style="background: #E91E63; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">${edgeData.selfLoopCount} 项</span>
-            </div>
-        `;
-
-        // 自环列表
-        if (edgeData.selfLoopEdges && edgeData.selfLoopEdges.length > 0) {
-            html += `<div class="self-loop-list" style="margin-top: 12px;">`;
-            edgeData.selfLoopEdges.forEach((loop, idx) => {
-                const loopId = loop.id || idx;
-                const isExpanded = expandedSelfLoops.has(loopId);
-                html += `
-                    <div class="self-loop-item" style="border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; overflow: hidden;">
-                        <div class="self-loop-item-header" 
-                             style="padding: 10px 12px; background: #f8f8f8; cursor: pointer; display: flex; align-items: center; justify-content: space-between;"
-                             onclick="toggleSelfLoopItem('${loopId}')">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="color: #999; font-size: 11px;">#${idx + 1}</span>
-                                <span style="font-weight: 500; color: #333;">${getRelationTypeName(loop.type) || '自环'}</span>
-                            </div>
-                            <span style="color: #999; font-size: 16px;">${isExpanded ? '−' : '+'}</span>
-                        </div>
-                        <div class="self-loop-item-content" id="self-loop-content-${loopId}" style="display: ${isExpanded ? 'block' : 'none'}; padding: 12px; border-top: 1px solid #e0e0e0; background: #fff;">
-                            ${loop.description ? `<div style="margin-bottom: 10px; line-height: 1.5; color: #444; font-size: 13px;">${loop.description}</div>` : ''}
-                            <div style="font-size: 11px; color: #999;">
-                                <div>ID: <span class="uuid-text">${loop.id || '-'}</span></div>
-                                ${loop.memory_ids ? `<div style="margin-top: 4px;">关联记忆: ${loop.memory_ids.length} 条</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += `</div>`;
-        }
-
-        content.innerHTML = html;
-        panel.classList.add('show');
+        renderSelfLoopDetail(edgeData, content, panel);
         return;
     }
 
     // ========== 普通边详情 ==========
     const edgeTypeName = getRelationTypeName(edgeData.type);
     const edgeColor = edgeColorMap[edgeData.type] || '#999';
+    
+    // 计算关系密度和情感色彩
+    const memoryCount = edgeData.memory_ids?.length || 0;
+    const density = calculateRelationDensity(memoryCount);
+    const emotionColor = calculateRelationEmotion(edgeData);
 
-    // 更直观的关系描述头部
+    // 关系头部 - 带密度指示器
     html += `
-        <div class="edge-relation-header" style="background: linear-gradient(135deg, #f8f8f8 0%, #fff 100%); padding: 16px; border-radius: 8px;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <div class="edge-relation-header" style="background: linear-gradient(135deg, #f8f8f8 0%, #fff 100%); padding: 16px; border-radius: 8px; border: 2px solid ${emotionColor}20;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
                 <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.source_name || '未知'}</span>
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <span style="color: ${edgeColor}; font-size: 18px;">→</span>
@@ -1752,111 +2917,214 @@ function showEdgeDetail(edgeData) {
                 </div>
                 <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.target_name || '未知'}</span>
             </div>
+            
+            <!-- 关系密度条 -->
+            <div style="display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid #e0e0e0;">
+                <span style="font-size: 11px; color: #666;">记忆密度:</span>
+                <div style="flex: 1; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${density}%; height: 100%; background: ${emotionColor}; border-radius: 3px; transition: width 0.3s;"></div>
+                </div>
+                <span style="font-size: 11px; color: ${emotionColor}; font-weight: 600;">${memoryCount} 条记忆</span>
+            </div>
         </div>
 
         ${formatTemporalInfoForDisplay(edgeData.temporal_info)}
     `;
 
-    // 显示 fact（关系陈述，新字段）
+    // 关系陈述
     if (edgeData.fact) {
         html += `
             <div class="detail-section">
                 <div class="section-title">关系陈述</div>
-                <div style="line-height: 1.6; color: #444; font-size: 13px; padding: 10px; background: #f8f9fa; border-left: 3px solid #3498db; border-radius: 0 6px 6px 0;">
+                <div style="line-height: 1.6; color: #444; font-size: 13px; padding: 10px; background: #f8f9fa; border-left: 3px solid ${emotionColor}; border-radius: 0 6px 6px 0;">
                     ${edgeData.fact}
                 </div>
             </div>
         `;
     }
 
-    if (edgeData.description) {
-        html += `
-            <div class="detail-section">
-                <div class="section-title">关系描述</div>
-                <div style="line-height: 1.6; color: #444; font-size: 13px;">${edgeData.description}</div>
-            </div>
-        `;
+    // 记忆时间轴
+    html += renderRelationTimeline(edgeData);
+
+    content.innerHTML = html;
+    panel.classList.add('show');
+    
+    // 更新探索面板
+    updateExplorePanelForEdge(edgeData);
+}
+
+// 渲染自环详情
+function renderSelfLoopDetail(edgeData, content, panel) {
+    let html = `
+        <div class="edge-relation-header self-loop-header" style="background: linear-gradient(135deg, #fce4ec 0%, #fff 100%); border-left: 3px solid #E91E63;">
+            <span style="font-weight: 600; color: #333;">${edgeData.source_name}</span>
+            <span style="color: #E91E63; margin: 0 8px;">↻</span>
+            <span style="font-size: 12px; color: #666;">自我反思</span>
+            <span class="self-loop-count" style="background: #E91E63; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">${edgeData.selfLoopCount} 条记忆</span>
+        </div>
+    `;
+
+    // 自环记忆时间轴
+    if (edgeData.selfLoopEdges && edgeData.selfLoopEdges.length > 0) {
+        html += `<div class="detail-section"><div class="section-title">记忆时间轴</div><div class="relation-timeline">`;
+        
+        // 按时间排序
+        const sortedLoops = [...edgeData.selfLoopEdges].sort((a, b) => 
+            new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        );
+        
+        sortedLoops.forEach((loop, idx) => {
+            const date = loop.created_at ? new Date(loop.created_at).toLocaleDateString('zh-CN') : '未知时间';
+            html += `
+                <div class="timeline-item">
+                    <div class="timeline-marker" style="background: #E91E63;"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date">${date}</div>
+                        <div class="timeline-text">${loop.fact || loop.description || getRelationTypeName(loop.type) || '自我反思'}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div></div>`;
     }
 
-    // 显示来源证据（合并记忆内容和片段）
+    content.innerHTML = html;
+    panel.classList.add('show');
+}
+
+// 计算关系密度 (0-100)
+function calculateRelationDensity(memoryCount) {
+    if (memoryCount === 0) return 0;
+    if (memoryCount >= 10) return 100;
+    return memoryCount * 10;
+}
+
+// 计算关系情感色彩
+function calculateRelationEmotion(edgeData) {
+    const episodes = edgeData.episodes || [];
+    if (episodes.length === 0) return '#999';
+    
+    let positive = 0, negative = 0, neutral = 0;
+    episodes.forEach(ep => {
+        const valence = ep.valence || 0;
+        if (valence > 0.3) positive++;
+        else if (valence < -0.3) negative++;
+        else neutral++;
+    });
+    
+    if (positive > negative && positive > neutral) return '#27ae60'; // 绿色-积极
+    if (negative > positive && negative > neutral) return '#e74c3c'; // 红色-消极
+    return '#f39c12'; // 黄色-中性
+}
+
+// 渲染关系记忆时间轴
+function renderRelationTimeline(edgeData) {
     const memorySummaries = edgeData.memory_summaries || [];
     const memoryIds = edgeData.memory_ids || [];
     const episodes = edgeData.episodes || [];
     
-    // 合并所有证据来源
+    // 合并所有证据并按时间排序
     const allEvidence = [];
     
-    // 添加记忆摘要作为证据
     memorySummaries.forEach((summary, idx) => {
         if (summary) {
             allEvidence.push({
                 type: 'memory',
                 content: summary,
                 icon: '📝',
-                color: '#7b2d8e'
+                color: '#7b2d8e',
+                timestamp: episodes[idx]?.timestamp || null,
+                valence: episodes[idx]?.valence || 0
             });
         }
     });
     
-    // 添加片段作为证据
     episodes.forEach((ep, idx) => {
-        if (ep.snippet) {
+        if (ep.snippet && !allEvidence.find(e => e.content === ep.snippet)) {
             allEvidence.push({
                 type: 'episode',
                 content: ep.snippet,
                 icon: '📄',
                 color: '#3498db',
-                timestamp: ep.timestamp
+                timestamp: ep.timestamp,
+                valence: ep.valence || 0
             });
         }
     });
     
-    // 去重（简单去重：内容相同则合并）
-    const uniqueEvidence = [];
-    const seen = new Set();
-    allEvidence.forEach(ev => {
-        const key = ev.content.substring(0, 50);
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueEvidence.push(ev);
-        }
+    // 按时间排序（最新在前）
+    allEvidence.sort((a, b) => {
+        const timeA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+        const timeB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+        return timeB - timeA;
     });
     
-    if (uniqueEvidence.length > 0) {
+    if (allEvidence.length === 0) return '';
+    
+    let html = `
+        <div class="detail-section">
+            <div class="section-title">记忆时间轴 (${allEvidence.length})</div>
+            <div class="relation-timeline">
+    `;
+    
+    allEvidence.forEach((ev, idx) => {
+        const date = ev.timestamp ? new Date(ev.timestamp).toLocaleDateString('zh-CN') : '时间未知';
+        const emotionColor = ev.valence > 0.3 ? '#27ae60' : ev.valence < -0.3 ? '#e74c3c' : '#999';
+        const displayText = ev.content.length > 80 ? ev.content.substring(0, 80) + '...' : ev.content;
+        
         html += `
-            <div class="detail-section">
-                <div class="section-title">来源证据 (${uniqueEvidence.length})</div>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-        `;
-        uniqueEvidence.slice(0, 5).forEach((ev, idx) => {
-            const displayText = ev.content.length > 100 ? ev.content.substring(0, 100) + '...' : ev.content;
-            html += `
-                <div style="padding: 10px 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #444; border-left: 3px solid ${ev.color};">
-                    <div style="display: flex; align-items: flex-start; gap: 8px;">
-                        <span style="color: ${ev.color}; flex-shrink: 0;">${ev.icon}</span>
-                        <span>${displayText}</span>
+            <div class="timeline-item">
+                <div class="timeline-marker" style="background: ${ev.color}; box-shadow: 0 0 0 3px ${ev.color}20;"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="timeline-date">${date}</span>
+                        <span class="timeline-emotion" style="color: ${emotionColor};">${ev.valence > 0.3 ? '😊' : ev.valence < -0.3 ? '😢' : '•'}</span>
                     </div>
-                    ${ev.timestamp ? `<div style="margin-top: 6px; font-size: 10px; color: #999; padding-left: 24px;">${new Date(ev.timestamp).toLocaleString('zh-CN')}</div>` : ''}
-                </div>
-            `;
-        });
-        if (uniqueEvidence.length > 5) {
-            html += `<div style="text-align: center; color: #999; font-size: 11px; padding: 4px;">... 还有 ${uniqueEvidence.length - 5} 条证据</div>`;
-        }
-        html += `</div></div>`;
-    } else if (memoryIds.length > 0) {
-        html += `
-            <div class="detail-section">
-                <div class="section-title">来源证据</div>
-                <div style="padding: 10px 12px; background: #f8f8f8; border-radius: 6px; font-size: 12px; color: #666;">
-                    <span style="color: #7b2d8e; margin-right: 6px;">📝</span>共有 ${memoryIds.length} 条相关记忆
+                    <div class="timeline-text">${displayText}</div>
                 </div>
             </div>
         `;
-    }
+    });
+    
+    html += `</div></div>`;
+    return html;
+}
 
-    content.innerHTML = html;
-    panel.classList.add('show');
+// 更新探索面板（关系）
+function updateExplorePanelForEdge(edgeData) {
+    currentSelectedEdge = edgeData;
+    currentSelectedNode = null;
+    
+    // 显示探索选项卡
+    const exploreTab = document.getElementById('tab-explore');
+    if (exploreTab) {
+        exploreTab.style.display = 'block';
+    }
+    
+    // 更新节点卡片（显示关系信息）
+    const nameEl = document.getElementById('exploreNodeName');
+    const typeEl = document.getElementById('exploreNodeType');
+    const avatarEl = document.getElementById('exploreNodeAvatar');
+    const memoryCountEl = document.getElementById('exploreNodeMemoryCount');
+    const connectionCountEl = document.getElementById('exploreNodeConnectionCount');
+    
+    if (nameEl) nameEl.textContent = edgeData.isSelfLoopGroup 
+        ? edgeData.source_name 
+        : `${edgeData.source_name} → ${edgeData.target_name}`;
+    if (typeEl) typeEl.textContent = edgeData.isSelfLoopGroup ? '自环关系' : '关系';
+    if (avatarEl) {
+        avatarEl.textContent = edgeData.isSelfLoopGroup ? '自' : '关';
+        avatarEl.style.background = edgeData.isSelfLoopGroup ? '#E91E63' : '#3498db';
+    }
+    if (memoryCountEl) memoryCountEl.textContent = edgeData.memory_ids?.length || 0;
+    if (connectionCountEl) connectionCountEl.textContent = edgeData.isSelfLoopGroup ? edgeData.selfLoopCount || 0 : 1;
+    
+    // 清空聊天历史
+    exploreChatHistory = [];
+    renderExploreChat();
+    
+    // 自动切换到探索面板
+    switchTab('explore');
 }
 
 // 切换自环项展开/折叠状态
@@ -1887,6 +3155,36 @@ function closeDetailPanel() {
     const panel = document.getElementById('detailPanel');
     panel.classList.remove('show');
     expandedSelfLoops.clear();  // 重置自环展开状态
+    
+    // 清空头部操作区
+    const headerActions = document.getElementById('detailHeaderActions');
+    if (headerActions) headerActions.innerHTML = '';
+    
+    // 隐藏探索选项卡，切回录入记忆
+    const exploreTab = document.getElementById('tab-explore');
+    if (exploreTab) {
+        exploreTab.style.display = 'none';
+    }
+    
+    // 清空选中状态
+    currentSelectedNode = null;
+    currentSelectedEdge = null;
+    pathTargetNode = null;
+    exploreChatHistory = [];
+    
+    // 隐藏路径侦探器和结果
+    const pathFinder = document.getElementById('pathFinder');
+    if (pathFinder) pathFinder.style.display = 'none';
+    const pathResult = document.getElementById('pathResult');
+    if (pathResult) pathResult.classList.remove('show');
+    const storyResult = document.getElementById('storyResult');
+    if (storyResult) storyResult.classList.remove('show');
+    
+    // 清除路径高亮
+    highlightedPath = null;
+    
+    // 切回录入记忆面板
+    switchTab('create');
 }
 
 function toggleEdgeLabels(show) {
@@ -1926,14 +3224,285 @@ document.getElementById('searchInput')?.addEventListener('keypress', function(e)
 document.getElementById('searchInput')?.addEventListener('input', function(e) {
     if (e.target.value.trim() === '') {
         highlightedNodeIds.clear();
-        renderGraph();
+        highlightedPath = null;
+        updateGraphStyles();
         loadMemories();
     }
 });
 
-// 监听窗口大小变化
-window.addEventListener('resize', () => {
-    if (graphData.nodes && graphData.nodes.length > 0) {
-        loadGraphData();
+// 禁用 resize 自动重绘 - 避免页面元素变化导致图谱抖动
+// 如需手动刷新，可调用 loadGraphData()
+
+// 更新图谱样式（不重新渲染，只更新高亮状态）
+function updateGraphStyles() {
+    const svg = d3.select('#graph-svg');
+    if (svg.empty()) return;
+    
+    const g = svg.select('.graph-main-group');
+    if (g.empty()) return;
+    
+    // 更新节点样式
+    g.selectAll('.nodes circle')
+        .attr('r', d => {
+            if (highlightedPath?.nodeIds.has(d.id)) return 16;
+            if (highlightedNodeIds.has(d.id)) return 14;
+            return 10;
+        })
+        .attr('stroke', d => {
+            if (highlightedPath?.nodeIds.has(d.id)) return '#E91E63';
+            if (highlightedNodeIds.has(d.id)) return '#FFD700';
+            return '#fff';
+        })
+        .attr('stroke-width', d => {
+            if (highlightedPath?.nodeIds.has(d.id)) return 5;
+            if (highlightedNodeIds.has(d.id)) return 4;
+            return 2.5;
+        });
+    
+    // 更新边样式
+    g.selectAll('.links path')
+        .attr('stroke', d => {
+            const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+            const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+            const edgeKey = [sourceId, targetId].sort().join('_');
+            if (highlightedPath?.edgeIds.has(d.id) || highlightedPath?.edgeIds.has(edgeKey)) return '#E91E63';
+            if (d.isSelfLoop) return '#E91E63';
+            return edgeColorMap[d.type] || '#C0C0C0';
+        })
+        .attr('stroke-width', d => {
+            const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+            const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+            const edgeKey = [sourceId, targetId].sort().join('_');
+            if (highlightedPath?.edgeIds.has(d.id) || highlightedPath?.edgeIds.has(edgeKey)) return 4;
+            if (d.isSelfLoop) return 2;
+            return 1.5;
+        });
+}
+
+// ==================== 有意思的功能 ====================
+
+// 路径侦探目标节点
+let pathTargetNode = null;
+
+// 更新路径侦探器显示
+function updatePathFinder() {
+    const pathFinder = document.getElementById('pathFinder');
+    if (!pathFinder || !currentSelectedNode) return;
+    
+    // 如果已选中起点和终点，显示侦探器
+    if (pathTargetNode && currentSelectedNode.id !== pathTargetNode.id) {
+        pathFinder.style.display = 'block';
+        document.getElementById('pathFrom').textContent = currentSelectedNode.name;
+        document.getElementById('pathTo').textContent = pathTargetNode.name;
+    } else {
+        pathFinder.style.display = 'none';
     }
-});
+}
+
+// BFS 查找最短路径
+function findShortestPath(startId, endId) {
+    if (!graphData || !graphData.edges) return null;
+    
+    const queue = [[startId]];
+    const visited = new Set([startId]);
+    
+    while (queue.length > 0) {
+        const path = queue.shift();
+        const current = path[path.length - 1];
+        
+        if (current === endId) {
+            return path;
+        }
+        
+        // 查找相邻节点
+        for (const edge of graphData.edges) {
+            // 处理 D3 处理后的边（source/target 可能是对象或字符串）
+            const sourceId = typeof edge.source === 'object' ? edge.source.id : edge.source;
+            const targetId = typeof edge.target === 'object' ? edge.target.id : edge.target;
+            
+            let neighbor = null;
+            if (sourceId === current && targetId !== current) {
+                neighbor = targetId;
+            } else if (targetId === current && sourceId !== current) {
+                neighbor = sourceId;
+            }
+            
+            if (neighbor && !visited.has(neighbor)) {
+                visited.add(neighbor);
+                queue.push([...path, neighbor]);
+            }
+        }
+    }
+    
+    return null;
+}
+
+// 查找关系路径
+async function findRelationPath() {
+    if (!currentSelectedNode || !pathTargetNode) {
+        showToast('请先选择两个节点', 'warning');
+        return;
+    }
+    
+    const resultDiv = document.getElementById('pathResult');
+    const btn = document.querySelector('.btn-find-path');
+    
+    btn.disabled = true;
+    btn.textContent = '探索中...';
+    
+    // 查找路径
+    const path = findShortestPath(currentSelectedNode.id, pathTargetNode.id);
+    
+    if (!path) {
+        resultDiv.innerHTML = '<div style="color: #999; text-align: center;">未找到直接关联路径</div>';
+        resultDiv.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = '探索关联路径';
+        return;
+    }
+    
+    // 构建路径详情并收集边ID
+    const pathDetails = [];
+    const pathEdgeIds = new Set();
+    const pathNodeIds = new Set(path);
+    
+    for (let i = 0; i < path.length - 1; i++) {
+        const fromNode = graphData.nodes.find(n => n.id === path[i]);
+        const toNode = graphData.nodes.find(n => n.id === path[i + 1]);
+        
+        // 查找关系（处理 source/target 可能是对象的情况）
+        const edge = graphData.edges.find(e => {
+            const sourceId = typeof e.source === 'object' ? e.source.id : e.source;
+            const targetId = typeof e.target === 'object' ? e.target.id : e.target;
+            return (sourceId === path[i] && targetId === path[i + 1]) ||
+                   (sourceId === path[i + 1] && targetId === path[i]);
+        });
+        
+        if (edge) {
+            // 使用排序后的 ID，确保无论方向如何都能匹配
+            const edgeId = edge.id || [path[i], path[i+1]].sort().join('_');
+            pathEdgeIds.add(edgeId);
+        }
+        
+        pathDetails.push({
+            from: fromNode?.name || path[i],
+            to: toNode?.name || path[i + 1],
+            relation: edge?.name || '关联'
+        });
+    }
+    
+    // 保存高亮路径并重新渲染
+    highlightedPath = {
+        nodeIds: pathNodeIds,
+        edgeIds: pathEdgeIds
+    };
+    renderGraph();
+    
+    // 调用 AI 解读路径
+    try {
+        const response = await fetch('/api/graph/explore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question: `请解读以下关联路径，用侦探推理的方式描述这些节点如何联系在一起：\n${pathDetails.map((p, i) => `${i + 1}. ${p.from} ${p.relation} ${p.to}`).join('\n')}`,
+                node: currentSelectedNode,
+                history: []
+            })
+        });
+        
+        const result = await response.json();
+        
+        let html = '<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">🔍 侦探结果</div>';
+        
+        // 显示路径步骤
+        pathDetails.forEach((step, idx) => {
+            html += `
+                <div class="path-step">
+                    <div class="path-step-num">${idx + 1}</div>
+                    <div class="path-step-text">
+                        <strong>${step.from}</strong> 
+                        <span style="color: var(--color-text-secondary);">${step.relation}</span> 
+                        <strong>${step.to}</strong>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // AI 解读
+        if (result.success && result.data) {
+            html += `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light); font-style: italic; color: var(--color-text-secondary);">${result.data.answer}</div>`;
+        }
+        
+        resultDiv.innerHTML = html;
+        resultDiv.classList.add('show');
+        
+    } catch (error) {
+        resultDiv.innerHTML = '<div style="color: #c62828;">探索失败: ' + error.message + '</div>';
+        resultDiv.classList.add('show');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = '探索关联路径';
+}
+
+// 生成记忆故事
+async function generateMemoryStory() {
+    if (!currentSelectedNode && !currentSelectedEdge) {
+        showToast('请先选择一个节点或关系', 'warning');
+        return;
+    }
+    
+    const resultDiv = document.getElementById('storyResult');
+    const btn = document.querySelector('.btn-story');
+    
+    btn.disabled = true;
+    btn.textContent = '创作中...';
+    
+    try {
+        const response = await fetch('/api/graph/explore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question: `请基于以下信息，创作一段关于"${currentSelectedNode?.name || currentSelectedEdge?.source_name}"的记忆故事。这是用户记忆网络中的内容，请用第一人称"我"来叙述，像在回忆一段往事。文字要有情感、有画面感。`,
+                node: currentSelectedNode,
+                edge: currentSelectedEdge,
+                history: []
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            resultDiv.innerHTML = result.data.answer;
+            resultDiv.classList.add('show');
+        } else {
+            throw new Error(result.error || '生成失败');
+        }
+        
+    } catch (error) {
+        resultDiv.innerHTML = '<div style="color: #c62828;">创作失败: ' + error.message + '</div>';
+        resultDiv.classList.add('show');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = '生成关于此节点的记忆故事';
+}
+
+// 修改节点选中逻辑，支持路径侦探的双选
+function setupPathFinder(nodeData) {
+    if (!currentSelectedNode) {
+        // 第一次选中，设为起点
+        return;
+    }
+    
+    // 如果按住 Shift 键，设为终点
+    if (window.event && window.event.shiftKey) {
+        pathTargetNode = nodeData;
+        showToast(`已设置终点: ${nodeData.name}，点击"探索关联路径"`, 'info');
+        updatePathFinder();
+    } else {
+        // 清空之前的终点
+        pathTargetNode = null;
+        updatePathFinder();
+    }
+}

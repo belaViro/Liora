@@ -427,11 +427,536 @@ def get_relation_types():
         return jsonify({})
 
 
+@app.route('/api/graph/explore', methods=['POST'])
+def explore_node():
+    """
+    节点探索问答 - 基于节点上下文回答用户问题
+    """
+    try:
+        data = request.json
+        question = data.get('question', '')
+        node_data = data.get('node', {})
+        edge_data = data.get('edge', {})
+        chat_history = data.get('history', [])
+        
+        if not question:
+            return jsonify({'success': False, 'error': '问题不能为空'}), 400
+        
+        # 构建上下文
+        context_parts = []
+        
+        if node_data:
+            context_parts.append(f"节点名称: {node_data.get('name', '未知')}")
+            context_parts.append(f"节点类型: {node_data.get('type', 'Entity')}")
+            if node_data.get('description'):
+                context_parts.append(f"节点描述: {node_data.get('description')}")
+            if node_data.get('aliases'):
+                context_parts.append(f"别名: {', '.join(node_data.get('aliases', []))}")
+            if node_data.get('attributes'):
+                attrs = node_data.get('attributes', {})
+                attr_str = ', '.join([f"{k}={v}" for k, v in attrs.items()])
+                context_parts.append(f"属性: {attr_str}")
+        
+        elif edge_data:
+            if edge_data.get('isSelfLoopGroup'):
+                context_parts.append(f"自环节点: {edge_data.get('source_name', '未知')}")
+                context_parts.append(f"自环数量: {edge_data.get('selfLoopCount', 0)}")
+            else:
+                context_parts.append(f"源节点: {edge_data.get('source_name', '未知')}")
+                context_parts.append(f"关系: {edge_data.get('name', 'RELATED_TO')}")
+                context_parts.append(f"目标节点: {edge_data.get('target_name', '未知')}")
+            if edge_data.get('fact'):
+                context_parts.append(f"关系陈述: {edge_data.get('fact')}")
+            if edge_data.get('description'):
+                context_parts.append(f"关系描述: {edge_data.get('description')}")
+        
+        context = '\n'.join(context_parts)
+        
+        # 构建对话历史
+        messages = [
+            {"role": "system", "content": """
+你是 Liora 记忆网络的智能助手。Liora 是一个个人记忆管理系统，用户存储的所有内容都是 TA 的记忆。
+
+当前情境：
+- 用户正在查看自己记忆网络中的一个节点/关系
+- 节点包含的内容来自用户过往录入的记忆（文字、图片、音频等）
+- 你的任务是帮助用户回顾、整理和探索自己的记忆
+
+回答原则：
+1. 当用户问"这是谁的记忆"或"这是谁"时，要明确这是**用户自己的记忆**中的内容
+2. 基于节点描述进行回答，可以补充常识性背景
+3. 不要拒绝回答或说"这不是记忆"
+4. 如果用户问到记忆来源，可以说"这是您录入的记忆中的内容"
+
+回答风格：
+- 自然、友好、像在与朋友聊天
+- 不要机械地重复"根据节点信息"
+- 用中文回答
+"""}
+        ]
+        
+        # 添加历史对话
+        for msg in chat_history[-6:]:  # 只保留最近6轮
+            role = "user" if msg.get('role') == 'user' else "assistant"
+            messages.append({"role": role, "content": msg.get('content', '')})
+        
+        # 添加当前问题（带上下文）
+        prompt = f"""基于以下节点/关系信息：
+
+{context}
+
+用户问题：{question}
+
+请基于上述信息回答。如果问题与节点无关，请诚实告知。"""
+        
+        messages.append({"role": "user", "content": prompt})
+        
+        # 调用 LLM
+        response = llm_service.client.chat.completions.create(
+            model=llm_service.model_name,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=800
+        )
+        
+        answer = response.choices[0].message.content
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'answer': answer,
+                'timestamp': datetime.now().isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"节点探索失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'处理失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/graph/node/<node_id>', methods=['PUT'])
+def update_node(node_id):
+    """
+    更新实体信息（限制编辑）
+    """
+    try:
+        data = request.json
+        updates = {}
+        
+        # 只允许修改特定字段
+        if 'name' in data:
+            updates['name'] = data['name'].strip()
+        if 'type' in data:
+            if data['type'] in ['PERSON', 'LOCATION', 'EVENT', 'ENTITY']:
+                updates['type'] = data['type']
+        if 'description' in data:
+            updates['description'] = data['description'].strip()
+        if 'attributes' in data and isinstance(data['attributes'], dict):
+            updates['attributes'] = data['attributes']
+        
+        if not updates:
+            return jsonify({'success': False, 'message': '没有可更新的字段'})
+        
+        success = graph_service.update_node(node_id, updates)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '实体已更新',
+                'data': graph_service.get_entity(node_id)
+            })
+        else:
+            return jsonify({'success': False, 'message': '实体不存在'})
+            
+    except Exception as e:
+        logger.exception(f"更新实体失败: {e}")
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+
+@app.route('/api/graph/edge/<edge_id>', methods=['PUT'])
+def update_edge(edge_id):
+    """
+    更新关系边信息
+    """
+    try:
+        data = request.json
+        updates = {}
+        
+        # 只允许修改特定字段
+        if 'type' in data:
+            updates['type'] = data['type'].strip().upper()
+        if 'description' in data:
+            updates['description'] = data['description'].strip()
+        if 'fact' in data:
+            updates['fact'] = data['fact'].strip()
+        
+        if not updates:
+            return jsonify({'success': False, 'message': '没有可更新的字段'})
+        
+        success = graph_service.update_edge(edge_id, updates)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '关系已更新'
+            })
+        else:
+            return jsonify({'success': False, 'message': '关系不存在'})
+            
+    except Exception as e:
+        logger.exception(f"更新关系失败: {e}")
+        return jsonify({'success': False, 'message': f'更新失败: {str(e)}'})
+
+
+@app.route('/api/graph/edge/<edge_id>', methods=['DELETE'])
+def delete_edge(edge_id):
+    """
+    删除关系边
+    """
+    try:
+        success = graph_service.delete_edge(edge_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '关系已删除'
+            })
+        else:
+            return jsonify({'success': False, 'message': '关系不存在'})
+            
+    except Exception as e:
+        logger.exception(f"删除关系失败: {e}")
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
+
+@app.route('/api/graph/nodes/merge', methods=['POST'])
+def merge_nodes():
+    """
+    合并两个重复实体
+    """
+    try:
+        data = request.json
+        keep_id = data.get('keep_id')
+        remove_id = data.get('remove_id')
+        
+        if not keep_id or not remove_id:
+            return jsonify({'success': False, 'message': '需要指定保留和删除的实体ID'})
+        
+        if keep_id == remove_id:
+            return jsonify({'success': False, 'message': '不能合并相同实体'})
+        
+        success = graph_service.merge_nodes(keep_id, remove_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '实体已合并',
+                'data': {
+                    'keep_id': keep_id,
+                    'merged_memory_count': len(graph_service.get_entity(keep_id).get('memory_ids', []))
+                }
+            })
+        else:
+            return jsonify({'success': False, 'message': '合并失败，请检查实体ID'})
+            
+    except Exception as e:
+        logger.exception(f"合并实体失败: {e}")
+        return jsonify({'success': False, 'message': f'合并失败: {str(e)}'})
+
+
 # Socket.IO 事件处理
 @socketio.on('connect')
 def handle_connect():
     logger.info(f"客户端已连接: {request.sid}")
     emit('connected', {'message': '已连接到Liora'})
+
+
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    """
+    获取详细统计数据
+    """
+    try:
+        # 获取所有节点和边
+        nodes = graph_service.nodes
+        edges = graph_service.edges
+        memories = memory_service.get_all_memories()
+        
+        # 实体类型分布
+        entity_types = {}
+        for node in nodes.values():
+            node_type = node.get('type', 'ENTITY')
+            entity_types[node_type] = entity_types.get(node_type, 0) + 1
+        
+        # 关系类型分布
+        relation_types = {}
+        for edge in edges:
+            rel_type = edge.get('type', 'UNKNOWN')
+            relation_types[rel_type] = relation_types.get(rel_type, 0) + 1
+        
+        # 记忆时间分布（近30天）
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        daily_stats = {}
+        for i in range(30):
+            date = today - timedelta(days=i)
+            daily_stats[date.isoformat()] = 0
+        
+        for memory in memories:
+            created = memory.get('created_at', '')
+            if created:
+                try:
+                    date = datetime.fromisoformat(created.replace('Z', '+00:00')).date()
+                    if date.isoformat() in daily_stats:
+                        daily_stats[date.isoformat()] += 1
+                except:
+                    pass
+        
+        # 情感分布
+        emotion_stats = {'positive': 0, 'neutral': 0, 'negative': 0}
+        for memory in memories:
+            emotion = memory.get('emotion', {})
+            valence = emotion.get('valence', 0)
+            if valence > 0.3:
+                emotion_stats['positive'] += 1
+            elif valence < -0.3:
+                emotion_stats['negative'] += 1
+            else:
+                emotion_stats['neutral'] += 1
+        
+        # 最活跃实体TOP5
+        entity_activity = []
+        for node_id, node in nodes.items():
+            memory_count = len(memory_service.get_memories_by_entity(node_id))
+            entity_activity.append({
+                'id': node_id,
+                'name': node.get('name', '未知'),
+                'type': node.get('type', 'ENTITY'),
+                'memory_count': memory_count
+            })
+        entity_activity.sort(key=lambda x: x['memory_count'], reverse=True)
+        top_entities = entity_activity[:5]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_nodes': len(nodes),
+                'total_edges': len(edges),
+                'total_memories': len(memories),
+                'entity_types': entity_types,
+                'relation_types': relation_types,
+                'daily_stats': daily_stats,
+                'emotion_stats': emotion_stats,
+                'top_entities': top_entities
+            }
+        })
+        
+    except Exception as e:
+        logger.exception(f"获取统计数据失败: {e}")
+        return jsonify({'success': False, 'message': f'获取失败: {str(e)}'})
+
+
+@app.route('/api/memories/on-this-day', methods=['GET'])
+def get_memories_on_this_day():
+    """
+    获取往年今日的记忆，如果没有则随机返回不同的记忆
+    """
+    try:
+        from datetime import datetime
+        import random
+        
+        today = datetime.now()
+        current_year = today.year
+        current_month = today.month
+        current_day = today.day
+        
+        # 获取所有记忆
+        all_memories = memory_service.get_all_memories()
+        
+        if not all_memories:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'memories': [],
+                    'quote': "开始记录你的第一条记忆吧。",
+                    'today': today.strftime('%m月%d日'),
+                    'count': 0
+                }
+            })
+        
+        # 筛选往年今日的记忆
+        on_this_day = []
+        other_memories = []
+        
+        for memory in all_memories:
+            created = memory.get('created_at', '')
+            if created:
+                try:
+                    mem_date = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                    days_diff = (today - mem_date).days
+                    
+                    memory_data = {
+                        'memory': memory,
+                        'date': mem_date.strftime('%Y年%m月%d日'),
+                        'days_diff': days_diff
+                    }
+                    
+                    # 检查是否是今天（月日相同）但不是今年
+                    if (mem_date.month == current_month and 
+                        mem_date.day == current_day and 
+                        mem_date.year != current_year):
+                        on_this_day.append(memory_data)
+                    else:
+                        other_memories.append(memory_data)
+                except:
+                    continue
+        
+        # 如果有往年今日的记忆，优先展示（最多3条）
+        if on_this_day:
+            # 按时间排序，随机选取最多3条
+            on_this_day.sort(key=lambda x: x['days_diff'], reverse=True)
+            selected = on_this_day[:3]
+            quotes = [
+                "这些记忆如同时光的礼物，在今天重新展现。",
+                "往年的今天，你留下了这些印记。",
+                "时间是个圆，今天你回到了过去的这一天。",
+                "特定的日期，特别的回忆。"
+            ]
+        else:
+            # 没有往年今日的记忆，从其他记忆中随机选择（最多3条）
+            random.shuffle(other_memories)
+            selected = other_memories[:3]
+            quotes = [
+                "随机浮现的记忆，恰好是生命的礼物。",
+                "这些片段，构成了独一无二的你。",
+                "回忆如漫天星辰，随机而美丽。",
+                "今天，这些记忆想与你相见。"
+            ]
+        
+        quote = random.choice(quotes)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'memories': selected,
+                'quote': quote,
+                'today': today.strftime('%m月%d日'),
+                'count': len(selected),
+                'has_on_this_day': len(on_this_day) > 0
+            }
+        })
+        
+    except Exception as e:
+        logger.exception(f"获取往年今日记忆失败: {e}")
+        return jsonify({'success': False, 'message': f'获取失败: {str(e)}'})
+
+
+@app.route('/api/memories/ai-quote', methods=['POST'])
+def generate_ai_quote():
+    """
+    为记忆生成AI洛忆的评价和摘要
+    """
+    try:
+        data = request.json
+        memory_content = data.get('content', '')
+        days_ago = data.get('days_ago', 365)
+        emotion = data.get('emotion', {})
+        
+        if not memory_content:
+            return jsonify({'success': False, 'message': '记忆内容不能为空'})
+        
+        # 构建提示
+        emotion_desc = ""
+        if emotion:
+            valence = emotion.get('valence', 0)
+            if valence > 0.3:
+                emotion_desc = "当时感觉挺好的"
+            elif valence < -0.3:
+                emotion_desc = "当时心情不太好"
+            else:
+                emotion_desc = "当时心情还行"
+        
+        # 短记忆直接使用，长记忆需要摘要
+        content_length = len(memory_content)
+        if content_length <= 80:
+            summary = memory_content
+        else:
+            summary = None
+        
+        # 根据情绪设定洛忆的回复风格
+        valence = emotion.get('valence', 0) if emotion else 0
+        if valence > 0.3:
+            tone_instruction = """用户当时心情不错。你的回应要偏搞怪、调侃、有趣一点，像个捞天的朋友。
+例如："好家伙，这波装到了" "又来？你是不是暗恋人家" "这不给我带点？绝交了"""
+        elif valence < -0.3:
+            tone_instruction = """用户当时心情不太好。你的回应要偏安慰、共情、温暖，让对方感觉被理解。
+例如："抱抱，那时候挺难的吧" "都过去了，你已经很棒了" "我在，想聊的话随时说"""
+        else:
+            tone_instruction = """用户当时心情比较平静。你的回应要温和、伴侣，像一起慢慢生活的朋友。
+例如："这种日子挺好的" "看着就觉得安静" "这样的时光最轻松了"""
+        
+        prompt = f"""你是洛忆，用户最好的朋友。看到了用户{days_ago}天前的这条记忆：
+
+{memory_content[:300]}
+
+请返两行结果：
+
+第一行（SUMMARY）：用一句话摘要这条记忆的核心内容，25-35字左右。不要进行价值判断，只说事实。
+例如："周末在咖啡店偶遇老同学，聊了很久大学时光" "下雨天一个人在家看电影，很放松的一天"
+
+第二行（QUOTE）：你的回应。不要用大词，不要教育用户，不要超过25字。
+{tone_instruction}"""
+
+        response = llm_service.client.chat.completions.create(
+            model=llm_service.model_name,
+            messages=[
+                {"role": "system", "content": "你是洛忆，用户的朋友。你说话直接、真诚，不喜欢用大词。你很会观察细节，总能看到别人看不到的点。"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.9,
+            max_tokens=150
+        )
+        
+        result_text = response.choices[0].message.content.strip()
+        
+        # 解析响应
+        quote = ""
+        if summary is None:
+            # 需要解析AI返回的摘要
+            lines = [line.strip() for line in result_text.split('\n') if line.strip()]
+            for line in lines:
+                if line.startswith('SUMMARY') or line.startswith('摘要'):
+                    summary = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
+                elif line.startswith('QUOTE') or line.startswith('回应'):
+                    quote = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
+            # 如果没解析出来，整体当做quote
+            if not quote and result_text:
+                quote = result_text.split('\n')[0].strip().strip('"')
+            if not summary:
+                summary = memory_content[:80] + '...' if len(memory_content) > 80 else memory_content
+        else:
+            # 短记忆，整体当做quote
+            quote = result_text.split('\n')[0].strip().strip('"') if result_text else "这个细节我还记得。"
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'quote': quote,
+                'summary': summary
+            }
+        })
+        
+    except Exception as e:
+        logger.exception(f"生成AI评价失败: {e}")
+        return jsonify({
+            'success': True,
+            'data': {
+                'quote': "时间会淡去伤痛，留下的都是成长的印记。"
+            }
+        })
 
 
 @socketio.on('disconnect')

@@ -443,3 +443,134 @@ class GraphService:
             'edge_types': relation_type_counts,
             'average_degree': len(self.edges) * 2 / len(self.nodes) if self.nodes else 0
         }
+    
+    def update_node(self, node_id: str, updates: Dict[str, Any]) -> bool:
+        """
+        更新实体信息（限制编辑）
+        
+        Args:
+            node_id: 实体ID
+            updates: 更新字段（只允许 name, type, description, attributes）
+            
+        Returns:
+            是否成功
+        """
+        if node_id not in self.nodes:
+            return False
+        
+        node = self.nodes[node_id]
+        
+        # 只允许修改特定字段
+        allowed_fields = ['name', 'type', 'description', 'attributes']
+        for field in allowed_fields:
+            if field in updates:
+                node[field] = updates[field]
+        
+        node['updated_at'] = datetime.now().isoformat()
+        self._save_graph()
+        logger.info(f"实体已更新: {node_id}")
+        return True
+    
+    def update_edge(self, edge_id: str, updates: Dict[str, Any]) -> bool:
+        """
+        更新关系边信息
+        
+        Args:
+            edge_id: 边索引（或 UUID）
+            updates: 更新字段（只允许 type, description）
+            
+        Returns:
+            是否成功
+        """
+        for edge in self.edges:
+            edge_id_in_list = edge.get('id') or edge.get('uuid')
+            if edge_id_in_list == edge_id:
+                allowed_fields = ['type', 'description', 'fact']
+                for field in allowed_fields:
+                    if field in updates:
+                        edge[field] = updates[field]
+                edge['updated_at'] = datetime.now().isoformat()
+                self._save_graph()
+                logger.info(f"关系边已更新: {edge_id}")
+                return True
+        return False
+    
+    def delete_edge(self, edge_id: str) -> bool:
+        """
+        删除关系边
+        
+        Args:
+            edge_id: 边ID
+            
+        Returns:
+            是否成功
+        """
+        initial_count = len(self.edges)
+        self.edges = [e for e in self.edges if (e.get('id') or e.get('uuid')) != edge_id]
+        
+        if len(self.edges) < initial_count:
+            self._save_graph()
+            logger.info(f"关系边已删除: {edge_id}")
+            return True
+        return False
+    
+    def merge_nodes(self, keep_id: str, remove_id: str) -> bool:
+        """
+        合并两个重复实体
+        
+        Args:
+            keep_id: 保留的实体ID
+            remove_id: 删除的实体ID
+            
+        Returns:
+            是否成功
+        """
+        if keep_id not in self.nodes or remove_id not in self.nodes:
+            return False
+        
+        if keep_id == remove_id:
+            return False
+        
+        keep_node = self.nodes[keep_id]
+        remove_node = self.nodes[remove_id]
+        
+        # 合并记忆关联（去重）
+        keep_memories = set(keep_node.get('memory_ids', []))
+        remove_memories = set(remove_node.get('memory_ids', []))
+        merged_memories = list(keep_memories | remove_memories)
+        keep_node['memory_ids'] = merged_memories
+        
+        # 更新所有关系边
+        for edge in self.edges:
+            if edge.get('source') == remove_id:
+                edge['source'] = keep_id
+            if edge.get('target') == remove_id:
+                edge['target'] = keep_id
+        
+        # 删除重复实体
+        del self.nodes[remove_id]
+        
+        # 去除可能产生的自环和重复边
+        seen_edges = set()
+        unique_edges = []
+        for edge in self.edges:
+            src = edge.get('source')
+            tgt = edge.get('target')
+            edge_type = edge.get('type', '')
+            
+            # 跳过自环（除非原本就是自环）
+            if src == tgt and src != keep_id:
+                continue
+                
+            # 去重
+            edge_key = (src, tgt, edge_type)
+            if edge_key not in seen_edges:
+                seen_edges.add(edge_key)
+                unique_edges.append(edge)
+        
+        self.edges = unique_edges
+        
+        keep_node['updated_at'] = datetime.now().isoformat()
+        self._save_graph()
+        logger.info(f"实体已合并: {remove_id} → {keep_id}")
+        return True
