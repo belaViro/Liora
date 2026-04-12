@@ -2489,10 +2489,8 @@ function showNodeDetail(nodeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.style.display = 'none';
-    badge.textContent = nodeData.type || 'ENTITY';
-    badge.style.background = colorMap[nodeData.type] || '#999';
-    badge.style.display = 'inline-block';
+    title.textContent = nodeData.name || '未知';
+    badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
     if (headerActions) {
@@ -2512,10 +2510,22 @@ function showNodeDetail(nodeData) {
         `;
     }
 
+    const typeNameMap = {
+        'PERSON': '人物',
+        'LOCATION': '地点',
+        'EVENT': '事件',
+        'OBJECT': '物品',
+        'CONCEPT': '概念',
+        'ENTITY': '实体'
+    };
+    const typeName = typeNameMap[nodeData.type] || nodeData.type || '实体';
+
     let html = `
         <div class="detail-row">
-            <span class="detail-label">名称:</span>
-            <span class="detail-value">${nodeData.name || '未知'}</span>
+            <span class="detail-label">类型:</span>
+            <span class="detail-value">
+                <span class="type-badge-inline" style="background: ${colorMap[nodeData.type] || '#999'}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${typeName}</span>
+            </span>
         </div>
     `;
 
@@ -3173,10 +3183,8 @@ function showEdgeDetail(edgeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.style.display = 'none';
-    badge.textContent = 'RELATION';
-    badge.style.background = '#8e44ad';
-    badge.style.display = 'inline-block';
+    title.textContent = sourceName + ' → ' + targetName;
+    badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
     const edgeId = edgeData.id || edgeData.uuid || '';
