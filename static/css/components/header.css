@@ -1,0 +1,114 @@
+/**
+ * Liora - Header 组件样式
+ * 顶部导航栏 - 借鉴终端风格
+ */
+
+/* ============================================
+   顶部系统栏 - 借鉴终端风格
+   ============================================ */
+
+.header {
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
+    background-color: var(--color-bg);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--font-mono);
+}
+
+.logo {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo::before {
+    content: '◆';
+    color: var(--color-memory);
+    font-size: 18px;
+}
+
+.search-box {
+    flex: 1;
+    display: flex;
+    border: 1px solid var(--color-border-light);
+    max-width: 500px;
+    background: var(--color-bg);
+    transition: all 0.2s ease;
+}
+
+.search-box:focus-within {
+    border-color: var(--color-memory);
+    box-shadow: 0 0 0 3px var(--color-memory-light);
+}
+
+.search-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    background: transparent;
+}
+
+.search-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.search-button {
+    padding: 10px 16px;
+    border: none;
+    border-left: 1px solid var(--color-border-light);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.search-button:hover {
+    background-color: var(--color-memory);
+    color: #fff;
+    border-color: var(--color-memory);
+}
+
+.search-button:focus-visible {
+    outline: 2px solid var(--color-memory);
+    outline-offset: 2px;
+}
+
+/* 时光旅行按钮 */
+.time-travel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.time-travel-btn:hover {
+    border-color: var(--color-memory);
+    color: var(--color-memory);
+    background: var(--color-memory-light);
+}
+
+.time-travel-icon {
+    font-size: 14px;
+}

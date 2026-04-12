@@ -14,6 +14,9 @@
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
 
+    <!-- 组件样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
+
     <style>
 
         /* ============================================
@@ -6667,50 +6670,7 @@
 
     <div class="container">
 
-        <!-- 顶部搜索记忆-->
-
-        <div class="header">
-
-            <div class="logo">◆Liora</div>
-
-            <div class="search-box">
-
-                <input type="text" class="search-input" id="searchInput" placeholder="搜索你的记忆..">
-
-                <button class="search-button" onclick="searchMemories()">搜索</button>
-
-            </div>
-
-
-
-            <!-- 历史上的今天入口-->
-
-            <button class="time-travel-btn" onclick="openTimeTravelPanel()" title="历史上的今天"
-
-                <span class="time-travel-icon">⏱</span>
-
-                <span class="time-travel-text">时光</span>
-
-            </button>
-
-
-
-            <!-- 移动端菜单按钮-->
-
-            <button class="mobile-menu-btn" onclick="toggleMobileMenu()" title="菜单">
-
-
-
-
-            </button>
-
-        </div>
-
-        <!-- 移动端菜单-->
-
-        <div class="mobile-menu" id="mobileMenu">
-
-        </div>
+        {% include 'components/header.html' %}
 
 
 
