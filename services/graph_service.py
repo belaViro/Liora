@@ -102,9 +102,16 @@ class GraphService:
     def _normalize_entity_id(self, name: str) -> str:
         """生成标准化的实体ID"""
         import re
-        # 转换为小写，移除非字母数字字符，用下划线连接
-        normalized = re.sub(r'[^\w\s]', '', name.lower())
+        import hashlib
+        # 处理中文：保留中文、英文、数字，移除特殊字符
+        # 使用 Unicode 属性来匹配字母和数字（包括中文）
+        normalized = re.sub(r'[^\w\s\u4e00-\u9fff]', '', name.lower())
         normalized = re.sub(r'\s+', '_', normalized.strip())
+        
+        # 如果处理后为空（全是特殊字符），使用哈希值
+        if not normalized:
+            normalized = hashlib.md5(name.encode()).hexdigest()[:8]
+        
         return normalized
 
     def update_graph(self, entities: List[Dict], relations: List[Dict], memory_id: str, 
@@ -295,8 +302,8 @@ class GraphService:
                 if entity_types is None or node['type'] in entity_types:
                     filtered_nodes[nid] = node
         
-        # 限制节点数量
-        if len(filtered_nodes) > max_nodes:
+        # 限制节点数量（max_nodes=0 表示不限制）
+        if max_nodes > 0 and len(filtered_nodes) > max_nodes:
             # 按关系数量排序，保留最重要的节点
             sorted_nodes = sorted(
                 filtered_nodes.items(),

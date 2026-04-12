@@ -875,8 +875,8 @@ async function searchMemories() {
         const result = await response.json();
 
         if (result.success) {
-            // 先高亮节点（这会触发renderGraph）
-            highlightNodesFromMemories(result.results);
+            // 先高亮节点（记忆 + 图谱节点）
+            highlightSearchResults(result.results, result.matched_nodes);
             // 再切换标签页（跳过自动加载，因为已有数据）
             switchTab('memories', null, true);
             renderSearchResults(result, query);
@@ -893,14 +893,15 @@ async function searchMemories() {
 function renderSearchResults(result, query) {
     const listEl = document.getElementById('memoryList');
     const memories = result.results || [];
+    const matchedNodes = result.matched_nodes || [];
     const matchTypes = result.match_types || [];
     const scores = result.scores || [];
     const searchInfo = result.search_info || {};
 
-    if (memories.length === 0) {
+    if (memories.length === 0 && matchedNodes.length === 0) {
         listEl.innerHTML = `
             <div style="text-align: center; padding: 20px; color: #666;">
-                <div>未找到与 "${query}" 相关的记忆</div>
+                <div>未找到与 "${query}" 相关的记忆或节点</div>
                 <div style="font-size: 11px; margin-top: 8px; color: #999;">
                     向量搜索: ${searchInfo.vector_enabled ? '✓' : '✗'} | 
                     关键词搜索: ${searchInfo.keyword_enabled ? '✓' : '✗'}
@@ -925,11 +926,29 @@ function renderSearchResults(result, query) {
     let html = `
         <div style="padding: 10px 12px; background: #f8f8f8; border-radius: 6px; margin-bottom: 12px; font-size: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>找到 ${memories.length} 个结果</span>
+                <span>找到 ${memories.length} 个记忆${matchedNodes.length > 0 ? '，' + matchedNodes.length + ' 个节点' : ''}</span>
                 <span>${searchInfoHtml}</span>
             </div>
         </div>
     `;
+    
+    // 显示匹配的图谱节点
+    if (matchedNodes.length > 0) {
+        html += `<div style="margin-bottom: 12px;">`;
+        matchedNodes.forEach(node => {
+            html += `
+                <div class="memory-item" style="border-left: 3px solid #8b7355; background: #faf8f5;" onclick="focusNodeById('${node.id}')">
+                    <div class="memory-item-header">
+                        <span class="memory-type" style="background: transparent; border: 1px solid #8b7355; color: #8b7355;">节点</span>
+                        <span style="font-weight: 500; color: #4a3c2e;">${node.name}</span>
+                        <span style="margin-left: auto; color: #999; font-size: 11px;">${node.type}</span>
+                    </div>
+                    ${node.description ? `<div class="memory-content" style="font-size: 12px; color: #666;">${node.description}</div>` : ''}
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
 
     html += memories.map((memory, idx) => {
         const typeLabels = {
@@ -996,10 +1015,179 @@ function highlightNodesFromMemories(memories) {
     }
 }
 
-// 聚焦到高亮节点中心（暂时禁用，避免干扰用户缩放）
+// 根据搜索结果高亮节点（记忆 + 图谱节点）
+function highlightSearchResults(memories, matchedNodes) {
+    highlightedNodeIds.clear();
+    console.log('[搜索高亮] 开始处理，记忆数量:', memories?.length, '节点数量:', matchedNodes?.length);
+
+    // 从记忆中收集实体ID
+    if (memories) {
+        memories.forEach(memory => {
+            const entities = memory.entities || [];
+            entities.forEach(entity => {
+                if (entity.id) {
+                    highlightedNodeIds.add(entity.id);
+                    console.log('[搜索高亮] 从记忆添加:', entity.id);
+                }
+            });
+        });
+    }
+    
+    // 从匹配的图谱节点添加
+    if (matchedNodes) {
+        matchedNodes.forEach(node => {
+            if (node.id) {
+                highlightedNodeIds.add(node.id);
+                console.log('[搜索高亮] 从节点匹配添加:', node.id, node.name);
+            }
+        });
+    }
+    
+    console.log('[搜索高亮] 总共高亮节点数:', highlightedNodeIds.size);
+
+    // 如果图谱已加载，更新样式并聚焦
+    if (graphData.nodes && graphData.nodes.length > 0) {
+        updateGraphStyles();
+        // 延迟聚焦，等待渲染完成
+        setTimeout(focusOnHighlightedNodes, 500);
+    }
+}
+
+// 通过ID聚焦到特定节点
+function focusNodeById(nodeId) {
+    console.log('[聚焦] 点击节点:', nodeId);
+    if (!graphData || !graphData.nodes) return;
+    
+    const node = graphData.nodes.find(n => n.id === nodeId);
+    if (!node) {
+        console.log('[聚焦] 节点未找到:', nodeId);
+        return;
+    }
+    
+    // 高亮该节点
+    highlightedNodeIds.clear();
+    highlightedNodeIds.add(nodeId);
+    updateGraphStyles();
+    
+    // 显示详情
+    showNodeDetail(node);
+    
+    // 聚焦到节点
+    if (node.x !== undefined && node.y !== undefined) {
+        const svg = d3.select('#graph-svg');
+        if (svg.empty()) return;
+        
+        const container = svg.node().parentElement;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        const transform = d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(1.2)
+            .translate(-node.x, -node.y);
+        
+        svg.transition()
+            .duration(750)
+            .ease(d3.easeCubicOut)
+            .call(graphZoom.transform, transform);
+        
+        console.log('[聚焦] 已聚焦到节点:', node.name);
+    }
+}
+
+// 聚焦到高亮节点中心
 function focusOnHighlightedNodes() {
-    // 暂时禁用自动聚焦，确保用户缩放不受影响
-    return;
+    console.log('[聚焦] focusOnHighlightedNodes 被调用', {
+        highlightedCount: highlightedNodeIds?.size,
+        graphDataExists: !!graphData,
+        nodesCount: graphData?.nodes?.length,
+        graphZoomExists: !!graphZoom
+    });
+    
+    if (!highlightedNodeIds || highlightedNodeIds.size === 0) {
+        console.log('[聚焦] 无高亮节点，跳过');
+        return;
+    }
+    if (!graphData || !graphData.nodes) {
+        console.log('[聚焦] 无图谱数据，跳过');
+        return;
+    }
+    if (!graphZoom) {
+        console.log('[聚焦] graphZoom 未初始化，跳过');
+        return;
+    }
+    
+    // 延迟执行，确保力导向模拟稳定
+    setTimeout(() => {
+        // 获取高亮节点的坐标
+        const highlightedNodes = graphData.nodes.filter(n => highlightedNodeIds.has(n.id));
+        console.log('[聚焦] 找到高亮节点:', highlightedNodes.length, highlightedNodes.map(n => n.name));
+        
+        if (highlightedNodes.length === 0) {
+            console.log('[聚焦] 高亮节点未在 graphData 中找到');
+            return;
+        }
+        
+        // 计算边界框
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        let validCount = 0;
+        highlightedNodes.forEach(node => {
+            console.log('[聚焦] 检查节点坐标:', node.name, { x: node.x, y: node.y });
+            if (node.x !== undefined && node.y !== undefined && !isNaN(node.x) && !isNaN(node.y)) {
+                minX = Math.min(minX, node.x);
+                maxX = Math.max(maxX, node.x);
+                minY = Math.min(minY, node.y);
+                maxY = Math.max(maxY, node.y);
+                validCount++;
+            }
+        });
+        
+        // 如果没有有效坐标，跳过
+        if (validCount === 0) {
+            console.log('[聚焦] 无有效坐标，跳过');
+            return;
+        }
+        
+        // 计算中心点和合适的缩放级别
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const bboxWidth = Math.max(maxX - minX + 200, 300); // 添加边距，最小 300
+        const bboxHeight = Math.max(maxY - minY + 200, 300);
+        
+        const svg = d3.select('#graph-svg');
+        if (svg.empty()) {
+            console.log('[聚焦] SVG 不存在');
+            return;
+        }
+        
+        const container = svg.node().parentElement;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        // 计算合适的缩放级别（使所有高亮节点都在视野内）
+        const scaleX = width / bboxWidth;
+        const scaleY = height / bboxHeight;
+        const scale = Math.min(scaleX, scaleY, 1.5); // 最大缩放 1.5 倍
+        const clampedScale = Math.max(0.3, Math.min(scale, 2)); // 限制在 0.3-2 之间
+        
+        console.log('[聚焦] 计算参数:', { centerX, centerY, bboxWidth, bboxHeight, scale: clampedScale });
+        
+        // 计算 transform
+        const transform = d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(clampedScale)
+            .translate(-centerX, -centerY);
+        
+        console.log('[聚焦] 应用 transform:', transform);
+        
+        // 应用平滑过渡动画
+        svg.transition()
+            .duration(750)
+            .ease(d3.easeCubicOut)
+            .call(graphZoom.transform, transform);
+        
+        console.log(`[聚焦] ✅ 已居中 ${validCount} 个节点，缩放: ${clampedScale.toFixed(2)}`);
+    }, 800); // 800ms 延迟，等待力导向模拟稳定
 }
 
 // ==================== 记忆列表 ====================
@@ -1010,6 +1198,7 @@ async function loadMemories() {
         const result = await response.json();
 
         if (result.success) {
+            originalMemories = result.memories || []; // 保存原始完整列表
             renderMemoryList(result.memories);
         }
     } catch (error) {
@@ -1019,6 +1208,7 @@ async function loadMemories() {
 
 // 全局存储记忆列表用于搜索
 let allMemories = [];
+let originalMemories = []; // 保存原始完整列表，用于搜索恢复
 
 function renderMemoryList(memories) {
     const listEl = document.getElementById('memoryList');
@@ -1121,11 +1311,11 @@ function getEmotionColor(valence) {
 // 搜索记忆
 function filterMemories(query) {
     if (!query.trim()) {
-        renderMemoryList(allMemories);
+        renderMemoryList(originalMemories);
         return;
     }
     
-    const filtered = allMemories.filter(m => {
+    const filtered = originalMemories.filter(m => {
         const content = m.understanding?.description || m.content || '';
         const entities = (m.entities || []).map(e => e.name).join(' ');
         const searchText = (content + ' ' + entities).toLowerCase();
@@ -1138,7 +1328,7 @@ function filterMemories(query) {
 // 清除搜索
 function clearMemorySearch() {
     document.getElementById('memorySearchInput').value = '';
-    renderMemoryList(allMemories);
+    renderMemoryList(originalMemories);
 }
 
 async function viewMemory(memoryId) {
@@ -1612,11 +1802,19 @@ function initGraph() {
     graphInitialized = true;
 }
 
-async function loadGraphData(entityTypes = null) {
+async function loadGraphData(entityTypes = null, centerEntity = null) {
     try {
-        let url = '/api/graph/data?max_nodes=100';
+        // 默认返回所有节点（不限制数量）
+        let url = '/api/graph/data';
+        const params = [];
         if (entityTypes && entityTypes !== 'all') {
-            url += `&types=${entityTypes}`;
+            params.push(`types=${entityTypes}`);
+        }
+        if (centerEntity) {
+            params.push(`entity=${encodeURIComponent(centerEntity)}`);
+        }
+        if (params.length > 0) {
+            url += '?' + params.join('&');
         }
 
         const response = await fetch(url);
@@ -1626,6 +1824,10 @@ async function loadGraphData(entityTypes = null) {
             graphData = result.data;
             renderGraph();
             updateLegend();
+            // 如果有高亮节点，聚焦到它们
+            if (highlightedNodeIds && highlightedNodeIds.size > 0) {
+                setTimeout(focusOnHighlightedNodes, 1000);
+            }
         }
     } catch (error) {
         console.error('加载图谱数据失败:', error);
@@ -2229,6 +2431,14 @@ function renderGraph() {
 
         node.attr('cx', d => d.x).attr('cy', d => d.y);
         nodeLabels.attr('x', d => d.x).attr('y', d => d.y);
+        
+        // 同步坐标到 graphData.nodes，供聚焦功能使用
+        nodes.forEach(n => {
+            if (n.rawData) {
+                n.rawData.x = n.x;
+                n.rawData.y = n.y;
+            }
+        });
     });
     
     // 点击空白关闭详情面板
@@ -2249,20 +2459,17 @@ function renderGraph() {
 
 // 拖拽功能
 function dragstarted(event, d) {
-    console.log('dragstarted', d.id);
     if (!event.active && simulation) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
     d.fy = d.y;
 }
 
 function dragged(event, d) {
-    console.log('dragged', d.id, event.x, event.y);
     d.fx = event.x;
     d.fy = event.y;
 }
 
 function dragended(event, d) {
-    console.log('dragended', d.id);
     if (!event.active && simulation) simulation.alphaTarget(0);
     d.fx = null;
     d.fy = null;
@@ -2350,6 +2557,14 @@ function showNodeDetail(nodeData) {
 
     // 更新探索面板
     updateExplorePanel(nodeData);
+    
+    // 触发预测功能（如果可用）
+    console.log('[预测] 检查预测功能...', typeof onNodeSelectedForPrediction);
+    if (typeof onNodeSelectedForPrediction === 'function') {
+        onNodeSelectedForPrediction(nodeData);
+    } else {
+        console.log('[预测] prediction.js 未加载或函数不存在');
+    }
 }
 
 // ==================== 详情面板编辑功能 ====================
@@ -2747,6 +2962,9 @@ function updateExplorePanel(nodeData) {
         storyGenSection.style.display = 'block';
     }
     
+    // 重置故事生成状态
+    resetStoryGenerator();
+    
     // 清空聊天历史
     exploreChatHistory = [];
     renderExploreChat();
@@ -3127,6 +3345,15 @@ function updateExplorePanelForEdge(edgeData) {
     if (memoryCountEl) memoryCountEl.textContent = edgeData.memory_ids?.length || 0;
     if (connectionCountEl) connectionCountEl.textContent = edgeData.isSelfLoopGroup ? edgeData.selfLoopCount || 0 : 1;
     
+    // 显示"生成此关系的记忆故事"按钮
+    const storyGenSection = document.querySelector('.explore-story-gen');
+    if (storyGenSection) {
+        storyGenSection.style.display = 'block';
+    }
+    
+    // 重置故事生成状态
+    resetStoryGenerator();
+    
     // 清空聊天历史
     exploreChatHistory = [];
     renderExploreChat();
@@ -3454,6 +3681,28 @@ async function findRelationPath() {
 }
 
 // 生成记忆故事
+// 重置故事生成器状态
+function resetStoryGenerator() {
+    const resultDiv = document.getElementById('storyResult');
+    const btn = document.querySelector('.btn-story');
+    
+    if (resultDiv) {
+        resultDiv.innerHTML = '';
+        resultDiv.classList.remove('show');
+    }
+    
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            生成关于此节点的记忆故事
+        `;
+    }
+}
+
 async function generateMemoryStory() {
     if (!currentSelectedNode && !currentSelectedEdge) {
         showToast('请先选择一个节点或关系', 'warning');
@@ -3462,16 +3711,29 @@ async function generateMemoryStory() {
     
     const resultDiv = document.getElementById('storyResult');
     const btn = document.querySelector('.btn-story');
+    const targetName = currentSelectedNode?.name || 
+        (currentSelectedEdge?.isSelfLoopGroup 
+            ? currentSelectedEdge?.source_name 
+            : `${currentSelectedEdge?.source_name} → ${currentSelectedEdge?.target_name}`);
+    
+    // 清除之前的结果
+    resultDiv.innerHTML = '';
+    resultDiv.classList.remove('show');
     
     btn.disabled = true;
-    btn.textContent = '创作中...';
+    btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+            <circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"></circle>
+        </svg>
+        <span class="loading-dots">创作中</span>
+    `;
     
     try {
         const response = await fetch('/api/graph/explore', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                question: `请基于以下信息，创作一段关于"${currentSelectedNode?.name || currentSelectedEdge?.source_name}"的记忆故事。这是用户记忆网络中的内容，请用第一人称"我"来叙述，像在回忆一段往事。文字要有情感、有画面感。`,
+                question: `请基于以下信息，创作一段关于"${targetName}"的记忆故事。这是用户记忆网络中的内容，请用第一人称"我"来叙述，像在回忆一段往事。文字要有情感、有画面感，控制在200字左右。`,
                 node: currentSelectedNode,
                 edge: currentSelectedEdge,
                 history: []
@@ -3481,8 +3743,24 @@ async function generateMemoryStory() {
         const result = await response.json();
 
         if (result.success && result.data) {
-            const html = `<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">📖 记忆故事</div>
-                <div style="line-height: 1.8; font-style: italic;">${result.data.answer}</div>`;
+            // 将文本分段，每段用p标签包裹
+            const paragraphs = result.data.answer
+                .split('\n')
+                .filter(p => p.trim())
+                .map(p => `<p>${p.trim()}</p>`)
+                .join('');
+            
+            const html = `
+                <div class="story-result-header">
+                    <span class="story-result-title">关于「${targetName}」的记忆</span>
+                </div>
+                <div class="story-result-content">
+                    ${paragraphs}
+                </div>
+                <div class="story-result-footer">
+                    <span class="story-result-brand">Liora · 记忆网络</span>
+                </div>
+            `;
             resultDiv.innerHTML = html;
             resultDiv.classList.add('show');
         } else {
@@ -3490,12 +3768,23 @@ async function generateMemoryStory() {
         }
         
     } catch (error) {
-        resultDiv.innerHTML = '<div style="color: #c62828; font-weight: 600; margin-bottom: 10px;">创作失败</div><div>' + error.message + '</div>';
+        resultDiv.innerHTML = `
+            <div class="story-error">
+                <strong>创作失败</strong><br>
+                ${error.message}
+            </div>
+        `;
         resultDiv.classList.add('show');
     }
     
     btn.disabled = false;
-    btn.textContent = '生成关于此节点的记忆故事';
+    btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        重新生成记忆故事
+    `;
 }
 
 // 修改节点选中逻辑，支持路径侦探的双选

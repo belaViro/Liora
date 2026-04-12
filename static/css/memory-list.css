@@ -1,0 +1,576 @@
+/**
+ * Liora Memory List Styles
+ * Extracted from templates/index.html (lines 3120-3695)
+ */
+
+/* ============================================
+   记忆列表 - 单个卡片列表
+   ============================================ */
+
+.memory-list {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+
+    max-height: calc(100vh - 200px);
+
+    overflow-y: auto;
+
+}
+
+
+
+/* 记忆搜索 */
+
+.memory-search {
+
+    display: flex;
+
+    gap: 8px;
+
+    margin-bottom: 16px;
+
+}
+
+
+
+.memory-search input {
+
+    flex: 1;
+
+    padding: 10px 12px;
+
+    border: 1px solid var(--color-border-light);
+
+    font-size: 13px;
+
+    outline: none;
+
+}
+
+
+
+.memory-search input:focus {
+
+    border-color: var(--color-memory);
+
+}
+
+
+
+.memory-search button {
+
+    width: 36px;
+
+    height: 36px;
+
+    border: 1px solid var(--color-border-light);
+
+    background: var(--color-bg);
+
+    cursor: pointer;
+
+    font-size: 18px;
+
+    color: var(--color-text-secondary);
+
+}
+
+
+
+.memory-search button:hover {
+
+    border-color: var(--color-memory);
+
+    color: var(--color-memory);
+
+}
+
+
+
+/* 时间分组 */
+
+.memory-group {
+
+    margin-bottom: 16px;
+
+}
+
+
+
+.memory-group-title {
+
+    font-size: 11px;
+
+    font-weight: 600;
+
+    color: var(--color-memory);
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.5px;
+
+    padding: 8px 0;
+
+    border-bottom: 1px solid var(--color-border-light);
+
+    margin-bottom: 12px;
+
+}
+
+
+
+.memory-item {
+
+    border: 1px solid var(--color-border-light);
+
+    padding: 14px;
+
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+
+    position: relative;
+
+    background: var(--color-bg);
+
+}
+
+
+
+.memory-item:hover {
+
+    border-color: var(--color-memory);
+
+    box-shadow: var(--shadow-sm);
+
+    transform: translateX(2px);
+
+}
+
+
+
+.memory-item:focus-visible {
+
+    outline: 2px solid var(--color-memory);
+
+    outline-offset: 2px;
+
+    border-color: var(--color-memory);
+
+}
+
+
+
+.memory-item:hover .memory-delete-btn {
+
+    opacity: 1;
+
+}
+
+
+
+.memory-item-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 6px;
+
+}
+
+
+
+.memory-type {
+
+    font-size: 9px;
+
+    padding: 2px 8px;
+
+    border: 1px solid var(--color-border-light);
+
+    font-family: var(--font-mono);
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.5px;
+
+    color: var(--color-text-secondary);
+
+}
+
+
+
+.memory-date {
+
+    font-size: 10px;
+
+    color: var(--color-text-muted);
+
+    font-family: var(--font-mono);
+
+}
+
+
+
+.memory-delete-btn {
+
+    position: absolute;
+
+    top: 10px;
+
+    right: 10px;
+
+    width: 20px;
+
+    height: 20px;
+
+    border: 1px solid var(--color-border-light);
+
+    background: var(--color-bg);
+
+    cursor: pointer;
+
+    font-size: 12px;
+
+    line-height: 1;
+
+    color: var(--color-text-muted);
+
+    opacity: 0;
+
+    transition: all 0.2s;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+}
+
+
+
+.memory-delete-btn:hover {
+
+    background: #e74c3c;
+
+    border-color: #e74c3c;
+
+    color: #fff;
+
+}
+
+
+
+.memory-content {
+
+    font-size: 13px;
+
+    line-height: 1.5;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    display: -webkit-box;
+
+    -webkit-line-clamp: 2;
+
+    -webkit-box-orient: vertical;
+
+    color: var(--color-text);
+
+}
+
+
+
+.memory-entities {
+
+    margin-top: 10px;
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 6px;
+
+}
+
+
+
+.entity-tag {
+
+    font-size: 9px;
+
+    padding: 2px 8px;
+
+    background-color: var(--color-bg-secondary);
+
+    border: 1px solid var(--color-border-light);
+
+    font-family: var(--font-mono);
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.3px;
+
+    color: var(--color-text-secondary);
+
+    cursor: pointer;
+
+    transition: all 0.2s;
+
+}
+
+
+
+.entity-tag:hover {
+
+    background-color: var(--color-memory-light);
+
+    border-color: var(--color-memory);
+
+    color: var(--color-memory);
+
+}
+
+
+
+/* 记忆详情弹窗 */
+
+.memory-modal {
+
+    display: none;
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    right: 0;
+
+    bottom: 0;
+
+    background: rgba(0,0,0,0.5);
+
+    z-index: 1000;
+
+    justify-content: center;
+
+    align-items: center;
+
+}
+
+
+
+.memory-modal.show {
+
+    display: flex;
+
+}
+
+
+
+.memory-modal-content {
+
+    background: var(--color-bg);
+
+    width: 90%;
+
+    max-width: 600px;
+
+    max-height: 80vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+    border: 1px solid var(--color-border);
+
+    box-shadow: var(--shadow-lg);
+
+}
+
+
+
+.memory-modal-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    padding: 16px 20px;
+
+    border-bottom: 1px solid var(--color-border-light);
+
+    background: var(--color-bg-secondary);
+
+}
+
+
+
+.memory-modal-title {
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+}
+
+
+
+.memory-modal-close {
+
+    width: 32px;
+
+    height: 32px;
+
+    border: 1px solid var(--color-border-light);
+
+    background: var(--color-bg);
+
+    cursor: pointer;
+
+    font-size: 18px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+}
+
+
+
+.memory-modal-close:hover {
+
+    background: var(--color-memory);
+
+    color: #fff;
+
+    border-color: var(--color-memory);
+
+}
+
+
+
+.memory-modal-body {
+
+    padding: 20px;
+
+    overflow-y: auto;
+
+    line-height: 1.7;
+
+}
+
+
+
+.memory-modal-meta {
+
+    display: flex;
+
+    gap: 16px;
+
+    margin-bottom: 16px;
+
+    font-size: 12px;
+
+    color: var(--color-text-secondary);
+
+    padding-bottom: 16px;
+
+    border-bottom: 1px solid var(--color-border-light);
+
+}
+
+
+
+.memory-modal-content-text {
+
+    margin-bottom: 20px;
+
+    font-size: 14px;
+
+}
+
+
+
+.memory-modal-section {
+
+    margin-bottom: 16px;
+
+}
+
+
+
+.memory-modal-section-title {
+
+    font-size: 11px;
+
+    font-weight: 600;
+
+    color: var(--color-memory);
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.5px;
+
+    margin-bottom: 10px;
+
+}
+
+
+
+.memory-modal-entities {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+}
+
+
+
+.memory-modal-emotion {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 6px 12px;
+
+    background: var(--color-bg-secondary);
+
+    border: 1px solid var(--color-border-light);
+
+    font-size: 12px;
+
+}
+
+
+
+.emotion-indicator {
+
+    width: 8px;
+
+    height: 8px;
+
+    border-radius: 50%;
+
+}

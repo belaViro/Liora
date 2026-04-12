@@ -1,0 +1,505 @@
+/**
+ * Liora Responsive Styles
+ * Extracted from templates/index.html (lines 6166-6253)
+ */
+
+/* ============================================
+
+   ç§»åŠ¨ç«¯è�œå•
+
+   ============================================ */
+
+.mobile-menu-btn {
+
+    display: none;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+    padding: 8px;
+
+    background: none;
+
+    border: 1px solid var(--color-border-light);
+
+    cursor: pointer;
+
+}
+
+
+
+.mobile-menu-btn span {
+
+    display: block;
+
+    width: 18px;
+
+    height: 2px;
+
+    background: var(--color-text);
+
+    transition: all 0.2s ease;
+
+}
+
+
+
+.mobile-menu {
+
+    display: none;
+
+    position: absolute;
+
+    top: 50px;
+
+    right: 20px;
+
+    background: var(--color-bg);
+
+    border: 1px solid var(--color-border);
+
+    box-shadow: var(--shadow-lg);
+
+    padding: 12px;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+    z-index: 100;
+
+    min-width: 140px;
+
+}
+
+
+
+.mobile-menu.show {
+
+    display: flex;
+
+}
+
+
+
+.mobile-menu .control-btn {
+
+    width: 100%;
+
+    text-align: left;
+
+}
+
+
+
+/* ============================================
+
+   å“åº”å¼å¸ƒå±€
+
+   ============================================ */
+
+
+
+/* å¹³æ¿åŠä»¥ä¸Š*/
+
+@media (max-width: 1024px) {
+
+    .sidebar {
+
+        width: 320px;
+
+        min-width: 280px;
+
+    }
+
+
+
+    .search-box {
+
+        max-width: 400px;
+
+    }
+
+}
+
+
+
+/* å°å¹³æ¿*/
+
+@media (max-width: 900px) {
+
+    .memory-network-controls {
+
+        display: none;
+
+    }
+
+
+
+    .mobile-menu-btn {
+
+        display: flex;
+
+        margin-left: auto;
+
+    }
+
+
+
+    .search-box {
+
+        max-width: none;
+
+        flex: 1;
+
+    }
+
+}
+
+
+
+/* æ‰‹æœº */
+
+@media (max-width: 768px) {
+
+    .header {
+
+        padding: 10px 16px;
+
+        gap: 12px;
+
+    }
+
+
+
+    .logo {
+
+        font-size: 14px;
+
+    }
+
+
+
+    .search-input {
+
+        padding: 6px 10px;
+
+        font-size: 14px; /* é˜²æ­¢iOSç¼©æ”¾ */
+
+    }
+
+
+
+    .search-button {
+
+        padding: 6px 12px;
+
+        font-size: 11px;
+
+    }
+
+
+
+    .main-content {
+
+        flex-direction: column;
+
+    }
+
+
+
+    .sidebar {
+
+        width: 100%;
+
+        height: 35vh;
+
+        min-height: 250px;
+
+        border-left: none;
+
+        border-top: 1px solid var(--color-border);
+
+    }
+
+
+
+    .panel-content {
+
+        padding: 16px;
+
+    }
+
+
+
+    .graph-legend {
+
+        bottom: 12px;
+
+        left: 12px;
+
+        padding: 10px 14px;
+
+        width: 200px;
+
+        max-height: 240px;
+
+    }
+
+
+
+    .edge-labels-toggle {
+
+        top: 50px;
+
+        right: 12px;
+
+        padding: 6px 10px;
+
+    }
+
+
+
+    .detail-panel {
+
+        width: calc(100% - 40px);
+
+        right: 20px;
+
+        left: 20px;
+
+        top: 50px;
+
+        max-height: 60vh;
+
+    }
+
+
+
+    .form-group {
+
+        margin-bottom: 16px;
+
+    }
+
+
+
+    .form-textarea {
+
+        min-height: 80px;
+
+    }
+
+
+
+    .recall-panel {
+
+        width: calc(100% - 40px);
+
+        right: 20px;
+
+        left: 20px;
+
+        top: 60px;
+
+        max-height: 50vh;
+
+    }
+
+}
+
+
+
+/* å°å±æ‰‹æœº */
+
+@media (max-width: 480px) {
+
+    .header {
+
+        flex-wrap: wrap;
+
+        padding: 8px 12px;
+
+    }
+
+
+
+    .logo {
+
+        order: 1;
+
+    }
+
+
+
+    .mobile-menu-btn {
+
+        order: 2;
+
+        margin-left: auto;
+
+    }
+
+
+
+    .search-box {
+
+        order: 3;
+
+        width: 100%;
+
+        margin-top: 8px;
+
+    }
+
+
+
+    .graph-header {
+
+        padding: 10px 12px;
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 8px;
+
+    }
+
+
+
+    .graph-controls {
+
+        flex-wrap: wrap;
+
+    }
+
+
+
+    .graph-controls .control-btn {
+
+        padding: 4px 8px;
+
+        font-size: 10px;
+
+    }
+
+
+
+    .tabs {
+
+        overflow-x: auto;
+
+        -webkit-overflow-scrolling: touch;
+
+    }
+
+
+
+    .tab {
+
+        white-space: nowrap;
+
+        padding: 10px 16px;
+
+    }
+
+
+
+    .stats-grid {
+
+        grid-template-columns: 1fr 1fr;
+
+        gap: 8px;
+
+    }
+
+
+
+    .stat-card {
+
+        padding: 12px;
+
+    }
+
+
+
+    .stat-number {
+
+        font-size: 20px;
+
+    }
+
+}
+
+
+
+/* æ¨ªå±æ‰‹æœº */
+
+@media (max-height: 500px) and (orientation: landscape) {
+
+    .header {
+
+        padding: 6px 12px;
+
+    }
+
+
+
+    .sidebar {
+
+        height: 45vh;
+
+        min-height: 200px;
+
+    }
+
+
+
+    .form-textarea {
+
+        min-height: 60px;
+
+    }
+
+}
+
+
+
+/* è§¦æŽ§ä¼˜åŒ– */
+
+@media (hover: none) and (pointer: coarse) {
+
+    .control-btn,
+
+    .tab,
+
+    .btn {
+
+        min-height: 44px;
+    }
+
+
+
+    .memory-delete-btn {
+
+        opacity: 1;
+
+        width: 32px;
+
+        height: 32px;
+
+    }
+
+
+
+    .detail-close {
+
+        width: 44px;
+
+        height: 44px;
+
+    }
+
+}

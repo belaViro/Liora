@@ -1,0 +1,20 @@
+/**
+ * Liora Layout Styles
+ * Extracted from templates/index.html (lines 436-453)
+ */
+
+/* ============================================
+
+   ä¸»å Ð¡å®¹å 区- å双æ 栏å å±å± ¦
+
+   ============================================ */
+
+.main-content {
+
+    flex: 1;
+
+    display: flex;
+
+    overflow: hidden;
+
+}

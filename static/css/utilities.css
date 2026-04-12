@@ -1,0 +1,176 @@
+/**
+ * Liora Utilities Styles
+ * Extracted from templates/index.html (lines 3048-3119)
+ */
+
+/* ============================================
+
+   çŠ¶æ€æç¤º - ç»ˆç»“ç«¯é£Žæ ¼
+
+   ============================================ */
+
+.status-message {
+
+    padding: 12px 16px;
+
+    margin-bottom: 16px;
+
+    border-left: 4px solid var(--color-border);
+
+    font-size: 12px;
+
+    font-family: var(--font-mono);
+
+    font-weight: 500;
+
+    display: none;
+
+    background: var(--color-bg-secondary);
+
+}
+
+
+
+.status-message.show {
+
+    display: block;
+
+}
+
+
+
+.status-message.processing {
+
+    border-left-color: #f39c12;
+
+    background-color: #fff8e6;
+
+    color: #8b6914;
+
+}
+
+
+
+.status-message.completed {
+
+    border-left-color: #1a936f;
+
+    background-color: #e8f5f0;
+
+    color: #1a6b4d;
+
+}
+
+
+
+.status-message.error {
+
+    border-left-color: #e74c3c;
+
+    background-color: #fdf2f0;
+
+    color: #a0301e;
+
+}
+
+
+
+/* ============================================
+
+   åŠ è½½åŠ¨ç”»
+
+   ============================================ */
+
+.loading {
+
+    display: inline-block;
+
+    width: 14px;
+
+    height: 14px;
+
+    border: 2px solid var(--color-border-light);
+
+    border-radius: 50%;
+
+    border-top-color: var(--color-memory);
+
+    animation: spin 0.8s linear infinite;
+
+    margin-right: 8px;
+
+    vertical-align: middle;
+
+}
+
+
+
+@keyframes spin {
+
+    to { transform: rotate(360deg); }
+
+}
+
+
+
+/* ============================================
+
+   æç¤ºæ¶ˆæ¯ - Toast
+
+   ============================================ */
+
+.toast {
+
+    position: fixed;
+
+    top: 20px;
+
+    right: 20px;
+
+    padding: 14px 20px;
+
+    border-left: 3px solid var(--color-border);
+
+    background-color: var(--color-bg);
+
+    font-family: var(--font-mono);
+
+    font-size: 12px;
+
+    transform: translateX(150%);
+
+    transition: transform 0.3s ease;
+
+    z-index: 1000;
+
+    box-shadow: var(--shadow-lg);
+
+}
+
+
+
+.toast.show {
+
+    transform: translateX(0);
+
+}
+
+
+
+.toast.success {
+
+    border-left-color: #1a936f;
+
+    background-color: #f0f9f5;
+
+}
+
+
+
+.toast.error {
+
+    border-left-color: #e74c3c;
+
+    background-color: #fdf2f0;
+
+}

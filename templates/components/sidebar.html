@@ -254,9 +254,15 @@
                 <div class="path-result" id="pathResult"></div>
             </div>
 
-            <div class="explore-story-gen" style="margin-top: 20px; display: none;">
+            <div class="explore-story-gen" id="storyGenPanel" style="display: none;">
                 <div class="quick-title">记忆故事</div>
-                <button class="btn-story" onclick="generateMemoryStory()">生成关于此节点的记忆故事</button>
+                <button class="btn-story" onclick="generateMemoryStory()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    生成关于此节点的记忆故事
+                </button>
                 <div class="story-result" id="storyResult"></div>
             </div>
         </div>

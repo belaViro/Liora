@@ -1,0 +1,238 @@
+/* ============================================
+   联想建议 - 复古档案风格
+   ============================================ */
+
+/* 预测按钮 */
+.btn-predict {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: transparent;
+    color: #4a3f35;
+    border: 1px solid #b8a894;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-predict:hover:not(:disabled) {
+    background: #f5f0e6;
+    border-color: #4a3f35;
+}
+
+.btn-predict:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-predict.predict-loading {
+    background: #f5f0e6;
+    border-color: #a09070;
+    opacity: 0.7;
+}
+
+.predict-icon {
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.predict-icon.spinning {
+    opacity: 0.5;
+}
+
+.predict-text {
+    white-space: nowrap;
+}
+
+.predict-dots {
+    letter-spacing: 2px;
+    opacity: 0.6;
+}
+
+/* 联想面板 - 复古纸张风格 */
+.prediction-section {
+    background: #faf8f5;
+    border: 1px solid #d4c8b8;
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.prediction-section::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    height: 1px;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 4px,
+        #e0d8cc 4px,
+        #e0d8cc 5px
+    );
+}
+
+.prediction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #d4c8b8;
+}
+
+.prediction-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.prediction-label {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #4a3f35;
+    letter-spacing: 1px;
+}
+
+.prediction-subtitle {
+    font-size: 11px;
+    color: #8b7d6b;
+    font-style: italic;
+}
+
+.btn-reject-all {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid #c9b8a0;
+    border-radius: 3px;
+    font-size: 16px;
+    color: #8b7d6b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: all 0.2s;
+}
+
+.btn-reject-all:hover {
+    background: #f0ebe0;
+    border-color: #8b7d6b;
+    color: #4a3f35;
+}
+
+.prediction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.prediction-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #e0d8cc;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.prediction-item:hover {
+    border-color: #a09070;
+}
+
+.prediction-item.adopted {
+    opacity: 0.4;
+    border-color: #a8c9a0;
+    background: #f5f9f4;
+}
+
+.prediction-item.adopted .btn-adopt {
+    display: none;
+}
+
+.prediction-marker {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+}
+
+.prediction-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.prediction-name {
+    font-family: Georgia, serif;
+    font-weight: 600;
+    color: #3d3229;
+    font-size: 14px;
+    margin-bottom: 3px;
+}
+
+.prediction-meta-line {
+    font-size: 10px;
+    color: #8b7d6b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.prediction-reason {
+    font-size: 12px;
+    color: #5a4d3d;
+    line-height: 1.6;
+}
+
+.btn-adopt {
+    padding: 5px 12px;
+    background: transparent;
+    color: #4a3f35;
+    border: 1px solid #b8a894;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-adopt:hover {
+    background: #4a3f35;
+    color: #fff;
+    border-color: #4a3f35;
+}
+
+.prediction-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed #d4c8b8;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+    font-style: italic;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .prediction-item {
+        flex-wrap: wrap;
+    }
+    
+    .btn-adopt {
+        width: 100%;
+        margin-top: 8px;
+    }
+}

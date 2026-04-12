@@ -1,0 +1,119 @@
+/**
+ * Liora Design System Variables
+ * Extracted from templates/index.html (lines 22-143)
+ */
+
+/* ============================================
+
+   Liora Design System
+
+   借鉴 MiroFish 极简直线风格
+
+   融入Liora特有的暖色点缀
+
+   ============================================ */
+
+
+:root {
+
+    /* 核心色板 - 黑白灰*/
+
+    --color-bg: #ffffff;
+
+    --color-bg-secondary: #fafafa;
+
+    --color-bg-tertiary: #f5f5f5;
+
+    --color-text: #000000;
+
+    --color-text-secondary: #666666;
+
+    --color-text-muted: #757575;
+
+    --color-border: #000000;
+
+    --color-border-light: #e0e0e0;
+
+
+    /* Liora 特色色*/
+
+    --color-memory: #7B2D8E;        /* 紫罗兰- 记忆主色*/
+
+    --color-memory-light: #e3d4f7;  /* 淡紫 */
+
+
+    /* 字体 */
+
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+    --font-sans: 'Noto Sans SC', 'Inter', -apple-system, sans-serif;
+
+
+    /* 间距*/
+
+    --space-xs: 4px;
+
+    --space-sm: 8px;
+
+    --space-md: 16px;
+
+    --space-lg: 24px;
+
+    --space-xl: 32px;
+
+
+    /* 阴影 */
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+}
+
+
+
+* {
+
+    margin: 0;
+
+    padding: 0;
+
+    box-sizing: border-box;
+
+}
+
+
+
+body {
+
+    font-family: var(--font-sans);
+
+    background-color: var(--color-bg);
+
+    color: var(--color-text);
+
+    line-height: 1.6;
+
+    overflow: hidden;
+
+    -webkit-font-smoothing: antialiased;
+
+    -moz-osx-font-smoothing: grayscale;
+
+}
+
+
+
+.container {
+
+    width: 100vw;
+
+    height: 100vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+}

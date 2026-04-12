@@ -1,0 +1,106 @@
+/**
+ * Liora Button Styles
+ * Extracted from templates/index.html (lines 2944-3047)
+ */
+
+/* ============================================
+
+   æŒ‰é'ç³»ç»Ÿ
+
+   ============================================ */
+
+.btn {
+
+    padding: 10px 16px;
+
+    border: 1px solid var(--color-border);
+
+    background-color: var(--color-bg);
+
+    cursor: pointer;
+
+    font-size: 12px;
+
+    font-family: var(--font-mono);
+
+    font-weight: 500;
+
+    transition: all 0.2s ease;
+
+    width: 100%;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.5px;
+
+}
+
+
+
+.btn:hover {
+
+    background-color: var(--color-text);
+
+    color: var(--color-bg);
+
+}
+
+
+
+.btn-primary {
+
+    background-color: var(--color-memory);
+
+    color: #fff;
+
+    border-color: var(--color-memory);
+
+}
+
+
+
+.btn-primary:hover {
+
+    background-color: #6a2580;
+
+    border-color: #6a2580;
+
+}
+
+
+
+.btn:disabled {
+
+    opacity: 0.4;
+
+    cursor: not-allowed;
+
+}
+
+
+
+.btn:focus-visible {
+
+    outline: 2px solid var(--color-memory);
+
+    outline-offset: 2px;
+
+}
+
+
+
+.btn:hover:not(:disabled) {
+
+    transform: translateY(-1px);
+
+    box-shadow: var(--shadow-sm);
+
+}
+
+
+
+.btn:active:not(:disabled) {
+
+    transform: translateY(0);
+
+}

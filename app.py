@@ -18,6 +18,7 @@ from services.graph_service import GraphService
 from services.embedding_service import EmbeddingService
 from services.temporal_extractor import TemporalExtractor, format_temporal_display
 from services.enhanced_knowledge_extractor import EnhancedKnowledgeExtractor
+from services.prediction_service import PredictionService
 
 # 初始化时间提取器
 temporal_extractor = TemporalExtractor()
@@ -39,6 +40,13 @@ embedding_service = EmbeddingService()
 enhanced_extractor = EnhancedKnowledgeExtractor(
     llm_service=llm_service,
     embedding_service=embedding_service,
+    memory_service=memory_service
+)
+
+# 初始化预测服务
+prediction_service = PredictionService(
+    llm_service=llm_service,
+    graph_service=graph_service,
     memory_service=memory_service
 )
 
@@ -254,6 +262,23 @@ def search_memories():
         # 按综合分数排序
         results.sort(key=lambda x: x['score'], reverse=True)
         results = results[:limit]
+        
+        # 4. 同时搜索图谱节点（名称匹配）
+        matched_nodes = []
+        query_lower = query.lower()
+        for node_id, node in graph_service.nodes.items():
+            node_name = node.get('name', '')
+            # 完全匹配或包含匹配
+            if query_lower == node_name.lower() or query_lower in node_name.lower():
+                matched_nodes.append({
+                    'id': node_id,
+                    'name': node_name,
+                    'type': node.get('type', 'ENTITY'),
+                    'description': node.get('description', '')
+                })
+        
+        # 限制节点结果数量
+        matched_nodes = matched_nodes[:limit]
 
         # 构建返回结果
         response_data = {
@@ -261,10 +286,12 @@ def search_memories():
             'results': [r['memory'] for r in results],
             'scores': [{'combined': r['score'], 'vector': r['vector_score'], 'keyword': r['keyword_score']} for r in results],
             'match_types': [r['match_type'] for r in results],
+            'matched_nodes': matched_nodes,  # 添加匹配的图谱节点
             'search_info': {
                 'vector_enabled': use_vector and vector_working,
                 'keyword_enabled': keyword_working,
                 'total_results': len(results),
+                'matched_nodes_count': len(matched_nodes),
                 'query': query
             }
         }
@@ -294,10 +321,17 @@ def get_graph_data():
         # 支持搜索特定实体
         search_entity = request.args.get('entity', '').strip()
         
+        # 默认返回所有节点（max_nodes=0 表示不限制）
+        max_nodes = request.args.get('max_nodes', '0')
+        try:
+            max_nodes = int(max_nodes)
+        except:
+            max_nodes = 0
+        
         graph_data = graph_service.get_graph_data(
             entity_types=entity_types or None,
             center_entity=search_entity or None,
-            max_nodes=100
+            max_nodes=max_nodes
         )
         
         return jsonify({
@@ -957,6 +991,133 @@ def generate_ai_quote():
                 'quote': "时间会淡去伤痛，留下的都是成长的印记。"
             }
         })
+
+
+@app.route('/api/graph/predict/<node_id>', methods=['GET'])
+def predict_next_nodes(node_id):
+    """
+    预测从当前节点可能的下一个节点
+    """
+    try:
+        max_predictions = request.args.get('limit', 3, type=int)
+        predictions = prediction_service.predict_next_nodes(node_id, max_predictions)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'node_id': node_id,
+                'predictions': predictions
+            }
+        })
+    except Exception as e:
+        logger.exception(f"预测节点失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'预测失败: {str(e)}'
+        })
+
+
+@app.route('/api/graph/adopt-prediction', methods=['POST'])
+def adopt_prediction():
+    """
+    轻量级采纳预测节点 - 直接添加到图谱，不经过LLM分析
+    """
+    try:
+        data = request.json
+        source_node_id = data.get('source_node_id')
+        prediction = data.get('prediction', {})
+        
+        if not source_node_id or not prediction:
+            return jsonify({'success': False, 'message': '缺少必要参数'})
+        
+        # 直接构建实体和关系数据
+        entity_name = prediction.get('name')
+        entity_type = prediction.get('type', 'ENTITY')
+        relation_type = prediction.get('relation', '相关')
+        reason = prediction.get('reason', '')
+        
+        logger.info(f"[预测采纳] 接收数据: name={entity_name}, type={entity_type}, relation={relation_type}")
+        logger.info(f"[预测采纳] 源节点: {source_node_id}")
+        
+        # 检查实体是否已存在
+        existing_entity = None
+        for node_id, node in graph_service.nodes.items():
+            if node.get('name') == entity_name:
+                existing_entity = node_id
+                break
+        
+        if existing_entity:
+            # 实体已存在，只添加关系
+            entity_id = existing_entity
+            logger.info(f"实体已存在: {entity_name}, 添加新关系")
+        else:
+            # 创建新实体
+            from datetime import datetime
+            entity_id = graph_service._normalize_entity_id(entity_name)
+            if entity_id in graph_service.nodes:
+                entity_id = f"{entity_id}_{uuid.uuid4().hex[:4]}"
+            
+            graph_service.nodes[entity_id] = {
+                'id': entity_id,
+                'name': entity_name,
+                'type': entity_type,
+                'description': f'预测节点: {reason}',
+                'attributes': {},
+                'aliases': [],
+                'memory_ids': [],
+                'created_at': datetime.now().isoformat(),
+                'relation_count': 0
+            }
+            logger.info(f"[预测采纳] 创建新实体: {entity_id} ({entity_name})")
+        
+        # 添加关系到图谱
+        from datetime import datetime
+        edge_id = f"{source_node_id}_{relation_type}_{entity_id}_{uuid.uuid4().hex[:8]}"
+        
+        # 检查是否已有相同关系
+        exists = False
+        for edge in graph_service.edges:
+            if (edge['source'] == source_node_id and 
+                edge['target'] == entity_id and 
+                edge['type'] == relation_type):
+                exists = True
+                break
+        
+        if not exists:
+            graph_service.edges.append({
+                'id': edge_id,
+                'source': source_node_id,
+                'target': entity_id,
+                'type': relation_type,
+                'description': reason,
+                'fact': f"{graph_service.nodes[source_node_id]['name']} {relation_type} {entity_name}",
+                'memory_ids': [],
+                'memory_summaries': [],
+                'strength': 0.5,
+                'created_at': datetime.now().isoformat(),
+                'confidence': prediction.get('confidence', 0.7)
+            })
+            
+            # 更新节点关系计数
+            graph_service.nodes[source_node_id]['relation_count'] = graph_service.nodes[source_node_id].get('relation_count', 0) + 1
+            graph_service.nodes[entity_id]['relation_count'] = graph_service.nodes[entity_id].get('relation_count', 0) + 1
+        
+        # 保存图谱
+        graph_service._save_graph()
+        logger.info(f"[预测采纳] 图谱已保存，当前节点数: {len(graph_service.nodes)}, 边数: {len(graph_service.edges)}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'entity_id': entity_id,
+                'entity_name': entity_name,
+                'relation_added': not exists
+            }
+        })
+        
+    except Exception as e:
+        logger.exception(f"采纳预测节点失败: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 
 @socketio.on('disconnect')

@@ -1,0 +1,78 @@
+/**
+ * Liora Controls Styles
+ * Extracted from templates/index.html (lines 362-435)
+ */
+
+/* ============================================
+
+   Liora æ¥­å 制é�¢æ ¥¿- 开å 发è €è¡ ä¸ºå·¥å具é£Žæ ¼
+
+   ============================================ */
+
+.memory-network-controls {
+
+    display: flex;
+
+    gap: 8px;
+
+    margin-left: auto;
+
+}
+
+
+
+.memory-network-controls .control-btn {
+
+    padding: 10px 14px;
+
+    border: 1px solid var(--color-border-light);
+
+    background: var(--color-bg);
+
+    cursor: pointer;
+
+    font-size: 11px;
+
+    font-family: var(--font-mono);
+
+    transition: all 0.2s ease;
+
+    white-space: nowrap;
+
+    border-radius: 4px;
+
+    letter-spacing: 0.3px;
+
+}
+
+
+
+.memory-network-controls .control-btn:hover {
+
+    background: var(--color-bg-secondary);
+
+    border-color: var(--color-text-secondary);
+
+}
+
+
+
+.memory-network-controls .control-btn.active {
+
+    background: var(--color-memory);
+
+    color: #fff;
+
+    border-color: var(--color-memory);
+
+}
+
+
+
+.memory-network-controls .control-btn:focus-visible {
+
+    outline: 2px solid var(--color-memory);
+
+    outline-offset: 2px;
+
+}
