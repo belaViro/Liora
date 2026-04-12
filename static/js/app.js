@@ -2522,14 +2522,11 @@ function showNodeDetail(nodeData) {
 
     let html = `
         <div class="detail-row">
-            <span class="detail-label">类型:</span>
+            <span class="detail-label">名称:</span>
             <span class="detail-value">
+                <span style="font-weight: 600; font-size: 16px; margin-right: 8px;">${nodeData.name || '未知'}</span>
                 <span class="type-badge-inline" style="background: ${colorMap[nodeData.type] || '#999'}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${typeName}</span>
             </span>
-        </div>
-        <div class="detail-row">
-            <span class="detail-label">名称:</span>
-            <span class="detail-value" style="font-weight: 600; font-size: 16px;">${nodeData.name || '未知'}</span>
         </div>
     `;
 
