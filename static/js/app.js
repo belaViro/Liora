@@ -2489,8 +2489,8 @@ function showNodeDetail(nodeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = '节点详情';
-    badge.textContent = nodeData.type || 'Entity';
+    title.style.display = 'none';
+    badge.textContent = nodeData.type || 'ENTITY';
     badge.style.background = colorMap[nodeData.type] || '#999';
     badge.style.display = 'inline-block';
 
@@ -3173,8 +3173,10 @@ function showEdgeDetail(edgeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = '关系详情';
-    badge.style.display = 'none';
+    title.style.display = 'none';
+    badge.textContent = 'RELATION';
+    badge.style.background = '#8e44ad';
+    badge.style.display = 'inline-block';
 
     // 在头部添加编辑和删除按钮
     const edgeId = edgeData.id || edgeData.uuid || '';
