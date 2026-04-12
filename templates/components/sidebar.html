@@ -1,0 +1,264 @@
+<!-- 右侧：操作面板 -->
+<div class="sidebar">
+    <!-- 选项卡 -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('create')">录入记忆</button>
+        <button class="tab" onclick="switchTab('memories')">记忆列表</button>
+        <button class="tab" onclick="switchTab('stats')">统计</button>
+        <button class="tab" id="tab-explore" onclick="switchTab('explore')" style="display: none;">探索</button>
+    </div>
+
+    <!-- 面板内容 -->
+    <div class="panel-content">
+        <!-- 录入记忆面板 -->
+        <div class="panel active" id="panel-create">
+            <div class="status-message" id="statusMessage"></div>
+
+            <form id="memoryForm" onsubmit="submitMemory(event)">
+                <div class="form-group">
+                    <label class="form-label">记忆类型</label>
+                    <select class="form-select" id="memoryType" onchange="onTypeChange()">
+                        <option value="text">文字</option>
+                        <option value="image">图片</option>
+                        <option value="audio">音频</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">内容描述 <span class="char-count" id="charCount">0 字</span></label>
+                    <div class="textarea-wrapper">
+                        <textarea class="form-textarea" id="memoryContent" placeholder="记录你的想法、感受或事件..&#10;输入 @ 可提取人物，# 可标记主题" oninput="onContentInput(this)" onkeydown="onContentKeydown(event, this)"></textarea>
+                        <div class="mention-popup" id="mentionPopup"></div>
+                    </div>
+                </div>
+
+                <!-- 快捷情感标记 -->
+                <div class="form-group">
+                    <label class="form-label">情感色彩</label>
+                    <div class="emotion-quick-select">
+                        <button type="button" class="emotion-btn" data-emotion="positive" data-valence="0.8" onclick="selectEmotion(this)">😊 积极</button>
+                        <button type="button" class="emotion-btn" data-emotion="neutral" data-valence="0" onclick="selectEmotion(this)">😐 平静</button>
+                        <button type="button" class="emotion-btn" data-emotion="negative" data-valence="-0.8" onclick="selectEmotion(this)">😢 消极</button>
+                    </div>
+                    <input type="hidden" id="selectedEmotion" value="">
+                    <input type="hidden" id="selectedValence" value="">
+                </div>
+
+                <div class="form-group" id="fileUploadGroup" style="display: none;">
+                    <label class="form-label">上传文件</label>
+                    <label class="file-upload">
+                        <input type="file" id="memoryFile" onchange="onFileSelect(event)">
+                        <span class="file-upload-hint">点击或拖拽文件到这里</span>
+                    </label>
+                    <div class="file-preview" id="filePreview" style="display: none;"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">保存记忆</button>
+            </form>
+        </div>
+
+        <!-- 记忆列表面板 -->
+        <div class="panel" id="panel-memories">
+            <div class="memory-search">
+                <input type="text" id="memorySearchInput" placeholder="搜索记忆..." oninput="filterMemories(this.value)">
+                <button onclick="clearMemorySearch()">×</button>
+            </div>
+            <div class="memory-list" id="memoryList"></div>
+        </div>
+
+        <!-- 记忆详情弹窗 -->
+        <div class="memory-modal" id="memoryModal">
+            <div class="memory-modal-content">
+                <div class="memory-modal-header">
+                    <span class="memory-modal-title">记忆详情</span>
+                    <button class="memory-modal-close" onclick="closeMemoryModal()">×</button>
+                </div>
+                <div class="memory-modal-body" id="memoryModalBody"></div>
+            </div>
+        </div>
+
+        <!-- 统计面板 -->
+        <div class="panel" id="panel-stats">
+            <div class="stats-grid">
+                <div class="stat-card primary">
+                    <div class="stat-number" id="statMemories">0</div>
+                    <div class="stat-label">记忆总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statEntities">0</div>
+                    <div class="stat-label">实体数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statRelations">0</div>
+                    <div class="stat-label">关系数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statToday">0</div>
+                    <div class="stat-label">今日新记忆</div>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-section-title"><span class="section-icon">🔥</span>记忆活动热力</div>
+                <div class="heatmap-header">
+                    <span class="heatmap-count" id="heatmapTotal">0 天有记忆</span>
+                    <span class="heatmap-streak" id="heatmapStreak">连续记录 0 天</span>
+                </div>
+                <div class="heatmap-container" id="memoryHeatmap"></div>
+                <div class="heatmap-legend">
+                    <span class="legend-label">少</span>
+                    <span class="legend-cell level-0"></span>
+                    <span class="legend-cell level-1"></span>
+                    <span class="legend-cell level-2"></span>
+                    <span class="legend-cell level-3"></span>
+                    <span class="legend-cell level-4"></span>
+                    <span class="legend-label">多</span>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-section-title">实体类型分布</div>
+                <div class="entity-type-chart" id="entityTypeChart">
+                    <div class="chart-placeholder">加载中...</div>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-section-title">情感分布</div>
+                <div class="emotion-bars" id="emotionBars">
+                    <div class="emotion-bar-item">
+                        <span class="emotion-label">😊 积极</span>
+                        <div class="emotion-bar">
+                            <div class="emotion-fill positive" id="emotionPositive" style="width: 0%"></div>
+                        </div>
+                        <span class="emotion-count" id="emotionPositiveCount">0</span>
+                    </div>
+                    <div class="emotion-bar-item">
+                        <span class="emotion-label">😐 中性</span>
+                        <div class="emotion-bar">
+                            <div class="emotion-fill neutral" id="emotionNeutral" style="width: 0%"></div>
+                        </div>
+                        <span class="emotion-count" id="emotionNeutralCount">0</span>
+                    </div>
+                    <div class="emotion-bar-item">
+                        <span class="emotion-label">😔 消极</span>
+                        <div class="emotion-bar">
+                            <div class="emotion-fill negative" id="emotionNegative" style="width: 0%"></div>
+                        </div>
+                        <span class="emotion-count" id="emotionNegativeCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-section-title">关系类型</div>
+                <div class="relation-tags" id="relationTags">
+                    <span class="relation-tag-placeholder">加载中..</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史上的今天面板 -->
+        <div class="panel" id="panel-timetravel">
+            <div class="timetravel-header">
+                <div class="timetravel-icon-large">⏱</div>
+                <div class="timetravel-title">
+                    <div class="timetravel-main">历史上的今天</div>
+                    <div class="timetravel-sub"></div>
+                </div>
+            </div>
+
+            <div class="timetravel-quote" id="timetravelQuote">正在唤醒沉睡的记忆..</div>
+
+            <div class="timetravel-list" id="timetravelList"></div>
+
+            <div class="timetravel-empty" id="timetravelEmpty" style="display: none;">
+                <div class="empty-icon">💭</div>
+                <div class="empty-text">还没有记忆</div>
+                <div class="empty-hint">开始记录你的第一条记忆</div>
+            </div>
+        </div>
+
+        <!-- 探索面板 -->
+        <div class="panel" id="panel-explore">
+            <div class="explore-node-card" id="exploreNodeCard">
+                <div class="node-card-header">
+                    <div class="node-card-avatar" id="exploreNodeAvatar">节点</div>
+                    <div class="node-card-info">
+                        <div class="node-card-name" id="exploreNodeName">选中节点</div>
+                        <div class="node-card-type" id="exploreNodeType">PERSON</div>
+                    </div>
+                </div>
+                <div class="node-card-body" id="exploreNodeBody">
+                    <div class="node-meta-row">
+                        <span class="meta-label">关联记忆</span>
+                        <span class="meta-value" id="exploreNodeMemoryCount">0</span>
+                    </div>
+                    <div class="node-meta-row">
+                        <span class="meta-label">连接节点</span>
+                        <span class="meta-value" id="exploreNodeConnectionCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="explore-chat-section">
+                <div class="chat-header">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>问答探索</span>
+                </div>
+                <div class="chat-messages" id="exploreChatMessages">
+                    <div class="chat-empty">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                        </div>
+                        <p class="empty-text">问关于此节点的任何问题<br>AI 将基于记忆网络回答</p>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="exploreChatInput" placeholder="问一个问题..." rows="2"></textarea>
+                    <button class="btn-send" onclick="sendExploreQuestion()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="explore-quick-prompts">
+                <div class="quick-title">快捷提示</div>
+                <div class="quick-tags">
+                    <button class="quick-tag" onclick="setExploreQuestion('这是谁？')">这是谁？</button>
+                    <button class="quick-tag" onclick="setExploreQuestion('记忆来源')">记忆来源</button>
+                    <button class="quick-tag" onclick="setExploreQuestion('相关的事件有哪些？')">相关事件</button>
+                    <button class="quick-tag" onclick="setExploreQuestion('总结一下这个人')">总结此人</button>
+                </div>
+            </div>
+
+            <div class="explore-path-finder" id="pathFinder" style="margin-top: 20px; display: none;">
+                <div class="quick-title">🔍 关系路径探索</div>
+                <div class="path-finder-box">
+                    <div class="path-from-to">
+                        <span id="pathFrom">起点</span>
+                        <span class="path-arrow">→</span>
+                        <span id="pathTo">终点</span>
+                    </div>
+                    <button class="btn-find-path" onclick="findRelationPath()">探索关联路径</button>
+                </div>
+                <div class="path-result" id="pathResult"></div>
+            </div>
+
+            <div class="explore-story-gen" style="margin-top: 20px; display: none;">
+                <div class="quick-title">记忆故事</div>
+                <button class="btn-story" onclick="generateMemoryStory()">生成关于此节点的记忆故事</button>
+                <div class="story-result" id="storyResult"></div>
+            </div>
+        </div>
+    </div>
+</div>
