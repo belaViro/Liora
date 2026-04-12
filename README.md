@@ -1,58 +1,52 @@
-# ◆ Liora
+# Liora
 
-*A personal memory network — powered by AI*
-
-```
-Liora /liˈɔːrə/ — "to weave" or "binding together"
-```
+**个人记忆网络系统** — 基于大模型的多模态知识图谱
 
 ---
 
-## About
+## 关于
 
-Liora transforms how you capture and explore memories. Upload text, images, or audio, and watch as AI constructs a living knowledge graph of your experiences — connecting people, places, and moments across time.
+Liora 改变了你记录和探索记忆的方式。上传文字、图片或音频，AI 会自动构建属于你的知识图谱——连接人、地点和跨越时间的时刻。
 
-**Core capabilities:**
+**核心功能：**
 
-- **Knowledge graph visualization** — D3.js force-directed graph with 5 layouts
-- **Multimodal memory input** — text, images, audio with automatic entity extraction
-- **Semantic search** — vector + keyword hybrid search
-- **On This Day** — rediscover memories from the same date in past years
-- **Memory cards** — vintage archive-style export with AI-generated reflections
-- **AI companion** — "洛忆" responds to memories with warmth and insight
+- **知识图谱可视化** — D3.js 力导向图，支持 5 种布局
+- **多模态记忆录入** — 文字、图片、音频，自动提取实体和关系
+- **语义搜索** — 向量 + 关键词混合搜索
+- **历史上的今天** — 回顾往年今日的记忆
+- **记忆卡片** — 复古档案风格导出，AI 生成温暖回应
+- **AI 洛忆** — 智能伙伴为记忆注入生命
 
 ---
 
-## Quick Start
+## 快速开始
 
 ```bash
-# Clone and install
+# 克隆并安装
 git clone https://github.com/bela-viro/Liora.git
 cd Liora/MemoryWeaver
 
-# Create environment
+# 创建环境
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Configure
+# 配置
 cp .env.example .env
-# Edit .env with your LLM API credentials
+# 编辑 .env 填入你的 LLM API 凭证
 
-# Launch
+# 启动
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000)
+打开 [http://localhost:5000](http://localhost:5000)
 
-### Configuration
+### 支持的大模型
 
-Liora supports multiple LLM providers:
-
-| Provider | Endpoint | Model |
-|:---------|:---------|:------|
+| 提供商 | 端点 | 模型 |
+|:------|:-----|:-----|
 | MiniMax | `api.minimaxi.chat/v1` | `minimax-text-01` |
 | OpenAI | `api.openai.com/v1` | `gpt-4` |
 | 智谱AI | `open.bigmodel.cn/api/paas/v4` | `glm-4` |
@@ -60,83 +54,83 @@ Liora supports multiple LLM providers:
 
 ---
 
-## Architecture
+## 项目结构
 
 ```
 MemoryWeaver/
-├── app.py                     # Flask application
-├── requirements.txt          # Dependencies
+├── app.py                     # Flask 应用
+├── requirements.txt          # 依赖
 │
-├── services/                 # Business logic
-│   ├── llm_service.py        # LLM interface
-│   ├── memory_service.py     # Memory CRUD
-│   ├── graph_service.py      # Knowledge graph
-│   ├── embedding_service.py   # Vector search
-│   └── temporal_extractor.py # Time parsing
+├── services/                 # 业务逻辑
+│   ├── llm_service.py        # LLM 接口
+│   ├── memory_service.py     # 记忆管理
+│   ├── graph_service.py      # 知识图谱
+│   ├── embedding_service.py   # 向量搜索
+│   └── temporal_extractor.py # 时间解析
 │
-├── templates/index.html      # SPA frontend
-├── static/js/app.js          # D3.js visualization
-└── data/                     # Persistent storage
-    ├── memories.json         # Memory store
-    ├── graph.json            # Graph data
-    └── faiss_index.bin       # Vector index
+├── templates/index.html      # 单页应用
+├── static/js/app.js          # D3.js 可视化
+└── data/                     # 持久化存储
+    ├── memories.json         # 记忆数据
+    ├── graph.json            # 图谱数据
+    └── faiss_index.bin       # 向量索引
 ```
 
-### Technology Stack
+### 技术栈
 
-| Layer | Technology |
-|:------|:-----------|
-| Backend | Flask 3.0+, Flask-SocketIO, NetworkX, FAISS |
-| Frontend | D3.js v7, Socket.IO, html2canvas |
-| AI | MiniMax / OpenAI / Qwen, vector similarity |
-
----
-
-## Features in Detail
-
-### Knowledge Graph
-
-Five visualization layouts:
-- **Force** — physics simulation, natural distribution
-- **Ring** — nodes evenly distributed on a circle
-- **Hierarchical** — vertical layers by connection degree
-- **Grid** — orderly rows and columns
-- **Concentric** — central nodes on inner rings
-
-Drag nodes to reposition, scroll to zoom, click for details.
-
-### Memory Input
-
-Click "录入记忆" to add:
-- Free-form text with @mentions for entities and #tags for topics
-- Images (photos, screenshots)
-- Audio recordings
-
-AI automatically extracts entities and relationships, building the graph.
-
-### On This Day
-
-Click the clock icon to travel back. See memories from this date in previous years. Generate vintage-style cards to share.
-
-### AI Companion — 洛忆
-
-Every memory can receive a warm, thoughtful response from 洛忆 — your AI companion that knows your memory network.
+| 层级 | 技术 |
+|:-----|:-----|
+| 后端 | Flask 3.0+, Flask-SocketIO, NetworkX, FAISS |
+| 前端 | D3.js v7, Socket.IO, html2canvas |
+| AI | MiniMax / OpenAI / Qwen, 向量相似度 |
 
 ---
 
-## Design Philosophy
+## 功能详解
 
-| Element | Reference |
-|:--------|:----------|
-| Visual style | MiroFish minimalism |
-| Graph physics | D3.js force simulation |
-| Typography | Monospace labels |
-| Cards | Vintage archive aesthetic |
-| Color accent | `#7B2D8E` — the depth of memory |
+### 知识图谱
+
+五种可视化布局：
+- **力导向** — 物理模拟，自然分布
+- **圆环** — 节点均匀分布在圆周
+- **层次** — 按连接度数垂直分层
+- **网格** — 整齐行列排列
+- **同心圆** — 核心节点在内圈
+
+拖拽节点调整位置，滚轮缩放，点击查看详情。
+
+### 记忆录入
+
+点击「录入记忆」添加：
+- 自由文字，支持 @提及实体、#标记主题
+- 图片（照片、截图）
+- 音频录音
+
+AI 自动提取实体和关系，构建图谱。
+
+### 历史上的今天
+
+点击时钟图标穿越时空。查看往年今日的记忆，生成复古风格卡片分享。
+
+### AI 洛忆
+
+每条记忆都可以获得洛忆温暖而深思的回应——这位 AI 伙伴了解你的记忆网络。
 
 ---
 
-## License
+## 设计哲学
+
+| 元素 | 参考 |
+|:-----|:-----|
+| 视觉风格 | MiroFish 极简主义 |
+| 图谱物理 | D3.js 力导向模拟 |
+| 字体 | Monospace 等宽字体 |
+| 卡片 | 复古档案美学 |
+| 主色调 | `#7B2D8E` — 记忆的深邃感 |
+
+---
+
+## 许可证
 
 [GPL v2](LICENSE)
 
