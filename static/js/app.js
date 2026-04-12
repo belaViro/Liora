@@ -2489,7 +2489,7 @@ function showNodeDetail(nodeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = nodeData.name || '未知';
+    title.textContent = '节点详情';
     badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
@@ -2526,6 +2526,10 @@ function showNodeDetail(nodeData) {
             <span class="detail-value">
                 <span class="type-badge-inline" style="background: ${colorMap[nodeData.type] || '#999'}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${typeName}</span>
             </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">名称:</span>
+            <span class="detail-value" style="font-weight: 600; font-size: 16px;">${nodeData.name || '未知'}</span>
         </div>
     `;
 
@@ -3183,7 +3187,7 @@ function showEdgeDetail(edgeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = sourceName + ' → ' + targetName;
+    title.textContent = '关系详情';
     badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
