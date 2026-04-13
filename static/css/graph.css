@@ -15,11 +15,15 @@
 
     position: relative;
 
-    background-color: #FAFAFA;  /* MiroFish */
+    background-color: var(--color-bg);
 
-    background-image: radial-gradient(#D0D0D0 1.5px, transparent 1.5px);  /* MiroFish */
+    background-image:
 
-    background-size: 24px 24px;  /* MiroFish */
+        linear-gradient(var(--color-border-light) 1px, transparent 1px),
+
+        linear-gradient(90deg, var(--color-border-light) 1px, transparent 1px);
+
+    background-size: 40px 40px;
 
 }
 
@@ -67,6 +71,8 @@
 
     text-transform: uppercase;
 
+    color: #000000;
+
 }
 
 
@@ -113,6 +119,8 @@
 
     border-radius: 3px;
 
+    color: #000000;
+
 }
 
 
@@ -129,11 +137,11 @@
 
 .graph-controls .control-btn.active {
 
-    background-color: var(--color-text);
+    background-color: #000000;
 
-    color: var(--color-bg);
+    color: #ffffff;
 
-    border-color: var(--color-text);
+    border-color: #000000;
 
 }
 
@@ -145,6 +153,38 @@
 
     outline-offset: 2px;
 
+}
+
+/* 右下角导入导出按钮 - 复用 graph-controls 样式 */
+.graph-io-buttons {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+
+.graph-io-buttons .control-btn {
+    padding: 5px 10px;
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    transition: all 0.2s ease;
+    border-radius: 3px;
+    color: #000000;
+}
+
+.graph-io-buttons .control-btn:hover {
+    background-color: var(--color-bg-tertiary);
+    border-color: var(--color-text-secondary);
+}
+
+.graph-io-buttons .control-btn:focus-visible {
+    outline: 2px solid var(--color-memory);
+    outline-offset: 2px;
 }
 
 
@@ -289,7 +329,7 @@
 
     font-weight: 600;
 
-    color: var(--color-memory);
+    color: #000000;
 
     text-transform: uppercase;
 
@@ -623,7 +663,7 @@
 
 input:checked + .slider {
 
-    background-color: #7b2d8e;
+    background-color: var(--color-memory);
 
 }
 
@@ -641,7 +681,7 @@ input:checked + .slider:before {
 
     font-size: 12px;
 
-    color: #666;
+    color: #000000;
 
 }
 
@@ -1409,4 +1449,14 @@ input:checked + .slider:before {
 
     user-select: none;
 
+}
+
+/* 右下角导入导出按钮 */
+.graph-io-buttons {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
 }

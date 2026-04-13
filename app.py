@@ -19,6 +19,7 @@ from services.embedding_service import EmbeddingService
 from services.temporal_extractor import TemporalExtractor, format_temporal_display
 from services.enhanced_knowledge_extractor import EnhancedKnowledgeExtractor
 from services.prediction_service import PredictionService
+from services.export_service import ExportService
 
 # 初始化时间提取器
 temporal_extractor = TemporalExtractor()
@@ -49,6 +50,9 @@ prediction_service = PredictionService(
     graph_service=graph_service,
     memory_service=memory_service
 )
+
+# 初始化导入导出服务
+export_service = ExportService(memory_service=memory_service, graph_service=graph_service)
 
 # 确保上传目录存在
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
@@ -114,7 +118,7 @@ def create_memory():
         logger.info(f"时间信息: {temporal_info}")
         
         # ========== 合并 LLM 调用：同时理解和抽取知识 ==========
-        socketio.emit('processing_status', {'status': 'processing', 'message': 'AI正在分析记忆内容...'})
+        socketio.emit('processing_status', {'status': 'processing', 'message': '洛忆正在分析记忆内容...'})
         logger.info(f"开始处理记忆: {content[:50]}...")
 
         # 使用单次 LLM 调用完成理解和知识抽取
@@ -584,7 +588,7 @@ def update_node(node_id):
         if 'name' in data:
             updates['name'] = data['name'].strip()
         if 'type' in data:
-            if data['type'] in ['PERSON', 'LOCATION', 'EVENT', 'ENTITY']:
+            if data['type'] in ['PERSON', 'LOCATION', 'EVENT', 'OBJECT', 'CONCEPT', 'EMOTION', 'ENTITY']:
                 updates['type'] = data['type']
         if 'description' in data:
             updates['description'] = data['description'].strip()
@@ -1087,6 +1091,7 @@ def adopt_prediction():
                 'aliases': [],
                 'memory_ids': [],
                 'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat(),
                 'relation_count': 0
             }
             logger.info(f"[预测采纳] 创建新实体: {entity_id} ({entity_name})")
@@ -1110,8 +1115,9 @@ def adopt_prediction():
                 'source': source_node_id,
                 'target': entity_id,
                 'type': relation_type,
+                'directed': False,
                 'description': reason,
-                'fact': f"{graph_service.nodes[source_node_id]['name']} {relation_type} {entity_name}",
+                'fact': prediction.get('fact') or f"{graph_service.nodes[source_node_id]['name']} 与 {entity_name} 存在{relation_type}关系",
                 'memory_ids': [],
                 'memory_summaries': [],
                 'strength': 0.5,
@@ -1144,6 +1150,48 @@ def adopt_prediction():
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"客户端已断开: {request.sid}")
+
+
+@app.route('/api/memories/export', methods=['GET'])
+def export_memories():
+    """导出全部记忆为 .loyi 文件"""
+    try:
+        data = export_service.export_all()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'memories_{timestamp}.loyi'
+        return Response(
+            data,
+            mimetype='application/octet-stream',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    except Exception as e:
+        logger.exception(f"导出失败: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/memories/import', methods=['POST'])
+def import_memories():
+    """从 .loyi 文件导入记忆"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': '请选择文件'})
+
+        file = request.files['file']
+        if not file.filename.endswith('.loyi'):
+            return jsonify({'success': False, 'message': '请上传 .loyi 文件'})
+
+        file_data = file.read()
+        result = export_service.import_from_file(file_data)
+
+        return jsonify({
+            'success': True,
+            'message': f'导入完成：新增 {result["imported_memories"]} 条记忆、{result["imported_nodes"]} 个节点、{result["imported_edges"]} 条边，{result["skipped"]} 条跳过'
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)})
+    except Exception as e:
+        logger.exception(f"导入失败: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 
 if __name__ == '__main__':

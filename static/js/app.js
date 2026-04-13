@@ -1511,9 +1511,12 @@ function renderEntityTypeChart(entityTypes) {
     if (!container) return;
 
     const typeColors = {
-        'PERSON': '#7B2D8E',
-        'LOCATION': '#3498db',
-        'EVENT': '#e74c3c',
+        'PERSON': '#FF6B35',
+        'LOCATION': '#004E89',
+        'EVENT': '#C5283D',
+        'OBJECT': '#1A936F',
+        'CONCEPT': '#3498db',
+        'EMOTION': '#E9724C',
         'ENTITY': '#95a5a6'
     };
 
@@ -1521,6 +1524,9 @@ function renderEntityTypeChart(entityTypes) {
         'PERSON': '人物',
         'LOCATION': '地点',
         'EVENT': '事件',
+        'OBJECT': '物品',
+        'CONCEPT': '概念',
+        'EMOTION': '情感',
         'ENTITY': '其他'
     };
 
@@ -1593,9 +1599,12 @@ function renderTopEntities(topEntities) {
     }
 
     const typeColors = {
-        'PERSON': '#7B2D8E',
-        'LOCATION': '#3498db',
-        'EVENT': '#e74c3c',
+        'PERSON': '#FF6B35',
+        'LOCATION': '#004E89',
+        'EVENT': '#C5283D',
+        'OBJECT': '#1A936F',
+        'CONCEPT': '#3498db',
+        'EMOTION': '#E9724C',
         'ENTITY': '#95a5a6'
     };
 
@@ -1603,6 +1612,9 @@ function renderTopEntities(topEntities) {
         'PERSON': '人',
         'LOCATION': '地',
         'EVENT': '事',
+        'OBJECT': '物',
+        'CONCEPT': '念',
+        'EMOTION': '情',
         'ENTITY': '实'
     };
 
@@ -2516,6 +2528,7 @@ function showNodeDetail(nodeData) {
         'EVENT': '事件',
         'OBJECT': '物品',
         'CONCEPT': '概念',
+        'EMOTION': '情感',
         'ENTITY': '实体'
     };
     const typeName = typeNameMap[nodeData.type] || nodeData.type || '实体';
@@ -2615,6 +2628,9 @@ function enableNodeEdit(nodeId) {
                     <option value="PERSON" ${node.type === 'PERSON' ? 'selected' : ''}>人物</option>
                     <option value="LOCATION" ${node.type === 'LOCATION' ? 'selected' : ''}>地点</option>
                     <option value="EVENT" ${node.type === 'EVENT' ? 'selected' : ''}>事件</option>
+                    <option value="OBJECT" ${node.type === 'OBJECT' ? 'selected' : ''}>物品</option>
+                    <option value="CONCEPT" ${node.type === 'CONCEPT' ? 'selected' : ''}>概念</option>
+                    <option value="EMOTION" ${node.type === 'EMOTION' ? 'selected' : ''}>情感</option>
                     <option value="ENTITY" ${node.type === 'ENTITY' ? 'selected' : ''}>其他</option>
                 </select>
             </div>
@@ -2881,6 +2897,52 @@ async function deleteEdge(edgeId, sourceName, targetName) {
     }
 }
 
+// 批量删除自环关系
+async function deleteAllSelfLoops(nodeName) {
+    if (!currentSelectedEdge || !currentSelectedEdge.isSelfLoopGroup) return;
+    
+    const loops = currentSelectedEdge.selfLoopEdges || [];
+    if (loops.length === 0) return;
+    
+    if (!confirm(`确定要删除 ${nodeName} 的全部 ${loops.length} 条自环关系吗？此操作不可恢复。`)) {
+        return;
+    }
+    
+    showToast('正在删除自环关系...', 'info');
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const loop of loops) {
+        const loopId = loop.id || loop.uuid;
+        if (!loopId) {
+            failCount++;
+            continue;
+        }
+        try {
+            const response = await fetch(`/api/graph/edge/${loopId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (error) {
+            console.error('删除自环失败:', error);
+            failCount++;
+        }
+    }
+    
+    if (successCount > 0) {
+        showToast(`已删除 ${successCount} 条自环关系`, 'success');
+        await loadGraphData();
+        closeDetailPanel();
+        currentSelectedEdge = null;
+    }
+    if (failCount > 0) {
+        showToast(`${failCount} 条自环关系删除失败`, 'error');
+    }
+}
+
 // 查找重复实体
 function findDuplicateNodes(nodeId) {
     const currentNode = graphData.nodes.find(n => n.id === nodeId);
@@ -2947,7 +3009,7 @@ function showMergeDialog(keepNode, duplicates) {
         html += `
             <div class="top-entity-item" style="margin-bottom: 8px;">
                 <span class="entity-rank">${idx + 1}</span>
-                <div class="entity-avatar" style="background: ${colorMap[dup.type] || '#999'};">${dup.type === 'PERSON' ? '人' : dup.type === 'LOCATION' ? '地' : '实'}</div>
+                <div class="entity-avatar" style="background: ${colorMap[dup.type] || '#999'};">${dup.type === 'PERSON' ? '人' : dup.type === 'LOCATION' ? '地' : dup.type === 'EVENT' ? '事' : dup.type === 'OBJECT' ? '物' : dup.type === 'CONCEPT' ? '念' : dup.type === 'EMOTION' ? '情' : '实'}</div>
                 <span class="entity-name">${dup.name}</span>
                 <span class="entity-count">${dup.memory_ids?.length || 0} 条记忆</span>
                 <button class="btn-edit" style="margin-left: auto;" onclick="confirmMergeNodes('${keepNode.id}', '${dup.id}', '${dup.name}')">
@@ -3025,6 +3087,9 @@ function updateExplorePanel(nodeData) {
             'PERSON': '人',
             'LOCATION': '地',
             'EVENT': '事',
+            'OBJECT': '物',
+            'CONCEPT': '念',
+            'EMOTION': '情',
             'ENTITY': '实'
         };
         avatarEl.textContent = typeIcons[nodeData.type] || '实';
@@ -3206,6 +3271,18 @@ function showEdgeDetail(edgeData) {
                 </svg>
             </button>
         `;
+    } else if (headerActions && edgeData.isSelfLoopGroup) {
+        headerActions.innerHTML = `
+            <button class="btn-header-delete" onclick="deleteAllSelfLoops('${escapeHtml(edgeData.source_name || '')}')" title="删除全部自环">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span style="margin-left:4px;font-size:11px;">全部删除</span>
+            </button>
+        `;
+    } else if (headerActions) {
+        headerActions.innerHTML = '';
     }
 
     let html = '';
@@ -3294,12 +3371,23 @@ function renderSelfLoopDetail(edgeData, content, panel) {
         
         sortedLoops.forEach((loop, idx) => {
             const date = loop.created_at ? new Date(loop.created_at).toLocaleDateString('zh-CN') : '未知时间';
+            const loopId = loop.id || loop.uuid || '';
+            const loopSource = escapeHtml(loop.source_name || edgeData.source_name || '未知');
+            const loopTarget = escapeHtml(loop.target_name || edgeData.target_name || '未知');
             html += `
-                <div class="timeline-item">
-                    <div class="timeline-marker" style="background: #E91E63;"></div>
-                    <div class="timeline-content">
-                        <div class="timeline-date">${date}</div>
-                        <div class="timeline-text">${loop.fact || loop.description || getRelationTypeName(loop.type) || '自我反思'}</div>
+                <div class="timeline-item" style="align-items: flex-start;">
+                    <div class="timeline-marker" style="background: #E91E63; margin-top: 4px;"></div>
+                    <div class="timeline-content" style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div class="timeline-date">${date}</div>
+                            ${loopId ? `<button class="btn-header-delete" onclick="deleteEdge('${loopId}', '${loopSource}', '${loopTarget}')" title="删除此自环" style="padding: 2px 6px; font-size: 11px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>` : ''}
+                        </div>
+                        <div class="timeline-text" style="margin-top: 4px;">${loop.fact || loop.description || getRelationTypeName(loop.type) || '自我反思'}</div>
                     </div>
                 </div>
             `;
@@ -3886,7 +3974,7 @@ function setupPathFinder(nodeData) {
         // 第一次选中，设为起点
         return;
     }
-    
+
     // 如果按住 Shift 键，设为终点
     if (window.event && window.event.shiftKey) {
         pathTargetNode = nodeData;
@@ -3897,4 +3985,41 @@ function setupPathFinder(nodeData) {
         pathTargetNode = null;
         updatePathFinder();
     }
+}
+
+// ==================== 导入导出 ====================
+
+function exportMemories() {
+    showToast('正在导出记忆...', 'info');
+    window.location.href = '/api/memories/export';
+}
+
+function importMemories(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    showToast('正在导入记忆...', 'info');
+    fetch('/api/memories/import', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            loadMemories();
+            loadGraphData();
+        } else {
+            showToast(data.message || '导入失败', 'error');
+        }
+    })
+    .catch(err => {
+        showToast('导入失败: ' + err.message, 'error');
+    })
+    .finally(() => {
+        input.value = '';
+    });
 }

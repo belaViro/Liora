@@ -14,6 +14,11 @@
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
 
+    <!-- Fonts: 数字花园风格 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+
     <!-- 组件样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/header.css') }}">
 
@@ -67,9 +72,9 @@
 
                         <button class="control-btn" onclick="filterGraph('EVENT')">事件</button>
 
+                        <button class="control-btn" onclick="filterGraph('EMOTION')">情感</button>
+
                         <button class="control-btn" onclick="resetGraph()">重置</button>
-
-
 
                     </div>
 
@@ -78,6 +83,13 @@
 
 
                 <svg id="graph-svg"></svg>
+
+                <!-- 右下角导入导出按钮 -->
+                <div class="graph-io-buttons">
+                    <button class="control-btn" onclick="exportMemories()" title="导出记忆">导出</button>
+                    <button class="control-btn" onclick="document.getElementById('importFile').click()" title="导入记忆">导入</button>
+                </div>
+                <input type="file" id="importFile" accept=".loyi" style="display:none;" onchange="importMemories(this)">
 
 
 

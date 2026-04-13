@@ -168,7 +168,7 @@ class GraphService:
                 if len(new_desc) > len(old_desc):
                     self.nodes[entity_id]['description'] = new_desc
                 
-                self.nodes[entity_id]['last_updated'] = current_time
+                self.nodes[entity_id]['updated_at'] = current_time
                 logger.info(f"实体合并: '{entity_name}' -> 已有实体 '{self.nodes[entity_id]['name']}'")
                 
             elif entity_id not in self.nodes:
@@ -191,6 +191,7 @@ class GraphService:
                     'aliases': entity.get('aliases', []),
                     'memory_ids': [memory_id],
                     'created_at': current_time,
+                    'updated_at': current_time,
                     'relation_count': 0
                 }
             else:
@@ -243,6 +244,7 @@ class GraphService:
                     'source': source_id,
                     'target': target_id,
                     'type': relation['type'],
+                    'directed': False,                                           # 默认为无向关系
                     'description': relation.get('description', ''),
                     'fact': relation.get('fact', ''),                           # 关系陈述（核心字段）
                     'episodes': [{                                              # 来源片段
