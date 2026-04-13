@@ -181,6 +181,7 @@ async function adoptPrediction(index) {
                     name: prediction.name,
                     type: prediction.type,
                     relation: prediction.relation,
+                    fact: prediction.fact,
                     reason: prediction.reason,
                     confidence: prediction.confidence
                 }

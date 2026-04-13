@@ -66,7 +66,7 @@
     border: none;
     border-left: 1px solid var(--color-border-light);
     background-color: var(--color-bg);
-    color: var(--color-text);
+    color: #000000;
     cursor: pointer;
     font-family: var(--font-mono);
     font-size: 12px;
@@ -78,7 +78,7 @@
 
 .search-button:hover {
     background-color: var(--color-memory);
-    color: #fff;
+    color: #ffffff;
     border-color: var(--color-memory);
 }
 
@@ -95,7 +95,7 @@
     padding: 8px 14px;
     border: 1px solid var(--color-border-light);
     background: var(--color-bg);
-    color: var(--color-text);
+    color: #000000;
     cursor: pointer;
     font-family: var(--font-mono);
     font-size: 12px;
@@ -105,7 +105,7 @@
 
 .time-travel-btn:hover {
     border-color: var(--color-memory);
-    color: var(--color-memory);
+    color: #000000;
     background: var(--color-memory-light);
 }
 

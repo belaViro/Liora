@@ -1,242 +1,126 @@
 /**
  * Liora Base Styles
- * Extracted from templates/index.html (lines 144-361)
+ * 档案室工作台风格
  */
 
 /* ============================================
-
-   顶部系统æ Â¿- 借鉴终端风格
-
+   顶部系统栏 - 档案索引条风格
    ============================================ */
 
 .header {
-
     border-bottom: 1px solid var(--color-border);
-
     padding: 12px 20px;
-
     background-color: var(--color-bg);
-
     display: flex;
-
     align-items: center;
-
     gap: 20px;
-
     font-family: var(--font-mono);
-
 }
-
-
 
 .logo-img {
-
     height: 32px;
-
     width: auto;
-
     display: block;
-
 }
-
-
 
 .search-box {
-
     flex: 1;
-
     display: flex;
-
     border: 1px solid var(--color-border-light);
-
     max-width: 500px;
-
     background: var(--color-bg);
-
     transition: all 0.2s ease;
-
 }
-
-
 
 .search-box:focus-within {
-
     border-color: var(--color-memory);
-
     box-shadow: 0 0 0 3px var(--color-memory-light);
-
 }
-
-
 
 .search-input {
-
     flex: 1;
-
     padding: 8px 12px;
-
     border: none;
-
     outline: none;
-
     font-size: 13px;
-
     font-family: var(--font-mono);
-
     background: transparent;
-
 }
-
-
 
 .search-input::placeholder {
-
     color: var(--color-text-muted);
-
 }
-
-
 
 .search-button {
-
     padding: 10px 16px;
-
     border: none;
-
     border-left: 1px solid var(--color-border-light);
-
     background-color: var(--color-bg);
-
-    color: var(--color-text);
-
+    color: #000000;
     cursor: pointer;
-
     font-family: var(--font-mono);
-
     font-size: 12px;
-
     font-weight: 500;
-
     transition: all 0.2s ease;
-
     text-transform: uppercase;
-
     letter-spacing: 0.5px;
-
 }
-
-
 
 .search-button:hover {
-
     background-color: var(--color-memory);
-
-    color: #fff;
-
+    color: #ffffff;
     border-color: var(--color-memory);
-
 }
 
-
-
-/* 时å æ¥¹æ¥­è¡Œæ ¨é»ï¿½? */
-
+/* 时间旅行按钮 */
 .time-travel-btn {
-
     display: inline-flex;
-
     align-items: center;
-
     gap: 6px;
-
     padding: 8px 14px;
-
     border: 1px solid var(--color-border-light);
-
     background: var(--color-bg);
-
-    color: var(--color-text);
-
+    color: #000000;
     cursor: pointer;
-
     font-family: var(--font-mono);
-
     font-size: 12px;
-
     transition: all 0.2s ease;
-
     border-radius: 4px;
-
 }
-
-
 
 .time-travel-btn:hover {
-
     border-color: var(--color-memory);
-
-    color: var(--color-memory);
-
+    color: #000000;
     background: var(--color-memory-light);
-
 }
-
-
 
 .time-travel-icon {
-
     font-size: 14px;
-
 }
-
-
 
 .search-button:focus-visible {
-
     outline: 2px solid var(--color-memory);
-
     outline-offset: 2px;
-
 }
 
-
-
 /* ============================================
-
-   æ»šåŠ¨æ¡- æžçª„é»‘æ¡†
-
+   滚动条 - 极窄灰框
    ============================================ */
 
 ::-webkit-scrollbar {
-
     width: 6px;
-
     height: 6px;
-
 }
-
-
 
 ::-webkit-scrollbar-track {
-
     background: var(--color-bg-secondary);
-
 }
-
-
 
 ::-webkit-scrollbar-thumb {
-
-    background: var(--color-text-secondary);
-
+    background: var(--color-border);
     border-radius: 0;
-
 }
 
-
-
 ::-webkit-scrollbar-thumb:hover {
-
-    background: #333333;
-
+    background: var(--color-text-secondary);
 }

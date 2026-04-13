@@ -43,6 +43,8 @@
 
     letter-spacing: 0.3px;
 
+    color: #000000;
+
 }
 
 
@@ -59,11 +61,11 @@
 
 .memory-network-controls .control-btn.active {
 
-    background: var(--color-memory);
+    background: #000000;
 
-    color: #fff;
+    color: #ffffff;
 
-    border-color: var(--color-memory);
+    border-color: #000000;
 
 }
 

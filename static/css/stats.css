@@ -1683,7 +1683,7 @@
 
 .btn-save:hover {
 
-    background: #6a2480;
+    background: #6a5b7a;
 
 }
 
@@ -1715,9 +1715,9 @@
 
     padding: 12px;
 
-    background: #fff3e0;
+    background: #faf6ef;
 
-    border: 1px solid #ffb74d;
+    border: 1px solid var(--color-warm-accent);
 
     border-radius: 4px;
 
@@ -1727,9 +1727,9 @@
 
 .merge-section.warning {
 
-    background: #ffebee;
+    background: #faf0f0;
 
-    border-color: #ef5350;
+    border-color: #c97f7f;
 
 }
 
@@ -1741,7 +1741,7 @@
 
     font-weight: 600;
 
-    color: #e65100;
+    color: #9a7b50;
 
     margin-bottom: 8px;
 
@@ -1751,7 +1751,7 @@
 
 .merge-section.warning .merge-title {
 
-    color: #c62828;
+    color: #a05050;
 
 }
 

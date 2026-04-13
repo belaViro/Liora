@@ -178,7 +178,7 @@ class PredictionService:
 重要：预测那些**文本中未明确提及但逻辑上很可能存在**的节点。
 
 返回格式（JSON数组）：
-[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT", "relation": "关系类型", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
+[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION", "relation": "关系类型", "fact": "关系陈述（一句完整、具体、有信息量的话，描述两者之间的真实关系，避免空泛。例如：'张三和李四从大学起就是室友，毕业后仍保持密切联系。'）", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
 
             'LOCATION': f"""当前节点是一个地点：{node_name}
 描述：{node_desc}
@@ -199,7 +199,7 @@ class PredictionService:
 重要：预测那些**文本中未明确提及但逻辑上很可能存在**的节点。
 
 返回格式（JSON数组）：
-[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT", "relation": "关系类型", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
+[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION", "relation": "关系类型", "fact": "关系陈述（一句完整、具体、有信息量的话，描述两者之间的真实关系，避免空泛。例如：'张三和李四从大学起就是室友，毕业后仍保持密切联系。'）", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
 
             'EVENT': f"""当前节点是一个事件：{node_name}
 描述：{node_desc}
@@ -220,7 +220,26 @@ class PredictionService:
 重要：预测那些**文本中未明确提及但逻辑上很可能存在**的节点。
 
 返回格式（JSON数组）：
-[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT", "relation": "关系类型", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
+[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION", "relation": "关系类型", "fact": "关系陈述（一句完整、具体、有信息量的话，描述两者之间的真实关系，避免空泛。例如：'张三和李四从大学起就是室友，毕业后仍保持密切联系。'）", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
+            'EMOTION': f"""当前节点是一种情感：{node_name}
+描述：{node_desc}
+
+已知关系网络：
+{related_text}
+
+请基于逻辑推理，预测这种情感**可能还存在但尚未记录**的关联节点。
+
+这是推理任务，不是文本提取。请根据情感心理学和记忆关联常识进行推断：
+- 如果情感与特定人物相关，推理：其他引发类似情感的人、情感对比者
+- 如果情感与地点相关，推理：触发相同情感的其他场所、情感避难所
+- 如果情感与事件相关，推理：情感前因事件、后续情感转折点
+- 如果情感强烈（如愧疚、怀念），推理：相关的补偿行为、纪念物、未完成的愿望
+- 如果情感复杂（如 bittersweet），推理：矛盾情感的另一面、时间维度上的情感变化
+
+重要：预测那些**文本中未明确提及但在情感逻辑上很可能存在**的节点。
+
+返回格式（JSON数组）：
+[{{"name": "节点名称", "type": "PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION", "relation": "关系类型", "fact": "关系陈述（一句完整、具体、有信息量的话，描述两者之间的真实关系，避免空泛。例如：'张三和李四从大学起就是室友，毕业后仍保持密切联系。'）", "reason": "推理依据（说明为什么这个节点可能存在）", "confidence": 0.8}}]""",
         }
         
         return prompts.get(node_type, prompts['PERSON'])

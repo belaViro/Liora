@@ -1,5 +1,6 @@
 /* ============================================
-   记忆卡片导出样式 - 精简复古风
+   记忆卡片导出样式 - 精装手账内页风
+   与主界面统一纸白墨水系，紫藤点缀
    ============================================ */
 
 .memory-card-modal {
@@ -25,7 +26,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(45, 40, 35, 0.85);
+    background: rgba(42, 38, 34, 0.75);
     backdrop-filter: blur(10px);
 }
 
@@ -44,28 +45,28 @@
     width: 400px;
     min-height: 500px;
     position: relative;
-    background: #f5f0e6;
+    background: var(--color-bg-secondary);
     overflow: hidden;
-    box-shadow: 
-        0 20px 60px -10px rgba(0,0,0,0.35),
-        0 0 0 1px rgba(0,0,0,0.05);
+    box-shadow:
+        0 20px 60px -10px rgba(0,0,0,0.3),
+        0 0 0 1px rgba(0,0,0,0.04);
     display: flex;
     flex-direction: column;
 }
 
-/* 简单边框装饰 */
+/* 装订孔装饰 */
 .card-border-frame {
     position: absolute;
     top: 16px;
     left: 16px;
     right: 16px;
     bottom: 16px;
-    border: 2px solid #4a3f35;
+    border: 1.5px solid var(--color-warm-accent);
     pointer-events: none;
     z-index: 2;
 }
 
-/* 顶部装饰线 */
+/* 顶部紫藤色横线 - 品牌连接 */
 .card-top-line {
     position: absolute;
     top: 28px;
@@ -73,7 +74,7 @@
     transform: translateX(-50%);
     width: 60px;
     height: 2px;
-    background: #4a3f35;
+    background: var(--color-memory);
     z-index: 3;
 }
 
@@ -85,7 +86,7 @@
     transform: translateX(-50%);
     width: 40px;
     height: 1px;
-    background: #8b7d6b;
+    background: var(--color-warm-accent);
     z-index: 3;
 }
 
@@ -95,7 +96,7 @@
     padding: 55px 35px 50px;
     display: flex;
     flex-direction: column;
-    color: #3d3229;
+    color: var(--color-text);
     flex: 1;
 }
 
@@ -106,21 +107,21 @@
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 15px;
-    border-bottom: 1px dashed #b8a894;
+    border-bottom: 1px dashed var(--color-border);
 }
 
 .card-brand {
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--font-serif);
     font-size: 18px;
     font-weight: 600;
-    color: #4a3f35;
+    color: var(--color-memory);
     letter-spacing: 2px;
 }
 
 .card-date {
-    font-family: Georgia, serif;
+    font-family: var(--font-serif);
     font-size: 16px;
-    color: #6b5d4d;
+    color: var(--color-text-secondary);
 }
 
 /* 正文区域 */
@@ -132,10 +133,10 @@
 }
 
 .memory-card-text {
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--font-serif);
     font-size: 22px;
     line-height: 1.7;
-    color: #3d3229;
+    color: var(--color-text);
     text-align: left;
     max-height: 280px;
     overflow: hidden;
@@ -149,22 +150,22 @@
 .memory-card-note {
     margin-top: auto;
     padding: 20px 0;
-    border-top: 1px solid #d4c8b8;
+    border-top: 1px solid var(--color-border-light);
 }
 
 .note-author {
-    font-family: Georgia, serif;
+    font-family: var(--font-serif);
     font-size: 14px;
-    color: #8b7d6b;
+    color: var(--color-memory);
     font-style: italic;
     margin-bottom: 8px;
 }
 
 .note-content {
-    font-family: Georgia, serif;
+    font-family: var(--font-serif);
     font-size: 18px;
     line-height: 1.6;
-    color: #5a4d3d;
+    color: var(--color-text-secondary);
     font-style: italic;
 }
 
@@ -172,7 +173,7 @@
 .memory-card-footer {
     margin-top: 25px;
     padding-top: 20px;
-    border-top: 2px solid #4a3f35;
+    border-top: 1.5px solid var(--color-warm-accent);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -186,9 +187,9 @@
 }
 
 .card-signature {
-    font-family: Georgia, serif;
+    font-family: var(--font-serif);
     font-size: 14px;
-    color: #8b7d6b;
+    color: var(--color-text-muted);
     font-style: italic;
 }
 
@@ -209,25 +210,26 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: Georgia, serif;
-    letter-spacing: 1px;
+    font-family: var(--font-sans);
+    letter-spacing: 0.5px;
 }
 
 .btn-download {
-    background: #4a3f35;
-    color: #f5f0e6;
+    background: var(--color-memory);
+    color: #fff;
 }
 
 .btn-download:hover {
-    background: #3d3229;
+    background: #6a5b7a;
 }
 
 .btn-close {
     background: transparent;
-    color: #6b5d4d;
-    border: 1px solid #b8a894;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
 }
 
 .btn-close:hover {
-    background: rgba(139, 125, 107, 0.1);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text);
 }
