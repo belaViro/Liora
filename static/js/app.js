@@ -1810,7 +1810,7 @@ function initGraph() {
 
     // 存储引用
     svg.node().graphG = g;
-    
+
     graphInitialized = true;
 }
 
@@ -2494,6 +2494,10 @@ let currentSelectedNode = null;
 let currentSelectedEdge = null;
 let exploreChatHistory = []; // 探索面板的聊天历史
 
+// 人物视角模式
+let isPersonaMode = false;
+let personaNodeName = '';
+
 function showNodeDetail(nodeData) {
     const panel = document.getElementById('detailPanel');
     const title = document.getElementById('detailTitle');
@@ -3111,16 +3115,27 @@ function updateExplorePanel(nodeData) {
     if (storyGenSection) {
         storyGenSection.style.display = 'block';
     }
-    
+
     // 重置故事生成状态
     resetStoryGenerator();
-    
+
     // 清空聊天历史
     exploreChatHistory = [];
     renderExploreChat();
-    
+
     // 自动切换到探索面板
     switchTab('explore');
+
+    // PERSON 节点显示"以此人视角回忆"按钮
+    const personaBtn = document.getElementById('btn-persona');
+    if (personaBtn) {
+        personaBtn.style.display = nodeData.type === 'PERSON' ? 'inline-block' : 'none';
+    }
+
+    // 切换节点时退出 persona 模式
+    if (isPersonaMode) {
+        exitPersonaMode();
+    }
 }
 
 // 渲染探索面板聊天
@@ -3153,6 +3168,56 @@ function renderExploreChat() {
     
     // 滚动到底部
     container.scrollTop = container.scrollHeight;
+}
+
+// 切换到人物视角模式
+function switchToPersonaMode() {
+    if (!currentSelectedNode || currentSelectedNode.type !== 'PERSON') {
+        showToast('只有人物节点才能使用视角回忆', 'warning');
+        return;
+    }
+    isPersonaMode = true;
+    personaNodeName = currentSelectedNode.name;
+
+    // 显示 persona 指示器
+    const indicator = document.getElementById('personaIndicator');
+    const nameSpan = document.getElementById('personaName');
+    if (indicator) {
+        indicator.style.display = 'block';
+        if (nameSpan) nameSpan.textContent = personaNodeName;
+    }
+
+    // 隐藏 persona 按钮
+    const personaBtn = document.getElementById('btn-persona');
+    if (personaBtn) personaBtn.style.display = 'none';
+
+    // 自动填充问题
+    setExploreQuestion(`${personaNodeName}你为什么要这样做？`);
+
+    showToast(`🎭 洛忆已进入「${personaNodeName}」视角`, 'info');
+}
+
+// 退出人物视角模式
+function exitPersonaMode() {
+    const formerPersonaName = personaNodeName;
+    isPersonaMode = false;
+    personaNodeName = '';
+
+    // 隐藏 persona 指示器
+    const indicator = document.getElementById('personaIndicator');
+    if (indicator) indicator.style.display = 'none';
+
+    // 如果是 PERSON 节点则重新显示 persona 按钮
+    if (currentSelectedNode && currentSelectedNode.type === 'PERSON') {
+        const personaBtn = document.getElementById('btn-persona');
+        if (personaBtn) personaBtn.style.display = 'inline-block';
+    }
+
+    // 清空聊天历史
+    exploreChatHistory = [];
+    renderExploreChat();
+
+    showToast(`🎭 洛忆已退出「${formerPersonaName}」视角`, 'info');
 }
 
 // 设置探索问题
@@ -3209,7 +3274,9 @@ async function sendExploreQuestion() {
                 question: question,
                 node: currentSelectedNode,
                 edge: currentSelectedEdge,
-                history: exploreChatHistory
+                history: exploreChatHistory,
+                persona_mode: isPersonaMode,
+                persona_node_name: personaNodeName
             })
         });
         
@@ -3531,16 +3598,21 @@ function updateExplorePanelForEdge(edgeData) {
     if (storyGenSection) {
         storyGenSection.style.display = 'block';
     }
-    
+
     // 重置故事生成状态
     resetStoryGenerator();
-    
+
     // 清空聊天历史
     exploreChatHistory = [];
     renderExploreChat();
-    
+
     // 自动切换到探索面板
     switchTab('explore');
+
+    // 隐藏 persona 按钮，退出 persona 模式
+    const personaBtn = document.getElementById('btn-persona');
+    if (personaBtn) personaBtn.style.display = 'none';
+    if (isPersonaMode) exitPersonaMode();
 }
 
 // 切换自环项展开/折叠状态
@@ -3598,7 +3670,16 @@ function closeDetailPanel() {
     
     // 清除路径高亮
     highlightedPath = null;
-    
+
+    // 退出 persona 模式
+    if (isPersonaMode) exitPersonaMode();
+
+    // 隐藏 persona 按钮和指示器
+    const personaBtn = document.getElementById('btn-persona');
+    if (personaBtn) personaBtn.style.display = 'none';
+    const personaIndicator = document.getElementById('personaIndicator');
+    if (personaIndicator) personaIndicator.style.display = 'none';
+
     // 切回录入记忆面板
     switchTab('create');
 }

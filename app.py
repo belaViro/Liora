@@ -476,13 +476,15 @@ def explore_node():
         node_data = data.get('node', {})
         edge_data = data.get('edge', {})
         chat_history = data.get('history', [])
-        
+        persona_mode = data.get('persona_mode', False)
+        persona_node_name = data.get('persona_node_name', '')
+
         if not question:
             return jsonify({'success': False, 'error': '问题不能为空'}), 400
-        
+
         # 构建上下文
         context_parts = []
-        
+
         if node_data:
             context_parts.append(f"节点名称: {node_data.get('name', '未知')}")
             context_parts.append(f"节点类型: {node_data.get('type', 'Entity')}")
@@ -494,7 +496,7 @@ def explore_node():
                 attrs = node_data.get('attributes', {})
                 attr_str = ', '.join([f"{k}={v}" for k, v in attrs.items()])
                 context_parts.append(f"属性: {attr_str}")
-        
+
         elif edge_data:
             if edge_data.get('isSelfLoopGroup'):
                 context_parts.append(f"自环节点: {edge_data.get('source_name', '未知')}")
@@ -507,58 +509,79 @@ def explore_node():
                 context_parts.append(f"关系陈述: {edge_data.get('fact')}")
             if edge_data.get('description'):
                 context_parts.append(f"关系描述: {edge_data.get('description')}")
-        
+
         context = '\n'.join(context_parts)
-        
+
+        # 构建系统提示词
+        if persona_mode and persona_node_name:
+            system_prompt = f"""你扮演「{persona_node_name}」这个人物。现在你要以第一人称的视角，
+                基于用户记忆网络中的内容来回忆和回答问题。
+                回答风格：
+                - 第一人称"我"来叙述
+                - 自然、简洁，像在和人聊天，不要啰嗦
+                - 用中文回答
+                - 回答尽量简短，100字以内
+                """
+        else:
+            system_prompt = """你是 Liora 记忆网络的智能助手。Liora 是一个个人记忆管理系统，用户存储的所有内容都是 TA 的记忆。
+
+            当前情境：
+            - 用户正在查看自己记忆网络中的一个节点/关系
+            - 节点包含的内容来自用户过往录入的记忆（文字、图片、音频等）
+            - 你的任务是帮助用户回顾、整理和探索自己的记忆
+            
+            回答原则：
+            1. 当用户问"这是谁的记忆"或"这是谁"时，要明确这是**用户自己的记忆**中的内容
+            2. 基于节点描述进行回答，可以补充常识性背景
+            3. 不要拒绝回答或说"这不是记忆"
+            4. 如果用户问到记忆来源，可以说"这是您录入的记忆中的内容"
+            
+            回答风格：
+            - 自然、友好、像在聊天
+            - 不要机械地重复"根据节点信息"
+            - 用中文回答
+            """
+
         # 构建对话历史
         messages = [
-            {"role": "system", "content": """
-你是 Liora 记忆网络的智能助手。Liora 是一个个人记忆管理系统，用户存储的所有内容都是 TA 的记忆。
-
-当前情境：
-- 用户正在查看自己记忆网络中的一个节点/关系
-- 节点包含的内容来自用户过往录入的记忆（文字、图片、音频等）
-- 你的任务是帮助用户回顾、整理和探索自己的记忆
-
-回答原则：
-1. 当用户问"这是谁的记忆"或"这是谁"时，要明确这是**用户自己的记忆**中的内容
-2. 基于节点描述进行回答，可以补充常识性背景
-3. 不要拒绝回答或说"这不是记忆"
-4. 如果用户问到记忆来源，可以说"这是您录入的记忆中的内容"
-
-回答风格：
-- 自然、友好、像在与朋友聊天
-- 不要机械地重复"根据节点信息"
-- 用中文回答
-"""}
+            {"role": "system", "content": system_prompt}
         ]
         
         # 添加历史对话
         for msg in chat_history[-6:]:  # 只保留最近6轮
             role = "user" if msg.get('role') == 'user' else "assistant"
             messages.append({"role": role, "content": msg.get('content', '')})
-        
+
         # 添加当前问题（带上下文）
-        prompt = f"""基于以下节点/关系信息：
+        if persona_mode and persona_node_name:
+            prompt = f"""基于以下节点/关系信息：
+
+{context}
+
+用户问题：{question}
+
+请基于上述信息，以第一人称「{persona_node_name}」的视角回答。如果问题与此人无关，请诚实说明。"""
+        else:
+            prompt = f"""基于以下节点/关系信息：
 
 {context}
 
 用户问题：{question}
 
 请基于上述信息回答。如果问题与节点无关，请诚实告知。"""
-        
+
         messages.append({"role": "user", "content": prompt})
-        
+
         # 调用 LLM
         response = llm_service.client.chat.completions.create(
             model=llm_service.model_name,
             messages=messages,
             temperature=0.7,
-            max_tokens=800
+            max_tokens=300
         )
-        
+
         answer = response.choices[0].message.content
-        
+
         return jsonify({
             'success': True,
             'data': {

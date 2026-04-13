@@ -226,7 +226,15 @@
                     <button class="quick-tag" onclick="setExploreQuestion('记忆来源')">记忆来源</button>
                     <button class="quick-tag" onclick="setExploreQuestion('相关的事件有哪些？')">相关事件</button>
                     <button class="quick-tag" onclick="setExploreQuestion('总结一下这个人')">总结此人</button>
+                    <button class="quick-tag" id="btn-persona" onclick="switchToPersonaMode()" style="display:none; background:#E8F5E9;">🎭 以此人视角回忆</button>
                 </div>
+            </div>
+
+            <!-- 人物视角模式指示器 -->
+            <div class="persona-indicator" id="personaIndicator" style="display:none; margin: 10px 0; padding: 8px 12px; background: linear-gradient(135deg, #E8F5E9, #C8E6C9); border-radius: 8px; font-size: 12px; color: #2E7D32; text-align: center;">
+                🎭 洛忆已经入「<span id="personaName"></span>」视角
+                <span style="color: #666; font-size: 11px; display: block; margin-top: 2px;">⚠️ 内容基于记忆网络生成，准确度受记忆规模影响</span>
+                <button onclick="exitPersonaMode()" style="margin-top: 6px; background: #fff; border: 1px solid #A5D6A7; border-radius: 4px; padding: 2px 10px; cursor: pointer; font-size: 11px; color: #2E7D32;">退出视角</button>
             </div>
 
             <div class="explore-path-finder" id="pathFinder" style="margin-top: 20px; display: none;">
