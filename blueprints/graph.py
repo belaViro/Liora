@@ -6,6 +6,7 @@
 import uuid
 from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
+from loguru import logger
 
 graph_bp = Blueprint('graph', __name__, url_prefix='/api/graph')
 
@@ -158,13 +159,55 @@ def explore_node():
 
         # 添加当前问题（带上下文）
         if persona_mode and persona_node_name:
-            prompt = f"""基于以下节点/关系信息：
+            # 获取所有记忆，筛选出包含该人物的
+            memory_service = current_app.services.memory_service
+            all_memories = memory_service.get_all_memories()
+
+            # 筛选出实体标签包含该人物的记录
+            related_memories = []
+            for m in all_memories:
+                entities = m.get('entities', [])
+                for e in entities:
+                    if e.get('name') == persona_node_name:
+                        related_memories.append(m)
+                        break
+
+            logger.info(f"[Persona] 人物: {persona_node_name}, 相关记忆: {len(related_memories)}")
+
+            # 构建记忆上下文（30K 字符保护，避免超出 LLM 上下文窗口）
+            memory_context = ""
+            was_truncated = False
+            if related_memories:
+                memory_lines = []
+                total_chars = 0
+                max_chars = 30000  # 30K 字符保护
+                for m in related_memories:
+                    content = m.get('content', '')
+                    created = m.get('created_at', '')[:10] if m.get('created_at') else '未知时间'
+                    if content:
+                        memory_lines.append(f"[{created}] {content}")
+                        total_chars += len(content)
+                        if total_chars > max_chars:
+                            was_truncated = True
+                            break
+                if memory_lines:
+                    memory_context = "\n\n以下是用户记忆中与「" + persona_node_name + "」相关的记录：\n" + "\n".join(memory_lines)
+
+            # 如果没有相关记忆，切换为知识图谱结构作为上下文
+            if not memory_context and context:
+                prompt = f"""你扮演「{persona_node_name}」这个人物。
 
 {context}
 
+请基于上述记忆网络中的信息，以第一人称「{persona_node_name}」的视角回答。如果信息不足，请诚实说明。"""
+            else:
+                prompt = f"""你扮演「{persona_node_name}」这个人物。
+
+{memory_context}
+
 用户问题：{question}
 
-请基于上述信息，以第一人称「{persona_node_name}」的视角回答。如果问题与此人无关，请诚实说明。"""
+请以第一人称「{persona_node_name}」的视角，基于上述记忆内容回答。如果记忆中没有相关信息，请诚实说明。"""
         else:
             prompt = f"""基于以下节点/关系信息：
 
