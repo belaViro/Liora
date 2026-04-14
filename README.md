@@ -1,4 +1,4 @@
-# 记忆织网者 — 让 AI 成为你的记忆搭档！
+# Liora · 记忆织网者 — 让 AI 成为你的记忆搭档！
 
 
 <p align="center">
@@ -13,8 +13,6 @@
   <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-FFD700?style=for-the-badge" alt="FAISS"></a>
   <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-FFD700?style=for-the-badge" alt="D3.js"></a>
 </p>
-
-**基于大模型的多模态知识图谱引擎，记得清晰，连接万物。** 
 
 ---
 
