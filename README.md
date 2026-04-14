@@ -1,4 +1,5 @@
-# Liora · 记忆织网者
+# 记忆织网者 — 让 AI 成为你的记忆搭档！
+
 
 <p align="center">
   <img src="static/logo.png" alt="Liora Logo" width="320">
@@ -13,7 +14,7 @@
   <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-FFD700?style=for-the-badge" alt="D3.js"></a>
 </p>
 
-**个人记忆网络系统** — 基于大模型的多模态知识图谱引擎，记得清晰，连接万物。
+**基于大模型的多模态知识图谱引擎，记得清晰，连接万物。** 
 
 ---
 
