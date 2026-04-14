@@ -97,56 +97,6 @@
 
 
 
-.emotion-quick-select {
-
-    display: flex;
-
-    gap: 8px;
-
-}
-
-
-
-.emotion-btn {
-
-    flex: 1;
-
-    padding: 10px;
-
-    border: 1px solid var(--color-border-light);
-
-    background: var(--color-bg);
-
-    cursor: pointer;
-
-    font-size: 13px;
-
-    transition: all 0.2s;
-
-}
-
-
-
-.emotion-btn:hover {
-
-    border-color: var(--color-memory);
-
-}
-
-
-
-.emotion-btn.selected {
-
-    background: var(--color-memory);
-
-    color: #fff;
-
-    border-color: var(--color-memory);
-
-}
-
-
-
 .form-label {
 
     display: block;

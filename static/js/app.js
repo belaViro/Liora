@@ -732,14 +732,6 @@ function insertMention(textarea, value) {
     onContentInput(textarea);
 }
 
-// 选择情感
-function selectEmotion(btn) {
-    document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    document.getElementById('selectedEmotion').value = btn.dataset.emotion;
-    document.getElementById('selectedValence').value = btn.dataset.valence;
-}
-
 function onTypeChange() {
     const type = document.getElementById('memoryType').value;
     const fileGroup = document.getElementById('fileUploadGroup');
@@ -804,14 +796,6 @@ async function submitMemory(event) {
         formData.append('file', fileInput.files[0]);
     }
     
-    // 添加情感数据
-    const emotion = document.getElementById('selectedEmotion').value;
-    const valence = document.getElementById('selectedValence').value;
-    if (emotion) {
-        formData.append('emotion', emotion);
-        formData.append('valence', valence);
-    }
-
     // 禁用按钮
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="loading"></span>保存中...';
@@ -832,9 +816,6 @@ async function submitMemory(event) {
             document.getElementById('filePreview').style.display = 'none';
             document.getElementById('fileUploadGroup').style.display = 'none';
             document.getElementById('charCount').textContent = '0 字';
-            document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('selectedEmotion').value = '';
-            document.getElementById('selectedValence').value = '';
 
             // 刷新图谱和列表
             loadGraphData();
