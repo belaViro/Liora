@@ -41,16 +41,15 @@ def import_memories():
         if not file.filename.endswith('.loyi'):
             return jsonify({'success': False, 'message': '文件格式错误，请上传 .loyi 文件'})
 
-        # 读取文件内容
-        import io
-        file_content = file.read().decode('utf-8')
+        # 读取文件内容（保持二进制，ZIP 是 bytes 不是字符串）
+        file_content = file.read()
 
         # 导入数据
         result = export_service.import_from_file(file_content)
 
         return jsonify({
             'success': True,
-            'message': f'成功导入 {result.get("imported", 0)} 条记忆',
+            'message': f'成功导入 {result.get("imported_memories", 0)} 条记忆，新增 {result.get("imported_nodes", 0)} 个节点',
             'data': result
         })
 
