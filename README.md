@@ -6,12 +6,15 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.2-FFD700?style=for-the-badge" alt="Version"></a>
-  <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-FFD700?style=for-the-badge&logo=python" alt="Python"></a>
-  <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-FFD700?style=for-the-badge&logo=flask" alt="Flask"></a>
-  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-FFD700?style=for-the-badge" alt="LLM"></a>
-  <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-FFD700?style=for-the-badge" alt="FAISS"></a>
-  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-FFD700?style=for-the-badge" alt="D3.js"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.2-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
+  <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
+  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge" alt="LLM"></a>
+  <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-E63946?style=for-the-badge" alt="FAISS"></a>
+  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge" alt="D3.js"></a>
+  <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
+  <a href="#"><img src="https://img.shields.io/badge/second--brain-A8E6CF?style=for-the-badge" alt="Second Brain"></a>
+  <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
 </p>
 
 ---
