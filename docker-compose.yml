@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  memory-weaver:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      # 挂载代码目录，实时生效
+      - .:/app
+      # 挂载上传文件目录，持久化数据
+      - ./static/uploads:/app/static/uploads
+    environment:
+      # 从宿主机的 .env 文件读取（需要创建 .env.docker）
+      - FLASK_ENV=development
+      - SECRET_KEY=${SECRET_KEY:-liora-secret-key}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    # 开发模式直接用 flask run，不用 gunicorn
+    command: flask run --host=0.0.0.0 --port=5000
