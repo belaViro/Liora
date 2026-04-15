@@ -1,0 +1,515 @@
+/**
+ * 洛忆聊天面板 - 梦忆流年设计
+ * 温暖私密，如老友促膝；优雅空灵，似记忆流淌
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=ZCOOL+XiaoWei&display=swap');
+
+/* ==================== 变量 ==================== */
+:root {
+    --luoyi-primary: #7D5A6A;
+    --luoyi-primary-light: #9B7A8A;
+    --luoyi-primary-dark: #5D3D4A;
+    --luoyi-accent: #E8B87C;
+    --luoyi-accent-warm: #F0C89A;
+    --luoyi-bg: #FDF9F6;
+    --luoyi-bg-card: #FFFFFF;
+    --luoyi-bg-input: #F8F4F0;
+    --luoyi-text: #3D3235;
+    --luoyi-text-muted: #8A7A80;
+    --luoyi-border: #E8DFD8;
+    --luoyi-shadow: rgba(125, 90, 106, 0.12);
+    --luoyi-shadow-strong: rgba(125, 90, 106, 0.2);
+
+    --luoyi-msg-user-bg: linear-gradient(135deg, #7D5A6A 0%, #6B4D5E 100%);
+    --luoyi-msg-luoyi-bg: #FFFFFF;
+    --luoyi-msg-luoyi-border: #E8DFD8;
+
+    --luoyi-font-display: 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+    --luoyi-font-body: 'Noto Serif SC', -apple-system, sans-serif;
+
+    --luoyi-radius-sm: 8px;
+    --luoyi-radius-md: 16px;
+    --luoyi-radius-lg: 24px;
+    --luoyi-radius-full: 999px;
+}
+
+/* ==================== 面板容器 ==================== */
+#panel-luoyi {
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    margin: -12px -12px 0 -12px;
+    background: var(--luoyi-bg);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 背景装饰 - 浮动光斑 */
+#panel-luoyi::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -40px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(232, 184, 124, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    animation: float-gentle 8s ease-in-out infinite;
+}
+
+#panel-luoyi::after {
+    content: '';
+    position: absolute;
+    bottom: 100px;
+    left: -60px;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle, rgba(155, 122, 138, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+    animation: float-gentle 10s ease-in-out infinite reverse;
+}
+
+@keyframes float-gentle {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(15px, -15px) scale(1.05); }
+}
+
+/* ==================== 头部 ==================== */
+.luoyi-header {
+    position: relative;
+    padding: 24px 20px 20px;
+    background: linear-gradient(160deg, #7D5A6A 0%, #6B4D5E 50%, #5D3D4A 100%);
+    color: #fff;
+    overflow: hidden;
+}
+
+/* 头部装饰图案 */
+.luoyi-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        radial-gradient(circle at 20% 80%, rgba(232, 184, 124, 0.2) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 30%);
+    pointer-events: none;
+}
+
+/* 装饰性竖线 */
+.luoyi-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: var(--luoyi-accent);
+    border-radius: 3px 3px 0 0;
+}
+
+.luoyi-header-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.luoyi-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.luoyi-avatar-large {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--luoyi-accent-warm) 0%, var(--luoyi-accent) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--luoyi-font-display);
+    font-size: 22px;
+    color: var(--luoyi-primary-dark);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    animation: avatar-breathe 4s ease-in-out infinite;
+}
+
+@keyframes avatar-breathe {
+    0%, 100% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); }
+    50% { box-shadow: 0 4px 24px rgba(232, 184, 124, 0.4); }
+}
+
+/* 在线状态指示 */
+.luoyi-status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 14px;
+    height: 14px;
+    background: #7DD87D;
+    border: 3px solid var(--luoyi-primary);
+    border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.luoyi-header-info {
+    flex: 1;
+}
+
+.luoyi-title {
+    font-family: var(--luoyi-font-display);
+    font-size: 22px;
+    letter-spacing: 2px;
+    margin: 0 0 4px 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.luoyi-subtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 1px;
+}
+
+/* ==================== 消息区域 ==================== */
+.luoyi-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+}
+
+/* 自定义滚动条 */
+.luoyi-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.luoyi-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.luoyi-messages::-webkit-scrollbar-thumb {
+    background: var(--luoyi-border);
+    border-radius: 3px;
+}
+
+.luoyi-messages::-webkit-scrollbar-thumb:hover {
+    background: var(--luoyi-primary-light);
+}
+
+/* ==================== 欢迎消息 ==================== */
+.luoyi-welcome-card {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: var(--luoyi-bg-card);
+    border-radius: var(--luoyi-radius-md);
+    box-shadow: 0 2px 12px var(--luoyi-shadow);
+    animation: fadeSlideUp 0.5s ease-out;
+}
+
+.luoyi-welcome-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--luoyi-primary) 0%, var(--luoyi-primary-light) 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--luoyi-font-display);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.luoyi-welcome-bubble {
+    flex: 1;
+}
+
+.luoyi-welcome-bubble p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--luoyi-text);
+}
+
+.luoyi-welcome-bubble p:first-child {
+    font-weight: 600;
+    color: var(--luoyi-primary-dark);
+    margin-bottom: 6px;
+}
+
+.luoyi-welcome-bubble p + p {
+    color: var(--luoyi-text-muted);
+    font-size: 13px;
+}
+
+/* ==================== 消息气泡 ==================== */
+.luoyi-message {
+    display: flex;
+    gap: 10px;
+    animation: messageAppear 0.4s ease-out;
+}
+
+@keyframes messageAppear {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 用户消息 - 右侧 */
+.luoyi-message-user {
+    flex-direction: row-reverse;
+}
+
+.luoyi-message-user .luoyi-message-content {
+    background: var(--luoyi-msg-user-bg);
+    color: #fff;
+    border-radius: var(--luoyi-radius-lg) var(--luoyi-radius-sm) var(--luoyi-radius-lg) var(--luoyi-radius-lg);
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 80%;
+    box-shadow: 0 2px 12px var(--luoyi-shadow-strong);
+}
+
+/* 洛忆消息 - 左侧 */
+.luoyi-message-luoyi {
+    flex-direction: row;
+}
+
+.luoyi-message-luoyi .luoyi-message-content {
+    background: var(--luoyi-msg-luoyi-bg);
+    color: var(--luoyi-text);
+    border: 1px solid var(--luoyi-msg-luoyi-border);
+    border-radius: var(--luoyi-radius-sm) var(--luoyi-radius-lg) var(--luoyi-radius-lg) var(--luoyi-radius-lg);
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 80%;
+    box-shadow: 0 2px 8px var(--luoyi-shadow);
+}
+
+.luoyi-message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--luoyi-primary) 0%, var(--luoyi-primary-light) 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--luoyi-font-display);
+    font-size: 12px;
+    flex-shrink: 0;
+    align-self: flex-end;
+}
+
+.luoyi-message-content {
+    word-break: break-word;
+}
+
+/* 消息时间戳 */
+.luoyi-message-time {
+    font-size: 10px;
+    color: var(--luoyi-text-muted);
+    margin-top: 4px;
+    padding: 0 4px;
+}
+
+.luoyi-message-user .luoyi-message-time {
+    text-align: right;
+}
+
+/* ==================== 正在输入指示器 ==================== */
+.luoyi-typing {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.luoyi-typing-bubble {
+    background: var(--luoyi-bg-card);
+    border: 1px solid var(--luoyi-border);
+    border-radius: var(--luoyi-radius-sm) var(--luoyi-radius-lg) var(--luoyi-radius-lg) var(--luoyi-radius-lg);
+    padding: 14px 18px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    box-shadow: 0 2px 8px var(--luoyi-shadow);
+}
+
+.luoyi-typing-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--luoyi-primary-light);
+    border-radius: 50%;
+    animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.luoyi-typing-dot:nth-child(1) { animation-delay: 0s; }
+.luoyi-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.luoyi-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+}
+
+/* ==================== 上下文指示器 ==================== */
+.luoyi-context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: var(--luoyi-bg-input);
+    border: 1px solid var(--luoyi-border);
+    border-radius: var(--luoyi-radius-full);
+    font-size: 10px;
+    color: var(--luoyi-text-muted);
+    margin: 8px auto 0;
+}
+
+.luoyi-context-badge svg {
+    width: 10px;
+    height: 10px;
+}
+
+/* ==================== 输入区域 ==================== */
+.luoyi-input-area {
+    padding: 16px;
+    background: var(--luoyi-bg-card);
+    border-top: 1px solid var(--luoyi-border);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.luoyi-input-area::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: var(--luoyi-border);
+    border-radius: 2px;
+}
+
+.luoyi-input-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.luoyi-input {
+    flex: 1;
+    padding: 12px 16px;
+    background: var(--luoyi-bg-input);
+    border: 1px solid var(--luoyi-border);
+    border-radius: var(--luoyi-radius-lg);
+    font-family: var(--luoyi-font-body);
+    font-size: 14px;
+    color: var(--luoyi-text);
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    min-height: 44px;
+    max-height: 120px;
+    line-height: 1.5;
+}
+
+.luoyi-input::placeholder {
+    color: var(--luoyi-text-muted);
+}
+
+.luoyi-input:focus {
+    border-color: var(--luoyi-primary-light);
+    background: var(--luoyi-bg-card);
+    box-shadow: 0 0 0 3px rgba(125, 90, 106, 0.1);
+}
+
+.luoyi-send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--luoyi-primary) 0%, var(--luoyi-primary-dark) 100%);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px var(--luoyi-shadow-strong);
+}
+
+.luoyi-send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px var(--luoyi-shadow-strong);
+}
+
+.luoyi-send-btn:active {
+    transform: scale(0.95);
+}
+
+.luoyi-send-btn:disabled {
+    background: var(--luoyi-border);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.luoyi-send-btn svg {
+    width: 18px;
+    height: 18px;
+    transform: translateX(1px);
+}
+
+/* ==================== 辅助动画 ==================== */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==================== 暗色模式适配 ==================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --luoyi-bg: #2D2528;
+        --luoyi-bg-card: #3D3235;
+        --luoyi-bg-input: #4D4245;
+        --luoyi-text: #F0EBEB;
+        --luoyi-text-muted: #A89AA0;
+        --luoyi-border: #5D4D55;
+    }
+}

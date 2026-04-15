@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <b>Liora</b> 不是日记本，而是你的 <b>“第二大脑皮层”</b>。<br>
+  <b>Liora</b> 不是日记本，而是你的 <b>“第二大脑”</b>。<br>
   从碎片到图谱，从遗忘到预知 —— 让每一次记录都成为未来灵感的伏笔。
 </p>
 
@@ -31,6 +31,26 @@
 Liora 重新定义记忆的方式。不是简单的日记，不是孤立的关系图谱——而是**活的、互联的、不断生长的记忆网络**。
 
 上传一段文字、一张照片、一段录音，AI 自动解析其中的实体与关系，织成一张属于你的知识图谱。跨越时间、空间、情感的维度，帮你发现记忆之间那些隐秘却动人的联系。
+
+---
+
+## 📸 功能预览
+
+<p align="center">
+  <img src="Screenshots/记忆网络.png" alt="记忆网络" width="49%"/>
+  <img src="Screenshots/洛忆助手.png" alt="洛忆助手" width="49%"/>
+</p>
+
+<p align="center">
+  <img src="Screenshots/关联路径探索.png" alt="关联路径探索" width="49%"/>
+  <img src="Screenshots/数据统计.png" alt="数据统计" width="49%"/>
+
+</p>
+
+<p align="center">
+  <img src="Screenshots/节点预测.png" alt="节点预测" width="49%"/>
+  <img src="Screenshots/视角模式.png" alt="视角模式" width="49%"/>
+</p>
 
 ---
 
@@ -174,6 +194,13 @@ python app.py
 plaintext
 MemoryWeaver/
 ├── app.py                  # Flask 主应用 + SocketIO 实时通信
+├── blueprints/             # 路由模块化
+│   ├── memory.py          # 记忆 CRUD
+│   ├── graph.py          # 图谱查询
+│   ├── stats.py          # 统计接口
+│   ├── export.py         # 导入导出
+│   ├── config.py         # 配置管理
+│   └── luoyi.py          # 洛忆聊天
 ├── services/               # 核心业务服务
 │   ├── llm_service.py      # 大模型统一调度
 │   ├── graph_service.py    # NetworkX 图谱管理
@@ -181,13 +208,24 @@ MemoryWeaver/
 │   ├── prediction_service.py # 智能预测引擎
 │   └── export_service.py   # .loyi 导入导出
 ├── templates/              # HTML 模板
+│   └── components/        # 可复用组件
 ├── static/                 # JS/CSS/上传资源
-└── data/                   # 本地持久化存储
+│   ├── css/               # 样式模块化
+│   └── js/                # 前端逻辑
+├── data/                   # 本地持久化存储
+└── Dockerfile              # Docker 容器化部署
 ```
 
 
 
 ## 📅 更新日志
+
+### v1.0.3 · 2026-04-16
+- ✨ 新增洛忆聊天面板：AI 智能伙伴，支持情绪感知对话与第一人称视角
+- ✨ 新增产品详情面板
+- 🔌 后端模块化：`blueprints/luoyi.py` 洛忆聊天模块独立
+- 🎨 前端模块化：洛忆面板 CSS/JS 独立拆分（luoyi-chat.css、product-info.css）
+- 🐳 Docker 化部署支持，新增 Dockerfile
 
 ### v1.0.2 · 2026-04-13
 - ✨ 新增 .loyi 导入导出功能

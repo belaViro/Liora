@@ -20,6 +20,7 @@ def register_blueprints(app: 'Flask') -> None:
     from .stats import stats_bp
     from .export import export_bp
     from .config import config_bp
+    from .luoyi import luoyi_bp
 
     # 注册 Blueprint，使用 url_prefix 保持原有路径
     app.register_blueprint(memory_bp)
@@ -28,3 +29,4 @@ def register_blueprints(app: 'Flask') -> None:
     app.register_blueprint(stats_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(config_bp)
+    app.register_blueprint(luoyi_bp)  # /api/luoyi/* 路由

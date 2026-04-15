@@ -38,6 +38,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/sidebar.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/memory-card.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prediction.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/luoyi-chat.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/product-info.css') }}">
 
 
 </head>
@@ -282,7 +284,100 @@
 
     </div>
 
+    <!-- 产品详情按钮 -->
+    <button class="pi-trigger-btn" onclick="toggleProductInfo()" title="关于 Liora">
+        ?
+    </button>
 
+    <!-- 产品详情遮罩 -->
+    <div class="pi-overlay" id="piOverlay" onclick="toggleProductInfo()"></div>
+
+    <!-- 产品详情面板 -->
+    <div class="pi-panel" id="piPanel">
+        <div class="pi-header">
+            <div class="pi-header-content">
+                <div class="pi-logo">
+                    <div class="pi-logo-icon">洛</div>
+                    <div>
+                        <div class="pi-logo-text">Liora</div>
+                        <div class="pi-tagline">记忆织网者</div>
+                    </div>
+                </div>
+                <button class="pi-close-btn" onclick="toggleProductInfo()">×</button>
+            </div>
+        </div>
+
+        <div class="pi-content">
+            <div class="pi-hero">
+                <div class="pi-hero-icon">🧠</div>
+                <h2>你的第二大脑</h2>
+                <p>从碎片到图谱，从遗忘到预知<br>让每一次记录都成为未来灵感的伏笔</p>
+            </div>
+
+            <div class="pi-features">
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">🕸️</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">知识图谱</h4>
+                        <p class="pi-feature-desc">D3.js 力导向图谱，可视化你的"思维神经元"，拖拽缩放探索记忆网络</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">📝</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">多模态录入</h4>
+                        <p class="pi-feature-desc">文字/图片/音频，AI 自动解析实体与隐秘关联，@关联人物 #标记主题</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">🔍</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">混合搜索</h4>
+                        <p class="pi-feature-desc">FAISS 向量 + BM25 关键词，既懂语义又懂精准，多角度找回记忆</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">📅</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">记忆探索</h4>
+                        <p class="pi-feature-desc">沿时间线顺藤摸瓜，AI 推理还原完整故事链，发现隐秘联系</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">🤖</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">AI 洛忆</h4>
+                        <p class="pi-feature-desc">懂你情绪的智能伙伴，支持第一人称视角代述，像老友一样回应</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">🔮</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">智能预测</h4>
+                        <p class="pi-feature-desc">基于图谱拓扑结构，预言你可能遗忘的关联，补全记忆盲区</p>
+                    </div>
+                </div>
+
+                <div class="pi-feature">
+                    <div class="pi-feature-icon">📤</div>
+                    <div class="pi-feature-content">
+                        <h4 class="pi-feature-title">.loyi 归档</h4>
+                        <p class="pi-feature-desc">完整备份与迁移，数据主权属于你，一键导入导出</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pi-footer">
+                <p>Remember well. Connect everything.</p>
+                <p class="pi-footer-quote">"时间会流逝，但织网永存。"</p>
+            </div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}?v=2026041404"></script>
     <script src="{{ url_for('static', filename='js/prediction.js') }}?v=2026041402"></script>

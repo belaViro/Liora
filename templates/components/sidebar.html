@@ -6,6 +6,7 @@
         <button class="tab" onclick="switchTab('memories')">记忆列表</button>
         <button class="tab" onclick="switchTab('stats')">统计</button>
         <button class="tab" id="tab-explore" onclick="switchTab('explore')" style="display: none;">探索</button>
+        <button class="tab" id="tab-luoyi" onclick="switchTab('luoyi')">洛忆</button>
     </div>
 
     <!-- 面板内容 -->
@@ -260,6 +261,44 @@
                     生成关于此节点的记忆故事
                 </button>
                 <div class="story-result" id="storyResult"></div>
+            </div>
+        </div>
+
+        <!-- 洛忆聊天面板 -->
+        <div class="panel" id="panel-luoyi">
+            <div class="luoyi-header">
+                <div class="luoyi-header-content">
+                    <div class="luoyi-avatar-wrap">
+                        <div class="luoyi-avatar-large">洛</div>
+                        <div class="luoyi-status-dot"></div>
+                    </div>
+                    <div class="luoyi-header-info">
+                        <h2 class="luoyi-title">洛忆</h2>
+                        <p class="luoyi-subtitle">记忆伙伴 · 在线</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="luoyi-messages" id="luoyiChatMessages">
+                <div class="luoyi-welcome-card">
+                    <div class="luoyi-welcome-avatar">洛</div>
+                    <div class="luoyi-welcome-bubble">
+                        <p>你好！我是洛忆，你记忆网络的小伙伴~</p>
+                        <p>有什么想聊的，或者想回忆的？尽管问我吧！</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="luoyi-input-area">
+                <div class="luoyi-input-wrap">
+                    <textarea id="luoyiChatInput" class="luoyi-input" placeholder="和洛忆聊聊..." rows="1"></textarea>
+                    <button class="luoyi-send-btn" onclick="sendLuoyiMessage()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -14,6 +14,7 @@ let highlightedNodeIds = new Set(); // 搜索时高亮的节点ID
 let expandedSelfLoops = new Set();  // 自环展开状态
 let graphZoom = null;               // D3 zoom 行为引用
 let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set, edgeIds: Set}
+let luoyiChatHistory = [];          // 洛忆聊天历史
 
 // ==================== 移动端菜单 ====================
 
@@ -30,6 +31,27 @@ document.addEventListener('click', (e) => {
     const btn = document.querySelector('.mobile-menu-btn');
     if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
         menu.classList.remove('show');
+    }
+});
+
+// ==================== 产品详情面板 ====================
+
+function toggleProductInfo() {
+    const panel = document.getElementById('piPanel');
+    const overlay = document.getElementById('piOverlay');
+    if (panel && overlay) {
+        panel.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+}
+
+// ESC 键关闭产品详情
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const panel = document.getElementById('piPanel');
+        if (panel && panel.classList.contains('active')) {
+            toggleProductInfo();
+        }
     }
 });
 
@@ -346,6 +368,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         memoryModal.addEventListener('click', function(e) {
             if (e.target === memoryModal) {
                 closeMemoryModal();
+            }
+        });
+    }
+
+    // 洛忆聊天回车发送
+    const luoyiInput = document.getElementById('luoyiChatInput');
+    if (luoyiInput) {
+        luoyiInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendLuoyiMessage();
             }
         });
     }
@@ -4084,4 +4117,134 @@ function importMemories(input) {
     .finally(() => {
         input.value = '';
     });
+}
+
+// ==================== 洛忆聊天 ====================
+
+// 洛忆聊天历史（已在上方全局声明）
+
+/**
+ * 发送消息给洛忆
+ */
+function sendLuoyiMessage() {
+    const input = document.getElementById('luoyiChatInput');
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    // 添加用户消息到历史
+    luoyiChatHistory.push({ role: 'user', content: message });
+
+    // 清空输入框
+    input.value = '';
+
+    // 渲染用户消息
+    renderLuoyiMessages();
+
+    // 显示洛忆正在输入
+    showLuoyiTyping();
+
+    // 调用 API
+    fetch('/api/luoyi/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: message,
+            history: luoyiChatHistory
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        // 移除正在输入状态
+        hideLuoyiTyping();
+
+        if (data.success) {
+            // 添加洛忆回复到历史
+            luoyiChatHistory.push({ role: 'assistant', content: data.reply });
+            // 渲染消息
+            renderLuoyiMessages();
+        } else {
+            // 添加错误消息
+            luoyiChatHistory.push({ role: 'assistant', content: '抱歉，我刚才走神了... ' + (data.error || '') });
+            renderLuoyiMessages();
+        }
+    })
+    .catch(err => {
+        hideLuoyiTyping();
+        luoyiChatHistory.push({ role: 'assistant', content: '网络有点问题，稍后再试试？' });
+        renderLuoyiMessages();
+    });
+}
+
+/**
+ * 渲染洛忆聊天消息
+ */
+function renderLuoyiMessages() {
+    const container = document.getElementById('luoyiChatMessages');
+    if (!container) return;
+
+    // 欢迎消息卡片
+    let html = `
+        <div class="luoyi-welcome-card">
+            <div class="luoyi-welcome-avatar">洛</div>
+            <div class="luoyi-welcome-bubble">
+                <p>你好！我是洛忆，你记忆网络的小伙伴~</p>
+                <p>有什么想聊的，或者想回忆的？尽管问我吧！</p>
+            </div>
+        </div>
+    `;
+
+    // 渲染聊天历史
+    for (const msg of luoyiChatHistory) {
+        if (msg.role === 'user') {
+            html += `
+                <div class="luoyi-message luoyi-message-user">
+                    <div class="luoyi-message-content">${escapeHtml(msg.content)}</div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="luoyi-message luoyi-message-luoyi">
+                    <div class="luoyi-message-avatar">洛</div>
+                    <div class="luoyi-message-content">${escapeHtml(msg.content)}</div>
+                </div>
+            `;
+        }
+    }
+
+    container.innerHTML = html;
+
+    // 滚动到底部
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * 显示洛忆正在输入
+ */
+function showLuoyiTyping() {
+    const container = document.getElementById('luoyiChatMessages');
+    if (!container) return;
+
+    const typingHtml = `
+        <div class="luoyi-typing" id="luoyiTypingIndicator">
+            <div class="luoyi-message-avatar">洛</div>
+            <div class="luoyi-typing-bubble">
+                <div class="luoyi-typing-dot"></div>
+                <div class="luoyi-typing-dot"></div>
+                <div class="luoyi-typing-dot"></div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', typingHtml);
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * 隐藏洛忆正在输入
+ */
+function hideLuoyiTyping() {
+    const indicator = document.getElementById('luoyiTypingIndicator');
+    if (indicator) {
+        indicator.remove();
+    }
 }
