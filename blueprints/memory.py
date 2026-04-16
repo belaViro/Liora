@@ -29,11 +29,11 @@ def preprocess_file():
     file_ext = os.path.splitext(file.filename)[1].lower().strip('.')
     mime = file.content_type.lower()
 
-    if mime.startswith('image/') or ext in ['jpg','jpeg','png','gif','webp','bmp']:
+    if mime.startswith('image/') or file_ext in ['jpg','jpeg','png','gif','webp','bmp']:
         memory_type = 'image'
-    elif mime.startswith('audio/') or ext in ['mp3','wav','ogg','m4a','flac','aac']:
+    elif mime.startswith('audio/') or file_ext in ['mp3','wav','ogg','m4a','flac','aac']:
         memory_type = 'audio'
-    elif mime.startswith('video/') or ext in ['mp4','avi','mov','mkv','webm']:
+    elif mime.startswith('video/') or file_ext in ['mp4','avi','mov','mkv','webm']:
         memory_type = 'video'
     else:
         memory_type = 'text'
