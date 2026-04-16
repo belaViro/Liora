@@ -11,6 +11,64 @@ from flask import Blueprint, jsonify, request, current_app
 memory_bp = Blueprint('memory', __name__, url_prefix='/api/memory')
 
 
+@memory_bp.route('/preprocess', methods=['POST'])
+def preprocess_file():
+    """预处理文件：识别类型并提取内容，返回给前端填入文本框"""
+    import logging
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有文件'})
+
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({'success': False, 'message': '文件名为空'})
+
+    from config.settings import UPLOAD_FOLDER
+    file_ext = os.path.splitext(file.filename)[1]
+    file_name = f"{uuid.uuid4().hex}{file_ext}"
+    file_path = os.path.join(UPLOAD_FOLDER, file_name)
+    file.save(file_path)
+
+    # 自动识别类型
+    mime = file.content_type.lower()
+    ext = file_ext.lower().strip('.')
+    if mime.startswith('image/') or ext in ['jpg','jpeg','png','gif','webp','bmp']:
+        memory_type = 'image'
+    elif mime.startswith('audio/') or ext in ['mp3','wav','ogg','m4a','flac','aac']:
+        memory_type = 'audio'
+    elif mime.startswith('video/') or ext in ['mp4','avi','mov','mkv','webm']:
+        memory_type = 'video'
+    else:
+        memory_type = 'text'
+
+    content = ''
+    llm_service = current_app.services.llm_service
+
+    if memory_type == 'image':
+        logging.info(f"预处理图片: {file_path}")
+        try:
+            content = llm_service.describe_image(file_path)
+        except Exception as e:
+            logging.error(f"图片理解失败: {e}")
+
+    elif memory_type == 'audio':
+        logging.info(f"预处理音频: {file_path}")
+        try:
+            content = llm_service.transcribe_audio(file_path)
+        except Exception as e:
+            logging.error(f"音频转写失败: {e}")
+
+    # 返回文件路径（正式提交时用）和提取的内容
+    return jsonify({
+        'success': True,
+        'data': {
+            'file_path': file_path,
+            'type': memory_type,
+            'content': content
+        }
+    })
+
+
 @memory_bp.route('/create', methods=['POST'])
 def create_memory():
     """创建新记忆（手动输入）支持文本、图片、音频等多种输入"""
