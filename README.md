@@ -252,6 +252,12 @@ MemoryWeaver/
 
 ---
 
+##  Open to Opportunities
+
+如果你对我的项目感兴趣，欢迎联系我！
+
+[![Email](https://img.shields.io/badge/_Email-bela_viro@outlook.com-blue?style=for-the-badge)](mailto:bela_viro@outlook.com)
+
 <p align="center">
   <i>“时间会流逝，但织网永存。Remember well. Connect everything.”</i>
 </p>
