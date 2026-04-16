@@ -1,4 +1,4 @@
-# Liora · 记忆织网者 — 让 AI 成为你的记忆搭档！
+# Liora · AI 知识图谱 + RAG 个人第二大脑系统！
 
 <p align="center">
   <img src="static/logo.png" alt="Liora Logo" width="320">
