@@ -785,6 +785,7 @@ function onFileSelect(event) {
     const file = event.target.files[0];
     const hint = document.getElementById('fileTypeHint');
     const preview = document.getElementById('filePreview');
+    const contentArea = document.getElementById('memoryContent');
 
     if (file) {
         const type = detectFileType(file);
@@ -792,6 +793,34 @@ function onFileSelect(event) {
         hint.textContent = `（自动识别为${typeNames[type]}）`;
         preview.textContent = `已选择: ${file.name} (${formatFileSize(file.size)})`;
         preview.style.display = 'block';
+
+        // 图片或音频文件：预处理提取描述内容
+        if (type === 'image' || type === 'audio') {
+            hint.textContent = `（自动识别为${typeNames[type]}，正在提取内容...）`;
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/memory/preprocess', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data.content) {
+                    contentArea.value = data.data.content;
+                    onContentInput(contentArea);
+                    hint.textContent = `（自动识别为${typeNames[type]}，已提取内容）`;
+                } else {
+                    hint.textContent = `（自动识别为${typeNames[type]}）`;
+                    showToast('内容提取失败，请手动输入描述', 'warning');
+                }
+            })
+            .catch(err => {
+                console.error('预处理失败:', err);
+                hint.textContent = `（自动识别为${typeNames[type]}）`;
+                showToast('内容提取失败，请手动输入描述', 'warning');
+            });
+        }
     } else {
         hint.textContent = '';
         preview.style.display = 'none';

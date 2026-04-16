@@ -23,6 +23,9 @@ class LLMService:
         self.whisper_key = os.getenv('WHISPER_API_KEY', self.api_key)
         self.whisper_url = os.getenv('WHISPER_BASE_URL', self.base_url)
         self.whisper_model = os.getenv('WHISPER_MODEL_NAME', 'whisper-1')
+
+        # 视觉模型配置（用于图像理解）
+        self.vision_model = os.getenv('VISION_MODEL_NAME', 'Qwen/Qwen2.5-VL-32B-Instruct')
         
         # 初始化客户端
         self.client = OpenAI(
@@ -301,3 +304,70 @@ class LLMService:
             'time_range': time_range,
             'emotion_filter': emotion_filter
         }
+
+    def describe_image(self, file_path: str, prompt: str = "详细描述这张图片的内容") -> str:
+        """
+        用视觉模型描述图像内容
+
+        Args:
+            file_path: 图片文件路径
+            prompt: 描述提示词
+
+        Returns:
+            图像描述文本
+        """
+        try:
+            with open(file_path, 'rb') as f:
+                img_data = base64.b64encode(f.read()).decode('utf-8')
+
+            ext = os.path.splitext(file_path)[1].lower().strip('.')
+            mime_map = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'gif': 'gif', 'webp': 'webp', 'bmp': 'bmp'}
+            mime = mime_map.get(ext, 'png')
+
+            response = self.client.chat.completions.create(
+                model=self.vision_model,
+                messages=[{
+                    'role': 'user',
+                    'content': [
+                        {'type': 'image_url', 'image_url': {'url': f'data:image/{mime};base64,{img_data}'}},
+                        {'type': 'text', 'text': prompt}
+                    ]
+                }],
+                max_tokens=512,
+                temperature=0.1
+            )
+
+            description = response.choices[0].message.content
+            logger.info(f"图像描述完成: {description[:50]}...")
+            return description
+
+        except Exception as e:
+            logger.error(f"图像描述失败: {e}")
+            return ""
+
+    def transcribe_audio(self, file_path: str) -> str:
+        """
+        用 Whisper 模型转写音频为文字
+
+        Args:
+            file_path: 音频文件路径
+
+        Returns:
+            转写文本
+        """
+        try:
+            with open(file_path, 'rb') as f:
+                audio_data = f.read()
+
+            response = self.whisper_client.audio.transcriptions.create(
+                model=self.whisper_model,
+                file=('audio.mp3', audio_data)
+            )
+            # SenseVoice API 返回 JSON 格式，手动提取 text 字段
+            text = response.text if hasattr(response, 'text') else str(response)
+            logger.info(f"音频转写完成: {text[:50]}...")
+            return text
+
+        except Exception as e:
+            logger.error(f"音频转写失败: {e}")
+            return ""
