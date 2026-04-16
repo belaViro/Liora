@@ -12,7 +12,6 @@
   <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-E63946?style=for-the-badge" alt="FAISS"></a>
   <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge&logo=d3.js" alt="D3.js"></a>
   <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
-  <a href="#"><img src="https://img.shields.io/badge/second--brain-A8E6CF?style=for-the-badge" alt="Second Brain"></a>
   <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
   <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge&logo=opensourceinitiative" alt="License"></a>
 </p>
