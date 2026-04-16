@@ -1,4 +1,4 @@
-# Liora · AI 知识图谱 + RAG 个人第二大脑系统！
+# Liora · 个人知识图谱 | AI 记忆联网 | RAG 第二大脑
 
 <p align="center">
   <img src="static/logo.png" alt="Liora Logo" width="320">
