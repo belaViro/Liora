@@ -801,15 +801,19 @@ class MemoryWeaverDB {
         const files = await this.getAllFiles();
 
         // 序列化的数据（Blob 转为 base64）
-        const serializedFiles = files.map(f => ({
-            memory_id: f.memory_id,
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            mime: f.mime,
-            data: f.blob ? await this._blobToBase64(f.blob) : null,
-            created_at: f.created_at
-        }));
+        const serializedFiles = [];
+        for (const f of files) {
+            const base64 = f.blob ? await this._blobToBase64(f.blob) : null;
+            serializedFiles.push({
+                memory_id: f.memory_id,
+                name: f.name,
+                type: f.type,
+                size: f.size,
+                mime: f.mime,
+                data: base64,
+                created_at: f.created_at
+            });
+        }
 
         return {
             version: 1,

@@ -18,10 +18,8 @@ let luoyiChatHistory = [];          // 洛忆聊天历史
 
 // ==================== IndexedDB 服务初始化 ====================
 // 以下全局变量在 DOMContentLoaded 时初始化
+// 注意: memoryService, graphService, vectorSearch 在 client-*.js 中声明
 let db = null;
-let memoryService = null;
-let graphService = null;
-let vectorSearch = null;
 
 // ==================== 移动端菜单 ====================
 
