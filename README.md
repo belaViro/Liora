@@ -5,15 +5,16 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.2-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.3-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
-  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge" alt="LLM"></a>
+  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
   <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-E63946?style=for-the-badge" alt="FAISS"></a>
-  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge" alt="D3.js"></a>
+  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge&logo=d3.js" alt="D3.js"></a>
   <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
   <a href="#"><img src="https://img.shields.io/badge/second--brain-A8E6CF?style=for-the-badge" alt="Second Brain"></a>
   <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge&logo=opensourceinitiative" alt="License"></a>
 </p>
 
 <p align="center">
@@ -252,11 +253,17 @@ MemoryWeaver/
 
 ---
 
-##  Open to Opportunities
-
+## Open to Opportunities
 如果你对我的项目感兴趣，欢迎联系我！
 
 [![Email](https://img.shields.io/badge/_Email-bela_viro@outlook.com-blue?style=for-the-badge)](mailto:bela_viro@outlook.com)
+
+
+## License
+This project is released under the **MIT License**.
+You are free to use, modify, and distribute this software, as long as the original copyright notice is retained.
+
+For the full license, see the [LICENSE](sslocal://flow/file_open?url=LICENSE&flow_extra=eyJsaW5rX3R5cGUiOiJjb2RlX2ludGVycHJldGVyIn0=) file.
 
 <p align="center">
   <i>“时间会流逝，但织网永存。Remember well. Connect everything.”</i>
