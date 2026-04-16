@@ -765,25 +765,36 @@ function insertMention(textarea, value) {
     onContentInput(textarea);
 }
 
-function onTypeChange() {
-    const type = document.getElementById('memoryType').value;
-    const fileGroup = document.getElementById('fileUploadGroup');
+function detectFileType(file) {
+    const ext = file.name.toLowerCase().split('.').pop();
+    const mime = file.type;
 
-    if (type === 'image' || type === 'audio') {
-        fileGroup.style.display = 'block';
-    } else {
-        fileGroup.style.display = 'none';
-        document.getElementById('memoryFile').value = '';
-        document.getElementById('filePreview').style.display = 'none';
+    if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+        return 'image';
     }
+    if (mime.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'].includes(ext)) {
+        return 'audio';
+    }
+    if (mime.startsWith('video/') || ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'].includes(ext)) {
+        return 'video';
+    }
+    return 'text';
 }
 
 function onFileSelect(event) {
     const file = event.target.files[0];
+    const hint = document.getElementById('fileTypeHint');
+    const preview = document.getElementById('filePreview');
+
     if (file) {
-        const preview = document.getElementById('filePreview');
+        const type = detectFileType(file);
+        const typeNames = { text: '文字', image: '图片', audio: '音频', video: '视频' };
+        hint.textContent = `（自动识别为${typeNames[type]}）`;
         preview.textContent = `已选择: ${file.name} (${formatFileSize(file.size)})`;
         preview.style.display = 'block';
+    } else {
+        hint.textContent = '';
+        preview.style.display = 'none';
     }
 }
 
@@ -810,7 +821,6 @@ function showStatus(message, type) {
 async function submitMemory(event) {
     event.preventDefault();
 
-    const type = document.getElementById('memoryType').value;
     const content = document.getElementById('memoryContent').value.trim();
     const fileInput = document.getElementById('memoryFile');
     const submitBtn = document.getElementById('submitBtn');
@@ -818,6 +828,12 @@ async function submitMemory(event) {
     if (!content && !fileInput.files[0]) {
         showToast('请填写内容或上传文件', 'error');
         return;
+    }
+
+    // 自动识别记忆类型
+    let type = 'text';
+    if (fileInput.files[0]) {
+        type = detectFileType(fileInput.files[0]);
     }
 
     // 构建表单数据
@@ -828,7 +844,7 @@ async function submitMemory(event) {
     if (fileInput.files[0]) {
         formData.append('file', fileInput.files[0]);
     }
-    
+
     // 禁用按钮
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="loading"></span>保存中...';
@@ -847,7 +863,7 @@ async function submitMemory(event) {
             // 清空表单
             document.getElementById('memoryForm').reset();
             document.getElementById('filePreview').style.display = 'none';
-            document.getElementById('fileUploadGroup').style.display = 'none';
+            document.getElementById('fileTypeHint').textContent = '';
             document.getElementById('charCount').textContent = '0 字';
 
             // 刷新图谱和列表

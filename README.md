@@ -1,19 +1,19 @@
-# Liora · 记忆织网者 — 让 AI 成为你的记忆搭档！
+# Liora · 个人知识图谱 | AI 记忆联网 | RAG 第二大脑
 
 <p align="center">
   <img src="static/logo.png" alt="Liora Logo" width="320">
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.2-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.3-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
-  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge" alt="LLM"></a>
+  <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
   <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-E63946?style=for-the-badge" alt="FAISS"></a>
-  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge" alt="D3.js"></a>
+  <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge&logo=d3.js" alt="D3.js"></a>
   <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
-  <a href="#"><img src="https://img.shields.io/badge/second--brain-A8E6CF?style=for-the-badge" alt="Second Brain"></a>
   <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge&logo=opensourceinitiative" alt="License"></a>
 </p>
 
 <p align="center">
@@ -249,15 +249,20 @@ MemoryWeaver/
 - 复古风格记忆卡片导出
 - AI 洛忆智能伙伴
 - 统计面板
----
-
-## 🗺️ 未来路线图
-
-- [ ] **记忆活跃度系统**：节点随“回忆频率”呼吸闪烁，遗忘越久越暗淡。
-- [ ] **时空地图模式**：切换为地理视图，看记忆如何在不同城市间流转。
-- [ ] **溯源高亮**：点击实体直接定位到原始记忆片段，展示上下文。
 
 ---
+
+## Open to Opportunities
+如果你对我的项目感兴趣，欢迎联系我！
+
+[![Email](https://img.shields.io/badge/_Email-bela_viro@outlook.com-blue?style=for-the-badge)](mailto:bela_viro@outlook.com)
+
+
+## License
+This project is released under the **MIT License**.
+You are free to use, modify, and distribute this software, as long as the original copyright notice is retained.
+
+For the full license, see the [LICENSE](sslocal://flow/file_open?url=LICENSE&flow_extra=eyJsaW5rX3R5cGUiOiJjb2RlX2ludGVycHJldGVyIn0=) file.
 
 <p align="center">
   <i>“时间会流逝，但织网永存。Remember well. Connect everything.”</i>

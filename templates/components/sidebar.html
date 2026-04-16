@@ -17,15 +17,6 @@
 
             <form id="memoryForm" onsubmit="submitMemory(event)">
                 <div class="form-group">
-                    <label class="form-label">记忆类型</label>
-                    <select class="form-select" id="memoryType" onchange="onTypeChange()">
-                        <option value="text">文字</option>
-                        <option value="image">图片</option>
-                        <option value="audio">音频</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
                     <label class="form-label">内容描述 <span class="char-count" id="charCount">0 字</span></label>
                     <div class="textarea-wrapper">
                         <textarea class="form-textarea" id="memoryContent" placeholder="记录你的想法、感受或事件..&#10;输入 @ 可提取人物，# 可标记主题" oninput="onContentInput(this)" onkeydown="onContentKeydown(event, this)"></textarea>
@@ -33,11 +24,11 @@
                     </div>
                 </div>
 
-                <div class="form-group" id="fileUploadGroup" style="display: none;">
-                    <label class="form-label">上传文件</label>
+                <div class="form-group" id="fileUploadGroup">
+                    <label class="form-label">上传文件（可选）<span id="fileTypeHint" style="font-weight: normal; color: #888;"></span></label>
                     <label class="file-upload">
                         <input type="file" id="memoryFile" onchange="onFileSelect(event)">
-                        <span class="file-upload-hint">点击或拖拽文件到这里</span>
+                        <span class="file-upload-hint">点击或拖拽文件到这里（自动识别类型）</span>
                     </label>
                     <div class="file-preview" id="filePreview" style="display: none;"></div>
                 </div>
