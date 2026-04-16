@@ -11,12 +11,12 @@ class ServiceRegistry:
     用法:
         # app.py 中初始化
         from services import services
-        services.register('memory_service', MemoryService())
+        services.register('llm_service', LLMService())
         app.services = services
 
         # 路由中访问
         from flask import current_app
-        memory_service = current_app.services.memory_service
+        llm_service = current_app.services.llm_service
     """
 
     def __init__(self):
@@ -31,36 +31,12 @@ class ServiceRegistry:
         return self._services.get(name)
 
     @property
-    def memory_service(self):
-        return self._services.get('memory_service')
-
-    @property
-    def graph_service(self):
-        return self._services.get('graph_service')
-
-    @property
     def llm_service(self):
         return self._services.get('llm_service')
 
     @property
-    def embedding_service(self):
-        return self._services.get('embedding_service')
-
-    @property
     def temporal_extractor(self):
         return self._services.get('temporal_extractor')
-
-    @property
-    def enhanced_extractor(self):
-        return self._services.get('enhanced_extractor')
-
-    @property
-    def prediction_service(self):
-        return self._services.get('prediction_service')
-
-    @property
-    def export_service(self):
-        return self._services.get('export_service')
 
 
 # 全局服务注册表实例

@@ -16,6 +16,13 @@ let graphZoom = null;               // D3 zoom 行为引用
 let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set, edgeIds: Set}
 let luoyiChatHistory = [];          // 洛忆聊天历史
 
+// ==================== IndexedDB 服务初始化 ====================
+// 以下全局变量在 DOMContentLoaded 时初始化
+let db = null;
+let memoryService = null;
+let graphService = null;
+let vectorSearch = null;
+
 // ==================== 移动端菜单 ====================
 
 function toggleMobileMenu() {
@@ -335,7 +342,30 @@ function formatTemporalInfoForDisplay(temporalInfo) {
 document.addEventListener('DOMContentLoaded', async function() {
     // 先加载关系类型配置
     await loadRelationTypes();
-    
+
+    // 初始化 IndexedDB 和服务（数据主权在客户端）
+    try {
+        db = new MemoryWeaverDB();
+        await db.init();
+        console.log('[App] IndexedDB initialized');
+
+        vectorSearch = new ClientVectorSearch(computeApi);
+        await vectorSearch.init();
+        console.log('[App] Vector search initialized');
+
+        memoryService = new ClientMemoryService(db, computeApi, vectorSearch);
+        graphService = new ClientGraphService(db, computeApi);
+        console.log('[App] Client services initialized');
+
+        // 从 IndexedDB 加载已有数据
+        const savedGraphData = await db.getGraphData({ max_nodes: 0 });
+        if (savedGraphData.nodes && savedGraphData.nodes.length > 0) {
+            graphData = savedGraphData;
+        }
+    } catch (e) {
+        console.error('[App] Failed to initialize IndexedDB:', e);
+    }
+
     initSocket();
     initGraph();
     loadGraphData();
@@ -865,26 +895,17 @@ async function submitMemory(event) {
         type = detectFileType(fileInput.files[0]);
     }
 
-    // 构建表单数据
-    const formData = new FormData();
-    formData.append('type', type);
-    formData.append('content', content);
-
-    if (fileInput.files[0]) {
-        formData.append('file', fileInput.files[0]);
-    }
-
     // 禁用按钮
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="loading"></span>保存中...';
 
     try {
-        const response = await fetch('/api/memory/create', {
-            method: 'POST',
-            body: formData
+        // 使用客户端服务创建记忆（数据存储在 IndexedDB）
+        const result = await memoryService.createMemory({
+            content: content,
+            type: type,
+            file: fileInput.files[0] || null
         });
-
-        const result = await response.json();
 
         if (result.success) {
             showToast('记忆保存成功！', 'success');
@@ -900,7 +921,7 @@ async function submitMemory(event) {
             loadMemories();
             loadStats();
         } else {
-            showToast(result.message || '保存失败', 'error');
+            showToast(result.error || '保存失败', 'error');
         }
     } catch (error) {
         console.error('保存记忆失败:', error);
@@ -925,22 +946,32 @@ async function searchMemories() {
     }
 
     try {
-        const response = await fetch('/api/memory/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, limit: 20, use_vector: true })
-        });
-
-        const result = await response.json();
+        // 使用客户端搜索
+        const result = await memoryService.searchMemories(query, { limit: 20, useVector: true });
 
         if (result.success) {
             // 先高亮节点（记忆 + 图谱节点）
-            highlightSearchResults(result.results, result.matched_nodes);
+            const matchedNodes = []; // 客户端搜索暂不返回节点
+            highlightSearchResults(result.results, matchedNodes);
             // 再切换标签页（跳过自动加载，因为已有数据）
             switchTab('memories', null, true);
-            renderSearchResults(result, query);
+
+            // 构造兼容格式
+            const compatResult = {
+                success: true,
+                results: result.results.map(r => r.memory),
+                matched_nodes: matchedNodes,
+                match_types: result.results.map(r => r.match_type),
+                scores: result.results.map(r => ({ combined: r.score, vector: r.score, keyword: 0 })),
+                search_info: {
+                    vector_enabled: vectorSearch && vectorSearch.getVectorCount() > 0,
+                    keyword_enabled: true,
+                    total_results: result.results.length
+                }
+            };
+            renderSearchResults(compatResult, query);
         } else {
-            showToast(result.message || '搜索失败', 'error');
+            showToast(result.error || '搜索失败', 'error');
         }
     } catch (error) {
         console.error('搜索失败:', error);
@@ -1253,13 +1284,14 @@ function focusOnHighlightedNodes() {
 
 async function loadMemories() {
     try {
-        const response = await fetch('/api/memories/timeline');
-        const result = await response.json();
+        // 从 IndexedDB 加载记忆
+        const memories = await db.getAllMemories();
 
-        if (result.success) {
-            originalMemories = result.memories || []; // 保存原始完整列表
-            renderMemoryList(result.memories);
-        }
+        // 按时间排序（最新的在前）
+        memories.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+        originalMemories = memories; // 保存原始完整列表
+        renderMemoryList(memories);
     } catch (error) {
         console.error('加载记忆失败:', error);
     }
@@ -1527,37 +1559,55 @@ async function deleteMemory(memoryId) {
 
 async function loadStats() {
     try {
-        // 获取详细统计数据
-        const response = await fetch('/api/stats');
-        const result = await response.json();
-
-        if (!result.success) {
-            console.error('获取统计失败:', result.message);
-            return;
-        }
-
-        const data = result.data;
-
-        // 更新基础指标
-        document.getElementById('statMemories').textContent = data.total_memories;
-        document.getElementById('statEntities').textContent = data.total_nodes;
-        document.getElementById('statRelations').textContent = data.total_edges;
+        // 从 IndexedDB 获取统计数据
+        const memoryStats = await memoryService.getStatistics();
+        const memories = await db.getAllMemories();
 
         // 计算今日新增
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('statToday').textContent = data.daily_stats[today] || 0;
+        let todayCount = 0;
+        const dailyStats = {};
+        for (let i = 0; i < 30; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            dailyStats[date.toISOString().split('T')[0]] = 0;
+        }
+
+        for (const m of memories) {
+            const created = m.created_at ? m.created_at.split('T')[0] : null;
+            if (created && dailyStats.hasOwnProperty(created)) {
+                dailyStats[created]++;
+                if (created === today) todayCount++;
+            }
+        }
+
+        const emotionStats = { positive: 0, neutral: 0, negative: 0 };
+        for (const m of memories) {
+            const valence = m.emotion?.valence || 0;
+            if (valence > 0.3) emotionStats.positive++;
+            else if (valence < -0.3) emotionStats.negative++;
+            else emotionStats.neutral++;
+        }
+
+        // 更新基础指标
+        document.getElementById('statMemories').textContent = memoryStats.total_memories;
+        document.getElementById('statEntities').textContent = memoryStats.total_entities;
+        document.getElementById('statRelations').textContent = 0; // 需要从 relations store 计算
+
+        // 计算今日新增
+        document.getElementById('statToday').textContent = todayCount;
 
         // 渲染记忆热力图
-        renderMemoryHeatmap(data.daily_stats);
+        renderMemoryHeatmap(dailyStats);
 
         // 渲染实体类型分布
-        renderEntityTypeChart(data.entity_types);
+        renderEntityTypeChart(memoryStats.entity_distribution || {});
 
         // 渲染情感分布
-        renderEmotionBars(data.emotion_stats, data.total_memories);
+        renderEmotionBars(emotionStats, memoryStats.total_memories);
 
         // 渲染关系类型
-        renderRelationTags(data.relation_types);
+        renderRelationTags({});
 
     } catch (error) {
         console.error('加载统计失败:', error);
@@ -1875,30 +1925,19 @@ function initGraph() {
 
 async function loadGraphData(entityTypes = null, centerEntity = null) {
     try {
-        // 默认返回所有节点（不限制数量）
-        let url = '/api/graph/data';
-        const params = [];
-        if (entityTypes && entityTypes !== 'all') {
-            params.push(`types=${entityTypes}`);
-        }
-        if (centerEntity) {
-            params.push(`entity=${encodeURIComponent(centerEntity)}`);
-        }
-        if (params.length > 0) {
-            url += '?' + params.join('&');
-        }
+        // 从 IndexedDB 加载图谱数据
+        const result = await db.getGraphData({
+            entity_types: entityTypes && entityTypes !== 'all' ? entityTypes.split(',') : null,
+            center_entity: centerEntity || null,
+            max_nodes: 0  // 0 表示不限制
+        });
 
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (result.success) {
-            graphData = result.data;
-            renderGraph();
-            updateLegend();
-            // 如果有高亮节点，聚焦到它们
-            if (highlightedNodeIds && highlightedNodeIds.size > 0) {
-                setTimeout(focusOnHighlightedNodes, 1000);
-            }
+        graphData = result;
+        renderGraph();
+        updateLegend();
+        // 如果有高亮节点，聚焦到它们
+        if (highlightedNodeIds && highlightedNodeIds.size > 0) {
+            setTimeout(focusOnHighlightedNodes, 1000);
         }
     } catch (error) {
         console.error('加载图谱数据失败:', error);

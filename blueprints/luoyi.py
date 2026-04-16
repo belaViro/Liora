@@ -1,6 +1,7 @@
 """
 洛忆聊天 Blueprint
-Liora 记忆网络的 AI 伙伴聊天接口
+Liora 记忆网络的 AI 伙伴聊天接口（无状态版）
+注意：记忆数据由客户端传入，不读取服务器存储
 """
 
 import json
@@ -12,33 +13,33 @@ luoyi_bp = Blueprint('luoyi', __name__)
 
 @luoyi_bp.route('/api/luoyi/chat', methods=['POST'])
 def chat():
-    """洛忆聊天接口"""
+    """
+    洛忆聊天接口
+    注意：数据由客户端传入，不读取服务器存储
+    """
     try:
         llm_service = current_app.services.llm_service
-        memory_service = current_app.services.memory_service
-        graph_service = current_app.services.graph_service
 
         data = request.json
         message = data.get('message', '')
         history = data.get('history', [])
+        memories = data.get('memories', [])  # 客户端传入的记忆数据
+        graph_summary = data.get('graph_summary', {})  # 客户端传入的图谱摘要
 
         if not message:
             return jsonify({'success': False, 'error': '消息不能为空'}), 400
 
-        # 获取所有记忆用于上下文
-        all_memories = memory_service.get_all_memories()
-
         # 构建记忆上下文
-        memory_context, context_used = _build_memory_context(all_memories)
+        memory_context, context_used = _build_memory_context(memories)
 
         # 如果记忆为空或太多，尝试使用图谱上下文
         graph_context = ""
         if context_used == "graph" or (context_used == "none" and not memory_context):
-            graph_context = _build_graph_context(graph_service)
+            graph_context = _build_graph_context(graph_summary)
             context_used = "graph" if graph_context else "none"
 
         # 分析情感分布
-        emotion_stats = _analyze_emotions(all_memories)
+        emotion_stats = _analyze_emotions(memories)
 
         # 构建系统提示词
         system_prompt = _build_system_prompt(memory_context, graph_context, context_used, emotion_stats)
@@ -67,7 +68,7 @@ def chat():
             reply = response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM 调用失败: {e}")
-            reply = "抱歉，我现在有点累了...稍后再和我聊天吧。"
+            reply = "抱歉,我现在有点累了...稍后再和我聊天吧。"
 
         return jsonify({
             'success': True,
@@ -81,7 +82,7 @@ def chat():
 
 
 def _build_memory_context(memories, max_chars=30000):
-    """构建记忆上下文，超过限制时截断"""
+    """构建记忆上下文,超过限制时截断"""
     if not memories:
         return "", "none"
 
@@ -120,11 +121,11 @@ def _build_memory_context(memories, max_chars=30000):
     return context, context_used
 
 
-def _build_graph_context(graph_service):
+def _build_graph_context(graph_summary):
     """构建图谱上下文（当记忆太多时使用）"""
     try:
-        nodes = graph_service.nodes
-        edges = graph_service.edges
+        nodes = graph_summary.get('nodes', [])
+        edges = graph_summary.get('edges', [])
 
         if not nodes:
             return ""
@@ -148,7 +149,7 @@ def _build_graph_context(graph_service):
         # 添加高频实体
         lines.append("\n主要人物/实体：")
         for node_id in top_node_ids[:10]:
-            node = nodes.get(node_id, {})
+            node = next((n for n in nodes if n.get('id') == node_id), None)
             if node:
                 name = node.get('name', node_id)
                 n_type = node.get('type', 'ENTITY')
@@ -225,11 +226,11 @@ def _get_tone_instruction(emotion_stats):
     if dominant == "positive":
         return f"""【当前语气】用户记忆整体偏积极愉快。
 语气要求：轻松活泼，可以调侃打趣，像分享好消息的老友。
-示例语气："好家伙！这波回忆杀太甜了！"""""
+示例语气："好家伙！这波回忆杀太甜了！"""
     elif dominant == "negative":
         return f"""【当前语气】用户记忆整体偏深沉或有些低落。
 语气要求：温柔温暖，多倾听少说，像安静陪伴的老友。
-示例语气："抱抱，那种感觉很不容易，但都过去了..."""""
+示例语气："抱抱，那种感觉很不容易，但都过去了..." """
     elif dominant == "neutral":
         # 根据 valence 细分
         if valence_avg > 0:

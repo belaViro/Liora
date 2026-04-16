@@ -1,6 +1,7 @@
 """
 Liora - 个人记忆网络系统
-Flask 应用工厂
+Flask 应用工厂（无状态计算引擎模式）
+数据存储在客户端 IndexedDB，服务器仅做纯计算
 """
 
 import os
@@ -26,49 +27,22 @@ def create_app():
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # 禁用静态文件缓存
 
-    # 确保上传目录存在
+    # 确保上传目录存在（仅用于临时文件）
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    temp_dir = os.path.join(UPLOAD_FOLDER, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
 
     # 初始化 Socket.IO（挂载到 app 以便在路由中访问）
     app.socketio = socketio
 
-    # ========== 初始化服务 ==========
+    # ========== 初始化服务（仅保留纯计算服务） ==========
     from services import services
     from services.llm_service import LLMService
-    from services.memory_service import MemoryService
-    from services.graph_service import GraphService
-    from services.embedding_service import EmbeddingService
     from services.temporal_extractor import TemporalExtractor
-    from services.enhanced_knowledge_extractor import EnhancedKnowledgeExtractor
-    from services.prediction_service import PredictionService
-    from services.export_service import ExportService
 
-    # 注册服务
+    # 注册服务（无状态计算服务）
     services.register('temporal_extractor', TemporalExtractor())
     services.register('llm_service', LLMService())
-    services.register('memory_service', MemoryService())
-    services.register('graph_service', GraphService())
-    services.register('embedding_service', EmbeddingService())
-
-    # 增强知识提取器（需要依赖其他服务）
-    services.register('enhanced_extractor', EnhancedKnowledgeExtractor(
-        llm_service=services.llm_service,
-        embedding_service=services.embedding_service,
-        memory_service=services.memory_service
-    ))
-
-    # 预测服务
-    services.register('prediction_service', PredictionService(
-        llm_service=services.llm_service,
-        graph_service=services.graph_service,
-        memory_service=services.memory_service
-    ))
-
-    # 导入导出服务
-    services.register('export_service', ExportService(
-        memory_service=services.memory_service,
-        graph_service=services.graph_service
-    ))
 
     # 将 services 挂载到 app 以便通过 current_app 访问
     app.services = services
@@ -84,7 +58,7 @@ def create_app():
     from socket_handlers.events import register_handlers
     register_handlers(socketio)
 
-    logger.info("MemoryWeaver 应用已创建")
+    logger.info("MemoryWeaver 应用已创建（计算引擎模式）")
     return app
 
 
