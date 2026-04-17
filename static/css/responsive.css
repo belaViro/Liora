@@ -4,502 +4,405 @@
  */
 
 /* ============================================
-
-   ç§»åŠ¨ç«¯è�œå•
-
+   响应式布局
    ============================================ */
 
-.mobile-menu-btn {
-
-    display: none;
-
-    flex-direction: column;
-
-    gap: 4px;
-
-    padding: 8px;
-
-    background: none;
-
-    border: 1px solid var(--color-border-light);
-
-    cursor: pointer;
-
-}
-
-
-
-.mobile-menu-btn span {
-
-    display: block;
-
-    width: 18px;
-
-    height: 2px;
-
-    background: var(--color-text);
-
-    transition: all 0.2s ease;
-
-}
-
-
-
-.mobile-menu {
-
-    display: none;
-
-    position: absolute;
-
-    top: 50px;
-
-    right: 20px;
-
-    background: var(--color-bg);
-
-    border: 1px solid var(--color-border);
-
-    box-shadow: var(--shadow-lg);
-
-    padding: 12px;
-
-    flex-direction: column;
-
-    gap: 8px;
-
-    z-index: 100;
-
-    min-width: 140px;
-
-}
-
-
-
-.mobile-menu.show {
-
-    display: flex;
-
-}
-
-
-
-.mobile-menu .control-btn {
-
-    width: 100%;
-
-    text-align: left;
-
-}
-
-
-
-/* ============================================
-
-   å“åº”å¼å¸ƒå±€
-
-   ============================================ */
-
-
-
-/* å¹³æ¿åŠä»¥ä¸Š*/
-
+/* 平板及以上 */
 @media (max-width: 1024px) {
-
     .sidebar {
-
         width: 320px;
-
         min-width: 280px;
-
     }
 
-
-
     .search-box {
-
         max-width: 400px;
-
     }
-
 }
 
-
-
-/* å°å¹³æ¿*/
-
+/* 小平板 */
 @media (max-width: 900px) {
-
     .memory-network-controls {
-
         display: none;
-
     }
 
-
-
-    .mobile-menu-btn {
-
-        display: flex;
-
-        margin-left: auto;
-
+    .time-travel-btn {
+        display: none;
     }
 
+    .graph-legend,
+    .graph-legend.collapsed,
+    #graphLegend {
+        display: none !important;
+    }
 
+    .pi-trigger-btn {
+        display: none !important;
+    }
+
+    .luoyi-header {
+        display: none;
+    }
 
     .search-box {
-
         max-width: none;
-
         flex: 1;
-
     }
-
 }
 
-
-
-/* æ‰‹æœº */
-
+/* 手机 */
 @media (max-width: 768px) {
-
     .header {
-
-        padding: 10px 16px;
-
-        gap: 12px;
-
+        padding: 10px 12px;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
-
-
-    .logo {
-
-        font-size: 14px;
-
+    .logo-img {
+        height: 28px;
+        width: auto;
     }
 
-
+    .search-box {
+        order: 3;
+        width: 100%;
+        max-width: none;
+        margin-top: 8px;
+    }
 
     .search-input {
-
-        padding: 6px 10px;
-
-        font-size: 14px; /* é˜²æ­¢iOSç¼©æ”¾ */
-
+        padding: 8px 10px;
+        font-size: 14px;
     }
-
-
 
     .search-button {
-
-        padding: 6px 12px;
-
+        padding: 8px 12px;
         font-size: 11px;
-
     }
 
-
+    .time-travel-btn {
+        display: none;
+    }
 
     .main-content {
-
         flex-direction: column;
-
     }
 
-
+    .graph-section {
+        flex: 1;
+        min-height: 50vh;
+    }
 
     .sidebar {
-
-        width: 100%;
-
-        height: 35vh;
-
-        min-height: 250px;
-
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1;
+        height: auto;
+        max-height: none;
+        min-height: 300px;
         border-left: none;
-
         border-top: 1px solid var(--color-border);
-
     }
-
-
 
     .panel-content {
-
-        padding: 16px;
-
+        flex: 1;
+        width: 100%;
+        padding: 12px;
     }
-
-
 
     .graph-legend {
-
-        bottom: 12px;
-
-        left: 12px;
-
-        padding: 10px 14px;
-
-        width: 200px;
-
-        max-height: 240px;
-
+        bottom: 8px;
+        left: 8px;
+        padding: 8px 12px;
+        width: 180px;
+        max-height: 200px;
+        font-size: 10px;
     }
-
-
 
     .edge-labels-toggle {
-
-        top: 50px;
-
-        right: 12px;
-
-        padding: 6px 10px;
-
+        display: none;
     }
 
-
+    .graph-legend {
+        display: none;
+    }
 
     .detail-panel {
-
-        width: calc(100% - 40px);
-
-        right: 20px;
-
-        left: 20px;
-
-        top: 50px;
-
-        max-height: 60vh;
-
+        width: calc(100% - 32px);
+        right: 16px;
+        left: 16px;
+        top: 60px;
+        max-height: 50vh;
     }
-
-
 
     .form-group {
-
-        margin-bottom: 16px;
-
+        margin-bottom: 12px;
     }
-
-
 
     .form-textarea {
-
         min-height: 80px;
-
     }
-
-
 
     .recall-panel {
-
-        width: calc(100% - 40px);
-
-        right: 20px;
-
-        left: 20px;
-
+        width: calc(100% - 32px);
+        right: 16px;
+        left: 16px;
         top: 60px;
-
         max-height: 50vh;
-
     }
 
+    .graph-io-buttons {
+        bottom: 8px;
+        right: 8px;
+        left: auto;
+    }
+
+    .graph-io-buttons .control-btn {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    /* 详情面板移动端优化 */
+    .detail-panel {
+        width: calc(100% - 24px) !important;
+        left: 12px !important;
+        right: 12px !important;
+        top: 50px !important;
+        max-height: 60vh;
+        font-size: 12px;
+    }
+
+    .detail-panel-header {
+        padding: 10px 12px;
+        gap: 6px;
+    }
+
+    .detail-header-left {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .detail-title {
+        font-size: 13px;
+    }
+
+    .btn-header-edit,
+    .btn-header-delete {
+        width: 32px;
+        height: 32px;
+    }
+
+    .detail-content {
+        padding: 12px;
+    }
+
+    .detail-row {
+        margin-bottom: 10px;
+        font-size: 12px;
+    }
+
+    .detail-label {
+        font-size: 11px;
+        min-width: 60px;
+    }
+
+    .detail-section {
+        margin-top: 12px;
+        padding-top: 10px;
+    }
+
+    .section-title {
+        font-size: 11px;
+        margin-bottom: 8px;
+    }
+
+    /* 预测按钮 - 只显示图标 */
+    .btn-predict {
+        padding: 6px 8px;
+    }
+
+    .btn-predict .predict-text {
+        display: none;
+    }
+
+    .prediction-section {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+
+    .prediction-label {
+        font-size: 14px;
+    }
+
+    .prediction-item {
+        padding: 10px;
+    }
+
+    .prediction-name {
+        font-size: 13px;
+    }
+
+    .prediction-reason {
+        font-size: 11px;
+    }
+
+    /* 关系详情面板 */
+    .edge-relation-header {
+        font-size: 12px;
+        padding: 10px;
+    }
 }
 
-
-
-/* å°å±æ‰‹æœº */
-
+/* 小屏手机 */
 @media (max-width: 480px) {
-
     .header {
-
-        flex-wrap: wrap;
-
-        padding: 8px 12px;
-
+        padding: 8px 10px;
     }
 
-
-
-    .logo {
-
+    .logo-img {
         order: 1;
-
+        height: 24px;
     }
-
-
-
-    .mobile-menu-btn {
-
-        order: 2;
-
-        margin-left: auto;
-
-    }
-
-
 
     .search-box {
-
         order: 3;
-
-        width: 100%;
-
-        margin-top: 8px;
-
+        margin-top: 6px;
     }
-
-
 
     .graph-header {
-
-        padding: 10px 12px;
-
+        padding: 8px 10px;
         flex-direction: column;
-
         align-items: flex-start;
-
-        gap: 8px;
-
+        gap: 6px;
     }
 
-
+    .graph-title {
+        font-size: 11px;
+    }
 
     .graph-controls {
-
         flex-wrap: wrap;
-
+        gap: 4px;
     }
-
-
 
     .graph-controls .control-btn {
-
-        padding: 4px 8px;
-
-        font-size: 10px;
-
+        padding: 3px 6px;
+        font-size: 9px;
     }
-
-
 
     .tabs {
-
-        overflow-x: auto;
-
+        display: flex;
+        overflow-x: visible;
         -webkit-overflow-scrolling: touch;
-
+        flex-wrap: nowrap;
     }
-
-
 
     .tab {
-
-        white-space: nowrap;
-
-        padding: 10px 16px;
-
+        flex: 1;
+        white-space: normal;
+        padding: 8px 2px;
+        font-size: 10px;
+        text-align: center;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-
-
 
     .stats-grid {
-
         grid-template-columns: 1fr 1fr;
-
         gap: 8px;
-
     }
-
-
 
     .stat-card {
-
-        padding: 12px;
-
+        padding: 10px;
     }
-
-
 
     .stat-number {
-
-        font-size: 20px;
-
+        font-size: 18px;
     }
 
+    .stat-label {
+        font-size: 10px;
+    }
+
+    .graph-legend {
+        width: 150px;
+        font-size: 9px;
+    }
+
+    .pi-trigger-btn {
+        top: 8px;
+        right: 8px;
+    }
+
+    /* 小屏详情面板进一步优化 */
+    .detail-panel {
+        max-height: 70vh;
+    }
+
+    .detail-panel-header {
+        flex-wrap: wrap;
+    }
+
+    .detail-header-actions {
+        order: 3;
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 8px;
+    }
+
+    .btn-header-edit,
+    .btn-header-delete {
+        width: 36px;
+        height: 36px;
+    }
+
+    .prediction-item {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .prediction-marker {
+        display: none;
+    }
+
+    .btn-adopt {
+        width: 100%;
+        margin-top: 4px;
+    }
 }
 
-
-
-/* æ¨ªå±æ‰‹æœº */
-
+/* 横屏手机 */
 @media (max-height: 500px) and (orientation: landscape) {
-
     .header {
-
         padding: 6px 12px;
-
     }
-
-
 
     .sidebar {
-
         height: 45vh;
-
         min-height: 200px;
-
     }
-
-
 
     .form-textarea {
-
         min-height: 60px;
-
     }
-
 }
 
-
-
-/* è§¦æŽ§ä¼˜åŒ– */
-
+/* 触控优化 */
 @media (hover: none) and (pointer: coarse) {
-
     .control-btn,
-
     .tab,
-
     .btn {
-
         min-height: 44px;
     }
 
-
-
     .memory-delete-btn {
-
         opacity: 1;
-
         width: 32px;
-
         height: 32px;
-
     }
-
-
 
     .detail-close {
-
         width: 44px;
-
         height: 44px;
-
     }
-
 }

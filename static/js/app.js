@@ -17,27 +17,8 @@ let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set
 let luoyiChatHistory = [];          // 洛忆聊天历史
 
 // ==================== IndexedDB 服务初始化 ====================
-// 以下全局变量在 DOMContentLoaded 时初始化
-// 注意: memoryService, graphService, vectorSearch 在 client-*.js 中声明
-let db = null;
-
-// ==================== 移动端菜单 ====================
-
-function toggleMobileMenu() {
-    const menu = document.getElementById('mobileMenu');
-    if (menu) {
-        menu.classList.toggle('show');
-    }
-}
-
-// 点击外部关闭移动端菜单
-document.addEventListener('click', (e) => {
-    const menu = document.getElementById('mobileMenu');
-    const btn = document.querySelector('.mobile-menu-btn');
-    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.remove('show');
-    }
-});
+// db 在 indexeddb.js 中初始化
+// memoryService, graphService, vectorSearch 在 client-*.js 中声明
 
 // ==================== 产品详情面板 ====================
 
@@ -343,7 +324,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // 初始化 IndexedDB 和服务（数据主权在客户端）
     try {
-        db = new MemoryWeaverDB();
+        // db 已在 indexeddb.js 中初始化
         await db.init();
         console.log('[App] IndexedDB initialized');
 
@@ -414,10 +395,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // Socket.IO 连接
 function initSocket() {
-    socket = io();
+    socket = io({
+        reconnectionAttempts: 0,
+        timeout: 5000,
+    });
 
     socket.on('connect', function() {
         console.log('已连接到服务器');
+    });
+
+    socket.on('connect_error', function() {
+        // 静默连接错误，避免刷屏
     });
 
     socket.on('processing_status', function(data) {
@@ -425,7 +413,7 @@ function initSocket() {
     });
 
     socket.on('disconnect', function() {
-        console.log('与服务器断开连接');
+        // 静默断开，避免刷屏
     });
 }
 
@@ -608,53 +596,53 @@ async function loadTimeTravelMemories() {
     const emptyEl = document.getElementById('timetravelEmpty');
     const quoteEl = document.getElementById('timetravelQuote');
     const dateEl = document.getElementById('timetravelDate');
-    
+
     if (!listEl) return;
-    
+
     // 显示加载状态
     listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载中...</div>';
-    
+
     try {
-        const response = await fetch('/api/memories/on-this-day');
-        const result = await response.json();
-        
-        if (result.success) {
-            const data = result.data;
-            
-            // 更新日期和感悟
-            if (dateEl) dateEl.textContent = data.today;
-            if (quoteEl) quoteEl.textContent = data.quote;
-            
-            if (data.memories.length === 0) {
-                listEl.style.display = 'none';
-                if (emptyEl) emptyEl.style.display = 'block';
-            } else {
-                listEl.style.display = 'flex';
-                if (emptyEl) emptyEl.style.display = 'none';
-                
-                // 渲染记忆列表
-                listEl.innerHTML = data.memories.map(item => {
-                    const memory = item.memory;
-                    const content = memory.understanding?.description || memory.content || '';
-                    const emotion = memory.emotion;
-                    const emotionIcon = emotion ? getEmotionIcon(emotion.valence) : '';
-                    const emotionLabel = emotion?.label || '';
-                    
-                    // 优化时间显示
-                    let timeDisplay;
-                    if (data.has_on_this_day) {
-                        // 往年今日显示相对时间
-                        timeDisplay = formatTimeAgo(item.days_diff);
-                    } else {
-                        // 随机记忆显示具体日期
-                        timeDisplay = item.date;
-                    }
-                    
-                    return `
+        const result = await memoryService.getOnThisDay();
+
+        // 更新日期
+        const today = new Date();
+        if (dateEl) dateEl.textContent = today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+
+        // 合并往年今日和普通记忆
+        const memories = [...(result.onThisDay || []), ...(result.other || [])];
+
+        if (memories.length === 0) {
+            listEl.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (quoteEl) quoteEl.textContent = '暂无记忆';
+        } else {
+            listEl.style.display = 'flex';
+            if (emptyEl) emptyEl.style.display = 'none';
+
+            // 渲染记忆列表
+            listEl.innerHTML = memories.map(item => {
+                const memory = item.memory;
+                const content = memory.understanding?.description || memory.content || '';
+                const emotion = memory.emotion;
+                const emotionIcon = emotion ? getEmotionIcon(emotion.valence) : '';
+
+                // 优化时间显示
+                let timeDisplay;
+                if (result.onThisDay && result.onThisDay.some(h => h.memory.id === memory.id)) {
+                    // 往年今日显示相对时间
+                    timeDisplay = formatTimeAgo(item.days_diff);
+                } else {
+                    // 普通记忆显示具体日期
+                    const memDate = new Date(memory.created_at);
+                    timeDisplay = memDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+                }
+
+                return `
                         <div class="timetravel-item">
                             <div class="timetravel-year">
                                 ${timeDisplay}
-                                <button class="btn-card-share" onclick="event.stopPropagation(); showMemoryCard('${memory.id}', ${item.days_diff})" title="生成精美卡片">
+                                <button class="btn-card-share" onclick="event.stopPropagation(); showMemoryCard('${memory.id}', ${item.days_diff || 0})" title="生成精美卡片">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
@@ -666,14 +654,10 @@ async function loadTimeTravelMemories() {
                             <div class="timetravel-content" onclick="viewMemory('${memory.id}')">${content.substring(0, 120)}${content.length > 120 ? '...' : ''}</div>
                             <div class="timetravel-meta" onclick="viewMemory('${memory.id}')">
                                 <span class="timetravel-emotion">${emotionIcon}</span>
-                                ${emotionLabel ? `<span>${emotionLabel}</span>` : ''}
                             </div>
                         </div>
                     `;
                 }).join('');
-            }
-        } else {
-            listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载失败</div>';
         }
     } catch (error) {
         console.error('加载往年今日记忆失败:', error);
@@ -950,14 +934,15 @@ async function searchMemories() {
         if (result.success) {
             // 先高亮节点（记忆 + 图谱节点）
             const matchedNodes = []; // 客户端搜索暂不返回节点
-            highlightSearchResults(result.results, matchedNodes);
+            const memories = result.results.map(r => r.memory);
+            highlightSearchResults(memories, matchedNodes);
             // 再切换标签页（跳过自动加载，因为已有数据）
             switchTab('memories', null, true);
 
             // 构造兼容格式
             const compatResult = {
                 success: true,
-                results: result.results.map(r => r.memory),
+                results: memories,
                 matched_nodes: matchedNodes,
                 match_types: result.results.map(r => r.match_type),
                 scores: result.results.map(r => ({ combined: r.score, vector: r.score, keyword: 0 })),
@@ -1422,11 +1407,37 @@ function clearMemorySearch() {
 
 async function viewMemory(memoryId) {
     try {
-        const response = await fetch(`/api/memory/${memoryId}`);
-        const result = await response.json();
+        const memory = await db.getMemory(memoryId);
+        if (memory) {
+            showMemoryModal(memory);
 
-        if (result.success) {
-            showMemoryModal(result.data);
+            // 高亮并居中该记忆关联的实体节点
+            const entities = memory.entities || [];
+            console.log('[viewMemory] entities:', entities.length, entities.map(e => ({ id: e.id, name: e.name })));
+            console.log('[viewMemory] graphData.nodes count:', graphData?.nodes?.length);
+
+            if (entities.length > 0 && graphData?.nodes?.length > 0) {
+                // 优先按 ID 匹配，再用名称匹配（实体链接后 ID 可能变化）
+                const entityIds = entities.map(e => e.id).filter(Boolean);
+                const entityNames = entities.map(e => e.name?.toLowerCase()).filter(Boolean);
+
+                const matchedNodes = graphData.nodes.filter(n => {
+                    if (entityIds.includes(n.id)) return true;
+                    if (n.name && entityNames.includes(n.name.toLowerCase())) return true;
+                    return false;
+                });
+
+                console.log('[viewMemory] matchedNodes:', matchedNodes.length, matchedNodes.map(n => ({ id: n.id, name: n.name, x: n.x, y: n.y })));
+
+                if (matchedNodes.length > 0) {
+                    highlightedNodeIds.clear();
+                    matchedNodes.forEach(n => highlightedNodeIds.add(n.id));
+                    updateGraphStyles();
+
+                    // 等待模拟稳定后居中（力导向需要时间收敛）
+                    setTimeout(() => focusOnHighlightedNodes(), 1200);
+                }
+            }
         }
     } catch (error) {
         console.error('获取记忆详情失败:', error);
@@ -1533,11 +1544,7 @@ function confirmDeleteMemory(event, memoryId) {
 
 async function deleteMemory(memoryId) {
     try {
-        const response = await fetch(`/api/memory/${memoryId}`, {
-            method: 'DELETE'
-        });
-
-        const result = await response.json();
+        const result = await memoryService.deleteMemory(memoryId);
 
         if (result.success) {
             showToast('记忆已删除', 'success');
@@ -1545,7 +1552,7 @@ async function deleteMemory(memoryId) {
             loadGraphData();
             loadStats();
         } else {
-            showToast(result.message || '删除失败', 'error');
+            showToast(result.error || '删除失败', 'error');
         }
     } catch (error) {
         console.error('删除记忆失败:', error);
@@ -1948,8 +1955,10 @@ let legendExpandedSections = { nodes: false, edges: false };
 
 function toggleLegend() {
     const legendEl = document.getElementById('graphLegend');
+    if (window.innerWidth <= 900) return;
     legendCollapsed = !legendCollapsed;
     legendEl.classList.toggle('collapsed', legendCollapsed);
+    legendEl.style.display = '';
 }
 
 function toggleLegendSection(section) {
@@ -1962,6 +1971,11 @@ function updateLegend() {
     const legendItems = document.getElementById('legendItems');
 
     if ((!graphData.nodes || graphData.nodes.length === 0) && (!graphData.edges || graphData.edges.length === 0)) {
+        legendEl.style.display = 'none';
+        return;
+    }
+
+    if (window.innerWidth <= 900) {
         legendEl.style.display = 'none';
         return;
     }
@@ -2778,16 +2792,10 @@ async function saveNodeEdit() {
     const updates = { name, type };
     if (description) updates.description = description;
     if (Object.keys(attributes).length > 0) updates.attributes = attributes;
-    
+
     try {
-        const response = await fetch(`/api/graph/node/${editingNodeId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates)
-        });
-        
-        const result = await response.json();
-        
+        const result = await graphService.updateNode(editingNodeId, updates);
+
         if (result.success) {
             showToast('实体已更新', 'success');
             // 刷新图谱数据
@@ -2796,13 +2804,13 @@ async function saveNodeEdit() {
             const node = graphData.nodes.find(n => n.id === editingNodeId);
             if (node) showNodeDetail(node);
         } else {
-            showToast(result.message || '更新失败', 'error');
+            showToast(result.error || '更新失败', 'error');
         }
     } catch (error) {
         console.error('更新实体失败:', error);
         showToast('更新失败', 'error');
     }
-    
+
     editingNodeId = null;
 }
 
@@ -2894,12 +2902,8 @@ async function deleteEdge(edgeId) {
     }
     
     try {
-        const response = await fetch(`/api/graph/edge/${edgeId}`, {
-            method: 'DELETE'
-        });
-        
-        const result = await response.json();
-        
+        const result = await graphService.deleteEdge(edgeId);
+
         if (result.success) {
             showToast('关系已删除', 'success');
             // 刷新图谱
@@ -2907,7 +2911,7 @@ async function deleteEdge(edgeId) {
             // 关闭详情面板
             closeDetailPanel();
         } else {
-            showToast(result.message || '删除失败', 'error');
+            showToast(result.error || '删除失败', 'error');
         }
     } catch (error) {
         console.error('删除关系失败:', error);
@@ -2940,13 +2944,9 @@ async function deleteNode(nodeId, nodeName) {
     
     try {
         showToast(`正在删除 "${nodeName}"...`, 'info');
-        
-        const response = await fetch(`/api/graph/node/${nodeId}`, {
-            method: 'DELETE'
-        });
-        
-        const result = await response.json();
-        
+
+        const result = await graphService.deleteNode(nodeId);
+
         if (result.success) {
             showToast(`"${nodeName}" 已删除`, 'success');
             // 关闭详情面板
@@ -2956,7 +2956,7 @@ async function deleteNode(nodeId, nodeName) {
             // 刷新图谱数据
             await loadGraphData();
         } else {
-            showToast(result.message || '删除失败', 'error');
+            showToast(result.error || '删除失败', 'error');
         }
     } catch (error) {
         console.error('删除实体失败:', error);
@@ -2974,12 +2974,8 @@ async function deleteEdge(edgeId, sourceName, targetName) {
     try {
         showToast('正在删除关系...', 'info');
         
-        const response = await fetch(`/api/graph/edge/${edgeId}`, {
-            method: 'DELETE'
-        });
-        
-        const result = await response.json();
-        
+        const result = await graphService.deleteEdge(edgeId);
+
         if (result.success) {
             showToast('关系已删除', 'success');
             // 关闭详情面板
@@ -2989,11 +2985,11 @@ async function deleteEdge(edgeId, sourceName, targetName) {
             // 刷新图谱数据
             await loadGraphData();
         } else {
-            showToast(result.message || '删除失败', 'error');
+            showToast(result.error || '删除失败', 'error');
         }
     } catch (error) {
         console.error('删除关系失败:', error);
-        showToast('删除失败，请重试', 'error');
+        showToast('删除失败', 'error');
     }
 }
 
@@ -3137,23 +3133,17 @@ async function confirmMergeNodes(keepId, removeId, removeName) {
     }
     
     try {
-        const response = await fetch('/api/graph/nodes/merge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keep_id: keepId, remove_id: removeId })
-        });
-        
-        const result = await response.json();
-        
+        const result = await graphService.mergeNodes(keepId, removeId);
+
         if (result.success) {
-            showToast(`已合并，共 ${result.data.merged_memory_count} 条记忆`, 'success');
+            showToast('已合并', 'success');
             // 刷新图谱
             await loadGraphData();
             // 重新显示保留的节点
             const keepNode = graphData.nodes.find(n => n.id === keepId);
             if (keepNode) showNodeDetail(keepNode);
         } else {
-            showToast(result.message || '合并失败', 'error');
+            showToast(result.error || '合并失败', 'error');
         }
     } catch (error) {
         console.error('合并实体失败:', error);
@@ -4166,39 +4156,141 @@ function setupPathFinder(nodeData) {
 
 // ==================== 导入导出 ====================
 
-function exportMemories() {
+async function exportMemories() {
     showToast('正在导出记忆...', 'info');
-    window.location.href = '/api/memories/export';
+    try {
+        const memories = await db.getAllMemories();
+        const entities = await db.getAllEntities();
+        const relations = await db.getAllRelations();
+
+        const exportData = {
+            version: '1.0',
+            export_date: new Date().toISOString(),
+            memories: memories,
+            entities: entities,
+            relations: relations
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        a.download = `memories_${timestamp}.loyi`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast(`已导出 ${memories.length} 条记忆`, 'success');
+    } catch (error) {
+        console.error('导出失败:', error);
+        showToast('导出失败', 'error');
+    }
 }
 
-function importMemories(input) {
+async function importMemories(input) {
     const file = input.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     showToast('正在导入记忆...', 'info');
-    fetch('/api/memories/import', {
-        method: 'POST',
-        body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadMemories();
-            loadGraphData();
-        } else {
-            showToast(data.message || '导入失败', 'error');
+
+    try {
+        const text = await file.text();
+
+        // 验证是否为有效 JSON
+        if (!text || text.trim().startsWith('PK')) {
+            showToast('文件格式错误：不是有效的 .loyi 文件', 'error');
+            return;
         }
-    })
-    .catch(err => {
-        showToast('导入失败: ' + err.message, 'error');
-    })
-    .finally(() => {
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            showToast('文件格式错误：无法解析 JSON', 'error');
+            return;
+        }
+
+        if (!data.memories && !data.entities && !data.relations) {
+            showToast('文件格式错误：不是有效的记忆文件', 'error');
+            return;
+        }
+
+        const memories = data.memories || [];
+        const entities = data.entities || [];
+        const relations = data.relations || [];
+
+        // 批量保存记忆
+        for (const memory of memories) {
+            await db.saveMemory(memory);
+        }
+
+        // 批量保存实体
+        for (const entity of entities) {
+            await db.saveEntity(entity);
+        }
+
+        // 批量保存关系
+        for (const relation of relations) {
+            await db.saveRelation(relation);
+        }
+
+        showToast(`已导入 ${memories.length} 条记忆`, 'success');
+        loadMemories();
+        loadGraphData();
+    } catch (error) {
+        console.error('导入失败:', error);
+        showToast('导入失败: ' + error.message, 'error');
+    } finally {
         input.value = '';
-    });
+    }
+}
+
+// 加载示例数据
+async function loadSampleData() {
+    if (!confirm('确定要加载示例数据吗？这将添加示例记忆到现有数据中。')) {
+        return;
+    }
+
+    showToast('正在加载示例数据...', 'info');
+    try {
+        const response = await fetch('/data/memories_2026-04-16T16-56-51.loyi');
+
+        if (!response.ok) {
+            throw new Error('文件不存在');
+        }
+
+        const text = await response.text();
+
+        if (!text || text.trim().startsWith('PK')) {
+            showToast('示例数据文件格式错误', 'error');
+            return;
+        }
+
+        const data = JSON.parse(text);
+        const memories = data.memories || [];
+        const entities = data.entities || [];
+        const relations = data.relations || [];
+
+        for (const memory of memories) {
+            await db.saveMemory(memory);
+        }
+
+        for (const entity of entities) {
+            await db.saveEntity(entity);
+        }
+
+        for (const relation of relations) {
+            await db.saveRelation(relation);
+        }
+
+        showToast(`已加载 ${memories.length} 条示例记忆`, 'success');
+        loadMemories();
+        loadGraphData();
+        loadStats();
+    } catch (error) {
+        console.error('加载示例数据失败:', error);
+        showToast('加载示例数据失败: ' + error.message, 'error');
+    }
 }
 
 // ==================== 洛忆聊天 ====================
