@@ -42,7 +42,8 @@
 }
 
 .memory-card-export {
-    width: 400px;
+    width: 100%;
+    max-width: 400px;
     min-height: 500px;
     position: relative;
     background: var(--color-bg-secondary);
@@ -232,4 +233,28 @@
 .btn-close:hover {
     background: var(--color-bg-tertiary);
     color: var(--color-text);
+}
+
+/* 记忆详情弹窗中的"生成卡片"按钮 */
+.memory-card-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px;
+    background: var(--color-bg);
+    color: var(--color-memory);
+    border: 1px solid var(--color-memory);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.5px;
+}
+
+.memory-card-action-btn:hover {
+    background: var(--color-memory);
+    color: #fff;
 }

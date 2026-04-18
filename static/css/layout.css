@@ -44,3 +44,8 @@
 .sidebar.collapsed + .sidebar-toggle-btn {
     transform: translateX(0);
 }
+
+/* 移动端侧边栏头部默认隐藏 */
+.sidebar-mobile-header {
+    display: none;
+}

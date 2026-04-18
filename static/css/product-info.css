@@ -30,6 +30,215 @@
     background: var(--color-memory-light);
 }
 
+/* ============================================
+   页面加载动画
+   ============================================ */
+.page-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--color-bg);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.page-loader.done {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.page-loader-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.page-loader-logo {
+    width: 64px;
+    height: 64px;
+    animation: loaderPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes loaderPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.92); opacity: 0.7; }
+}
+
+.page-loader-text {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    letter-spacing: 1px;
+}
+
+.page-loader-bar {
+    width: 120px;
+    height: 2px;
+    background: var(--color-border-light);
+    overflow: hidden;
+    border-radius: 1px;
+}
+
+.page-loader-progress {
+    width: 40%;
+    height: 100%;
+    background: var(--color-memory);
+    animation: loaderSlide 1.2s ease-in-out infinite;
+}
+
+@keyframes loaderSlide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+}
+
+/* ============================================
+   欢迎弹窗（首次访问）
+   ============================================ */
+.welcome-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.welcome-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.welcome-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: 460px;
+    max-width: calc(100vw - 32px);
+    max-height: 90vh;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    z-index: 2001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease, transform 0.4s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.welcome-modal.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.welcome-content {
+    padding: 32px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.welcome-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.welcome-logo-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.welcome-title {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--font-serif);
+    color: var(--color-text);
+    letter-spacing: 1px;
+}
+
+.welcome-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+}
+
+.welcome-lead {
+    font-size: 15px;
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+.welcome-highlight {
+    color: var(--color-memory);
+    font-weight: 600;
+}
+
+.welcome-closing {
+    font-style: italic;
+    color: var(--color-text);
+    font-family: var(--font-serif);
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-border-light);
+}
+
+.welcome-close-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--color-memory);
+    color: #fff;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.welcome-close-btn:hover {
+    background: #6a5b7a;
+}
+
+/* 移动端欢迎弹窗 */
+@media (max-width: 768px) {
+    .welcome-content {
+        padding: 24px;
+    }
+
+    .welcome-title {
+        font-size: 16px;
+    }
+
+    .welcome-body {
+        font-size: 13px;
+    }
+}
+
 /* 移动端位置调整 */
 @media (max-width: 768px) {
     .pi-trigger-btn {

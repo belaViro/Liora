@@ -26,7 +26,7 @@ function showPredictionButton(node) {
     predictBtn.className = 'btn-predict';
     predictBtn.id = 'btn-predict';
     predictBtn.innerHTML = `
-        <svg class="predict-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="predict-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M12 16v-4"></path>
             <path d="M12 8h.01"></path>
@@ -99,7 +99,7 @@ async function loadPredictions(node, btnElement) {
             btnElement.disabled = false;
             btnElement.classList.remove('predict-loading');
             btnElement.innerHTML = `
-                <svg class="predict-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="predict-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <path d="M12 16v-4"></path>
                     <path d="M12 8h.01"></path>

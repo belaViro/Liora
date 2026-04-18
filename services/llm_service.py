@@ -92,10 +92,14 @@ class LLMService:
                 json_str = self._extract_json(content)
                 result = json.loads(json_str)
             
+            # 确保解析结果是字典（LLM 可能返回被引号包裹的字符串）
+            if not isinstance(result, dict):
+                result = {}
+            
             # 确保所有字段存在
-            if 'understanding' not in result:
+            if 'understanding' not in result or isinstance(result.get('understanding'), str):
                 result['understanding'] = {
-                    'description': text[:100], 
+                    'description': text[:100] if isinstance(result.get('understanding'), str) else text[:100], 
                     'summary': text[:50], 
                     'keywords': [], 
                     'persons': [], 

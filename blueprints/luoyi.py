@@ -20,7 +20,7 @@ def chat():
     try:
         llm_service = current_app.services.llm_service
 
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         message = data.get('message', '')
         history = data.get('history', [])
         memories = data.get('memories', [])  # 客户端传入的记忆数据

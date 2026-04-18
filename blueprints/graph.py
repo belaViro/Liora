@@ -20,7 +20,7 @@ def explore_node():
     try:
         llm_service = current_app.services.llm_service
 
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         question = data.get('question', '')
         context = data.get('context', {})
         chat_history = data.get('history', [])
@@ -69,7 +69,10 @@ def explore_node():
             memory_lines = []
             for m in memories[:5]:
                 content = m.get('content', '')[:200]
-                summary = m.get('understanding', {}).get('summary', '')
+                understanding = m.get('understanding', {})
+                if isinstance(understanding, str):
+                    understanding = {}
+                summary = understanding.get('summary', '')
                 if summary:
                     memory_lines.append(f"- {summary}")
                 elif content:

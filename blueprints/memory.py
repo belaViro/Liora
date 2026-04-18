@@ -115,7 +115,7 @@ def generate_ai_quote():
     try:
         llm_service = current_app.services.llm_service
 
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         memory_content = data.get('content', '')
         days_ago = data.get('days_ago', 365)
         emotion = data.get('emotion', {})

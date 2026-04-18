@@ -21,7 +21,7 @@ def compute_understand():
     输出: { understanding, entities, relations, emotion }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         content = data.get('content', '')
         memory_type = data.get('type', 'text')
         file_path = data.get('file_path')
@@ -64,7 +64,7 @@ def compute_temporal():
     输出: { temporal_info }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         content = data.get('content', '')
         memory_type = data.get('type', 'text')
         file_path = data.get('file_path')
@@ -100,7 +100,7 @@ def compute_embed():
     输出: { vector: [...], dimension: int }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         text = data.get('text', '')
 
         if not text:
@@ -145,7 +145,7 @@ def compute_search_rank():
     输出: { results: [{memory, score}] }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         query = data.get('query', '')
         memories = data.get('memories', [])
         top_k = data.get('top_k', 10)
@@ -171,7 +171,10 @@ def compute_search_rank():
         # 获取记忆文本的向量
         memory_texts = []
         for m in memories:
-            text = m.get('understanding', {}).get('description', '') or m.get('content', '')
+            understanding = m.get('understanding', {})
+            if isinstance(understanding, str):
+                understanding = {}
+            text = understanding.get('description', '') or m.get('content', '')
             memory_texts.append(text[:1000])  # 限制长度
 
         if not any(memory_texts):
@@ -219,7 +222,7 @@ def compute_predict():
     输出: { predictions: [...] }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         node = data.get('node', {})
         related_nodes = data.get('related_nodes', [])
         max_predictions = data.get('max_predictions', 5)
@@ -313,7 +316,7 @@ def compute_chat():
     输出: { reply, context_used }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         message = data.get('message', '')
         history = data.get('history', [])
         memories = data.get('memories', [])
@@ -329,7 +332,10 @@ def compute_chat():
             memory_contexts = []
             for m in memories[:5]:  # 限制数量
                 content = m.get('content', '')[:200]
-                summary = m.get('understanding', {}).get('summary', '')
+                understanding = m.get('understanding', {})
+                if isinstance(understanding, str):
+                    understanding = {}
+                summary = understanding.get('summary', '')
                 if summary:
                     memory_contexts.append(f"- {summary}")
                 elif content:
@@ -432,7 +438,7 @@ def merge_chunks():
     输出: { success, file_path }
     """
     try:
-        data = request.json
+        data = request.json if isinstance(request.json, dict) else {}
         upload_id = data.get('upload_id')
 
         if not upload_id:

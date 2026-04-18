@@ -43,6 +43,11 @@
         display: none;
     }
 
+    /* 显示移动端菜单按钮 */
+    .mobile-menu-btn {
+        display: inline-flex !important;
+    }
+
     .search-box {
         max-width: none;
         flex: 1;
@@ -92,15 +97,63 @@
         min-height: 50vh;
     }
 
+    /* 移动端侧边栏默认隐藏，以抽屉形式呈现 */
     .sidebar {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100% !important;
         max-width: 100% !important;
-        flex: 1;
-        height: auto;
-        max-height: none;
-        min-height: 300px;
+        height: 100vh;
+        max-height: 100vh;
+        min-height: auto;
         border-left: none;
-        border-top: 1px solid var(--color-border);
+        border-top: none;
+        z-index: 200;
+        background: var(--color-bg);
+        flex: none;
+    }
+
+    .sidebar.mobile-open {
+        display: flex;
+    }
+
+    /* 移动端侧边栏头部 */
+    .sidebar-mobile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        flex-shrink: 0;
+    }
+
+    .sidebar-mobile-title {
+        font-size: 14px;
+        font-weight: 600;
+        font-family: var(--font-mono);
+        letter-spacing: 0.5px;
+    }
+
+    .sidebar-mobile-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--color-border-light);
+        background: var(--color-bg);
+        cursor: pointer;
+        border-radius: 4px;
+        padding: 0;
+        color: #000;
+    }
+
+    .sidebar-mobile-close:hover {
+        border-color: var(--color-memory);
+        background: var(--color-memory-light);
     }
 
     .panel-content {
@@ -110,28 +163,37 @@
     }
 
     .graph-legend {
-        bottom: 8px;
-        left: 8px;
-        padding: 8px 12px;
-        width: 180px;
-        max-height: 200px;
-        font-size: 10px;
+        display: none;
     }
 
     .edge-labels-toggle {
         display: none;
     }
 
-    .graph-legend {
+    .detail-panel {
+        position: fixed;
+        width: calc(100% - 24px) !important;
+        left: 12px !important;
+        right: 12px !important;
+        top: 70px !important;
+        max-height: calc(100vh - 90px);
+        font-size: 12px;
+        z-index: 55;
+    }
+
+    .detail-panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.25);
+        z-index: 50;
         display: none;
     }
 
-    .detail-panel {
-        width: calc(100% - 32px);
-        right: 16px;
-        left: 16px;
-        top: 60px;
-        max-height: 50vh;
+    .detail-panel-overlay.show {
+        display: block;
     }
 
     .form-group {
@@ -159,16 +221,6 @@
     .graph-io-buttons .control-btn {
         padding: 4px 8px;
         font-size: 10px;
-    }
-
-    /* 详情面板移动端优化 */
-    .detail-panel {
-        width: calc(100% - 24px) !important;
-        left: 12px !important;
-        right: 12px !important;
-        top: 50px !important;
-        max-height: 60vh;
-        font-size: 12px;
     }
 
     .detail-panel-header {
@@ -215,9 +267,15 @@
         margin-bottom: 8px;
     }
 
-    /* 预测按钮 - 只显示图标 */
+    /* 预测按钮 - 只显示图标，与编辑/删除按钮等比例 */
     .btn-predict {
-        padding: 6px 8px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        justify-content: center;
+        background: var(--color-bg);
+        border-radius: 4px;
+        border-color: var(--color-border-light);
     }
 
     .btn-predict .predict-text {
@@ -249,6 +307,17 @@
     .edge-relation-header {
         font-size: 12px;
         padding: 10px;
+    }
+
+    /* 热力图移动端适配 */
+    .heatmap-container {
+        grid-template-columns: repeat(14, 1fr);
+        gap: 3px;
+    }
+
+    /* 洛忆面板边距修复 */
+    #panel-luoyi {
+        margin: 0;
     }
 }
 
@@ -286,12 +355,12 @@
 
     .graph-controls .control-btn {
         padding: 3px 6px;
-        font-size: 9px;
+        font-size: 10px;
     }
 
     .tabs {
         display: flex;
-        overflow-x: visible;
+        overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         flex-wrap: nowrap;
     }
@@ -300,7 +369,7 @@
         flex: 1;
         white-space: normal;
         padding: 8px 2px;
-        font-size: 10px;
+        font-size: 11px;
         text-align: center;
         min-width: 0;
         overflow: hidden;
@@ -321,17 +390,12 @@
     }
 
     .stat-label {
-        font-size: 10px;
+        font-size: 11px;
     }
 
     .graph-legend {
         width: 150px;
         font-size: 9px;
-    }
-
-    .pi-trigger-btn {
-        top: 8px;
-        right: 8px;
     }
 
     /* 小屏详情面板进一步优化 */
@@ -352,6 +416,11 @@
 
     .btn-header-edit,
     .btn-header-delete {
+        width: 36px;
+        height: 36px;
+    }
+
+    .btn-predict {
         width: 36px;
         height: 36px;
     }

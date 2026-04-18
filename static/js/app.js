@@ -31,15 +31,52 @@ function toggleProductInfo() {
     }
 }
 
-// ESC 键关闭产品详情
+// ESC 键关闭弹层面板
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const panel = document.getElementById('piPanel');
         if (panel && panel.classList.contains('active')) {
             toggleProductInfo();
         }
+        // ESC 关闭移动端侧边栏
+        const sidebar = document.getElementById('sidebarPanel');
+        if (sidebar && sidebar.classList.contains('mobile-open')) {
+            toggleMobileSidebar();
+        }
     }
 });
+
+// ==================== 欢迎弹窗 ====================
+function hidePageLoader() {
+    const loader = document.getElementById('pageLoader');
+    if (loader) {
+        loader.classList.add('done');
+        setTimeout(() => loader.remove(), 600);
+    }
+}
+
+function initWelcomeModal() {
+    const seen = localStorage.getItem('lioraWelcomeSeen');
+    if (seen) return;
+
+    const overlay = document.getElementById('welcomeOverlay');
+    const modal = document.getElementById('welcomeModal');
+    if (!overlay || !modal) return;
+
+    // 延迟一点显示，等页面加载完成
+    setTimeout(() => {
+        overlay.classList.add('show');
+        modal.classList.add('show');
+    }, 600);
+}
+
+function closeWelcomeModal() {
+    const overlay = document.getElementById('welcomeOverlay');
+    const modal = document.getElementById('welcomeModal');
+    if (overlay) overlay.classList.remove('show');
+    if (modal) modal.classList.remove('show');
+    localStorage.setItem('lioraWelcomeSeen', 'true');
+}
 
 // ==================== Liora 功能函数 ====================
 
@@ -351,6 +388,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadGraphData();
     loadMemories();
     loadStats();
+    initWelcomeModal();
+    hidePageLoader();
 
     // 边标签开关事件
     const edgeLabelsToggle = document.getElementById('showEdgeLabels');
@@ -1465,21 +1504,24 @@ function showMemoryModal(memory) {
     // 情感颜色
     const emotionColor = getEmotionColor(emotion.valence);
     
+    // 计算距今天数（用于卡片生成）
+    const daysDiff = Math.floor((new Date() - new Date(memory.created_at)) / (1000 * 60 * 60 * 24));
+
     body.innerHTML = `
         <div class="memory-modal-meta">
             <span>${typeLabels[memory.type] || memory.type}</span>
             <span>${date}</span>
         </div>
-        
+
         <div class="memory-modal-content-text">${content}</div>
-        
+
         ${understanding.summary ? `
             <div class="memory-modal-section">
                 <div class="memory-modal-section-title">摘要</div>
                 <div>${understanding.summary}</div>
             </div>
         ` : ''}
-        
+
         ${understanding.keywords?.length ? `
             <div class="memory-modal-section">
                 <div class="memory-modal-section-title">关键词</div>
@@ -1488,7 +1530,7 @@ function showMemoryModal(memory) {
                 </div>
             </div>
         ` : ''}
-        
+
         ${entities.length ? `
             <div class="memory-modal-section">
                 <div class="memory-modal-section-title">识别实体 (${entities.length})</div>
@@ -1497,7 +1539,7 @@ function showMemoryModal(memory) {
                 </div>
             </div>
         ` : ''}
-        
+
         ${emotion.dominant_emotion ? `
             <div class="memory-modal-section">
                 <div class="memory-modal-section-title">情感</div>
@@ -1507,8 +1549,19 @@ function showMemoryModal(memory) {
                 </div>
             </div>
         ` : ''}
+
+        <div class="memory-modal-actions" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border-light);">
+            <button class="memory-card-action-btn" onclick="closeMemoryModal(); showMemoryCard('${memory.id}', ${daysDiff});">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                生成记忆卡片
+            </button>
+        </div>
     `;
-    
+
     modal.classList.add('show');
 }
 
@@ -1955,8 +2008,9 @@ let legendCollapsed = false;
 let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 let legendExpandedSections = { nodes: false, edges: false };
 
-// 侧边栏折叠
+// 侧边栏折叠（桌面端）
 function toggleSidebar() {
+    if (window.innerWidth <= 768) return;
     const sidebar = document.querySelector('.sidebar');
     const toggleBtn = document.querySelector('.sidebar-toggle');
     sidebarCollapsed = !sidebarCollapsed;
@@ -1965,13 +2019,22 @@ function toggleSidebar() {
     localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
 }
 
+// 移动端侧边栏开关
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebarPanel');
+    if (!sidebar) return;
+    sidebar.classList.toggle('mobile-open');
+    // 打开时禁止背景滚动
+    document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+}
+
 // 初始化侧边栏状态
 function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const toggleBtn = document.querySelector('.sidebar-toggle');
-    if (sidebarCollapsed) {
+    if (window.innerWidth > 768 && sidebarCollapsed) {
         sidebar.classList.add('collapsed');
-        toggleBtn.textContent = '▶';
+        if (toggleBtn) toggleBtn.textContent = '▶';
     }
 }
 
@@ -2720,6 +2783,8 @@ function showNodeDetail(nodeData) {
 
     content.innerHTML = html;
     panel.classList.add('show');
+    const overlay = document.getElementById('detailPanelOverlay');
+    if (overlay) overlay.classList.add('show');
     // 移动端显示探索区块
     const exploreSection = document.getElementById('detailExploreSection');
     if (exploreSection) {
@@ -3403,12 +3468,13 @@ async function sendDetailExploreQuestion() {
 
         const result = await computeApi.chat(question, [], memories, graphSummary);
         if (chatDiv) loadingDiv.remove();
-        if (result.success && result.reply) {
+        const reply = result.data?.reply;
+        if (result.success && reply) {
             if (chatDiv) {
-                chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px;">${result.reply}</span></div>`;
+                chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px;">${reply}</span></div>`;
             }
         } else {
-            throw new Error(result.error || '未知错误');
+            throw new Error(result.message || result.error || '未知错误');
         }
     } catch (e) {
         if (chatDiv) {
@@ -3460,8 +3526,12 @@ async function sendExploreQuestion() {
             },
             body: JSON.stringify({
                 question: question,
-                node: currentSelectedNode,
-                edge: currentSelectedEdge,
+                context: {
+                    node: currentSelectedNode,
+                    edge: currentSelectedEdge,
+                    memories: [],
+                    graph_summary: {}
+                },
                 history: exploreChatHistory,
                 persona_mode: isPersonaMode,
                 persona_node_name: personaNodeName
@@ -3599,6 +3669,8 @@ function showEdgeDetail(edgeData) {
 
     content.innerHTML = html;
     panel.classList.add('show');
+    const overlay = document.getElementById('detailPanelOverlay');
+    if (overlay) overlay.classList.add('show');
     
     // 更新探索面板
     updateExplorePanelForEdge(edgeData);
@@ -3652,6 +3724,8 @@ function renderSelfLoopDetail(edgeData, content, panel) {
 
     content.innerHTML = html;
     panel.classList.add('show');
+    const overlay = document.getElementById('detailPanelOverlay');
+    if (overlay) overlay.classList.add('show');
 }
 
 // 计算关系密度 (0-100)
@@ -3831,7 +3905,7 @@ function closeDetailPanel() {
     const panel = document.getElementById('detailPanel');
     const overlay = document.getElementById('detailPanelOverlay');
     panel.classList.remove('show');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) overlay.classList.remove('show');
     expandedSelfLoops.clear();  // 重置自环展开状态
     
     // 清空头部操作区
@@ -4132,18 +4206,14 @@ async function findRelationPath() {
     btn.textContent = '探索关联路径';
 }
 
-// 生成记忆故事
-// 重置故事生成器状态
+// 重置故事生成器状态（同时重置所有实例）
 function resetStoryGenerator() {
-    const resultDiv = document.getElementById('storyResult');
-    const btn = document.querySelector('.btn-story');
-    
-    if (resultDiv) {
-        resultDiv.innerHTML = '';
-        resultDiv.classList.remove('show');
-    }
-    
-    if (btn) {
+    document.querySelectorAll('.story-result').forEach(el => {
+        el.innerHTML = '';
+        el.classList.remove('show');
+        el.style.display = '';
+    });
+    document.querySelectorAll('.btn-story').forEach(btn => {
         btn.disabled = false;
         btn.innerHTML = `
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -4152,17 +4222,19 @@ function resetStoryGenerator() {
             </svg>
             生成关于此节点的记忆故事
         `;
-    }
+    });
 }
 
-async function generateMemoryStory() {
+async function generateMemoryStory(event) {
     if (!currentSelectedNode && !currentSelectedEdge) {
         showToast('请先选择一个节点或关系', 'warning');
         return;
     }
     
-    const resultDiv = document.getElementById('storyResult');
-    const btn = document.querySelector('.btn-story');
+    // 通过点击事件定位正确的按钮和结果容器（支持移动端详情面板和桌面端侧边栏）
+    const btn = event && event.target ? event.target.closest('.btn-story') : document.querySelector('.btn-story');
+    const container = btn ? btn.closest('.detail-explore-section, .panel') : null;
+    const resultDiv = container ? container.querySelector('.story-result') : document.getElementById('storyResult');
     const targetName = currentSelectedNode?.name || 
         (currentSelectedEdge?.isSelfLoopGroup 
             ? currentSelectedEdge?.source_name 
@@ -4171,6 +4243,7 @@ async function generateMemoryStory() {
     // 清除之前的结果
     resultDiv.innerHTML = '';
     resultDiv.classList.remove('show');
+    resultDiv.style.display = 'none';
     
     btn.disabled = true;
     btn.innerHTML = `
@@ -4186,8 +4259,12 @@ async function generateMemoryStory() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 question: `请基于以下信息，创作一段关于"${targetName}"的记忆故事。这是用户记忆网络中的内容，请用第一人称"我"来叙述，像在回忆一段往事。文字要有情感、有画面感，控制在200字左右。`,
-                node: currentSelectedNode,
-                edge: currentSelectedEdge,
+                context: {
+                    node: currentSelectedNode,
+                    edge: currentSelectedEdge,
+                    memories: [],
+                    graph_summary: {}
+                },
                 history: []
             })
         });
@@ -4215,6 +4292,7 @@ async function generateMemoryStory() {
             `;
             resultDiv.innerHTML = html;
             resultDiv.classList.add('show');
+            resultDiv.style.display = 'block';
         } else {
             throw new Error(result.error || '生成失败');
         }
@@ -4227,6 +4305,7 @@ async function generateMemoryStory() {
             </div>
         `;
         resultDiv.classList.add('show');
+        resultDiv.style.display = 'block';
     }
     
     btn.disabled = false;
