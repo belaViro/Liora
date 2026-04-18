@@ -18,3 +18,29 @@
     overflow: hidden;
 
 }
+
+/* ============================================
+   侧边栏折叠
+   ============================================ */
+.sidebar {
+    transition: width 0.3s ease, min-width 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden;
+}
+
+.sidebar-toggle {
+    margin-right: 4px;
+    opacity: 0.7;
+}
+
+.sidebar-toggle:hover {
+    opacity: 1;
+}
+
+.sidebar.collapsed + .sidebar-toggle-btn {
+    transform: translateX(0);
+}

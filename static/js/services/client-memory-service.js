@@ -53,7 +53,7 @@ class ClientMemoryService {
             const extraction = understandResult.data || {};
 
             // 4. 构建记忆对象
-            const memoryId = generateUUID ? generateUUID() : this._generateUUID();
+            const memoryId = (typeof generateUUID !== 'undefined' && generateUUID) ? generateUUID() : this._generateUUID();
             const memory = {
                 id: memoryId,
                 type: type,

@@ -197,7 +197,7 @@ class ComputeAPI {
     async uploadChunked(file, onProgress = null) {
         const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-        const fileId = generateUUID ? generateUUID() : Date.now().toString(36);
+        const fileId = (typeof generateUUID !== 'undefined' && generateUUID) ? generateUUID() : Date.now().toString(36);
 
         try {
             for (let i = 0; i < totalChunks; i++) {

@@ -49,24 +49,42 @@ async function loadPredictions(node, btnElement) {
             <span class="predict-text">思考中</span>
         `;
     }
-    
+
     showToast('正在分析可能的关联节点...', 'info');
-    
+
     try {
-        const response = await fetch(`/api/graph/predict/${node.id}?limit=3`);
-        const result = await response.json();
-        
+        // 获取关联节点
+        const relations = await db.getAllRelations();
+        const relatedNodes = [];
+        const nodeIds = new Set();
+
+        for (const rel of relations) {
+            if (rel.source === node.id || rel.target === node.id) {
+                const otherId = rel.source === node.id ? rel.target : rel.source;
+                if (!nodeIds.has(otherId)) {
+                    nodeIds.add(otherId);
+                    const otherEntity = await db.getEntity(otherId);
+                    if (otherEntity) {
+                        relatedNodes.push(otherEntity);
+                    }
+                }
+            }
+        }
+
+        // 调用服务器预测
+        const result = await computeApi.predict(node, relatedNodes, 3);
+
         if (result.success && result.data.predictions.length > 0) {
             currentPredictions = result.data.predictions.map((p, idx) => ({
                 id: `prediction_${idx}`,
                 name: p.name,
                 type: p.type,
-                relation: p.relation,
-                reason: p.reason,
+                relation: p.relation_type,
+                reason: p.reasoning,
                 confidence: p.confidence,
                 sourceNode: node
             }));
-            
+
             showPredictionPanel(result.data.predictions);
             showToast(`发现 ${currentPredictions.length} 个可能的关联`, 'success');
         } else {
@@ -126,12 +144,12 @@ function showPredictionPanel(predictions) {
                         <div class="prediction-info">
                             <div class="prediction-name">${p.name}</div>
                             <div class="prediction-meta-line">
-                                ${p.type} · ${p.relation}
+                                ${p.type} · ${p.relation_type}
                                 <span class="prediction-confidence" style="color: ${getConfidenceColor(p.confidence)}">
                                     概率 ${Math.round(p.confidence * 100)}%
                                 </span>
                             </div>
-                            <div class="prediction-reason">${p.reason}</div>
+                            <div class="prediction-reason">${p.reasoning}</div>
                         </div>
                         <button class="btn-adopt" onclick="event.stopPropagation(); adoptPrediction(${idx})">
                             加入
@@ -159,91 +177,107 @@ async function adoptPrediction(index) {
         console.error('[预测] 未找到预测数据, index:', index);
         return;
     }
-    
+
     console.log('[预测] 采纳预测:', prediction.name, prediction);
-    
+
     // 防止重复点击
     const itemEl = document.getElementById(`prediction-item-${index}`);
     if (itemEl && itemEl.classList.contains('adopted')) {
         return;
     }
-    
+
     showToast(`正在添加 "${prediction.name}" 到图谱...`, 'info');
-    
+
     try {
-        // 使用轻量级 API 直接添加节点和关系，不经过 LLM 分析
-        const response = await fetch('/api/graph/adopt-prediction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                source_node_id: prediction.sourceNode.id,
-                prediction: {
-                    name: prediction.name,
-                    type: prediction.type,
-                    relation: prediction.relation,
-                    fact: prediction.fact,
-                    reason: prediction.reason,
-                    confidence: prediction.confidence
-                }
-            })
-        });
-        
-        const result = await response.json();
-        console.log('[预测] API 响应:', result);
-        
-        if (result.success) {
-            showToast(`已成功添加 "${prediction.name}"`, 'success');
-            
-            // 标记为已采纳（视觉反馈）
-            if (itemEl) {
-                itemEl.classList.add('adopted');
-                itemEl.style.opacity = '0.5';
-                itemEl.style.pointerEvents = 'none';
-            }
-            
-            // 刷新图谱显示新节点
-            console.log('[预测] 刷新图谱...');
-            await loadGraphData();
-            console.log('[预测] 图谱刷新完成');
-            
-            // 高亮新添加的节点
-            if (result.data && result.data.entity_id) {
-                const newNodeId = result.data.entity_id;
-                const newNode = graphData.nodes.find(n => n.id === newNodeId);
-                if (newNode) {
-                    console.log('[预测] 选中新节点:', newNode.name);
-                    // 显示详情面板
-                    if (typeof showNodeDetail === 'function') {
-                        showNodeDetail(newNode);
-                    }
-                    // 在图谱中高亮节点（使用 D3）
-                    setTimeout(() => {
-                        d3.selectAll('.node-group').classed('selected', false);
-                        d3.selectAll('.node-group').filter(d => d.id === newNodeId)
-                            .classed('selected', true)
-                            .select('circle')
-                            .attr('stroke', '#E91E63')
-                            .attr('stroke-width', 3);
-                    }, 100);
-                }
-            }
-            
-            // 检查是否全部已采纳
-            const remaining = currentPredictions.filter((p, i) => {
-                const el = document.getElementById(`prediction-item-${i}`);
-                return el && !el.classList.contains('adopted');
-            });
-            
-            if (remaining.length === 0) {
-                // 全部采纳完毕，延迟后清除面板
-                setTimeout(() => {
-                    rejectAllPredictions();
-                    showToast('全部预测已采纳', 'success');
-                }, 1500);
-            }
+        // 创建新实体
+        const newEntityId = prediction.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now().toString(36);
+        const newEntity = {
+            id: newEntityId,
+            name: prediction.name,
+            type: prediction.type,
+            description: prediction.reason || '',
+            attributes: {},
+            aliases: [],
+            memory_ids: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            relation_count: 0
+        };
+
+        // 检查是否已存在同名实体
+        const existingEntity = await db._findSimilarEntity(prediction.name, prediction.type);
+        let finalEntityId;
+
+        if (existingEntity) {
+            // 使用已存在的实体
+            finalEntityId = existingEntity.id;
         } else {
-            console.error('[预测] API 返回失败:', result.message);
-            showToast('添加失败: ' + result.message, 'error');
+            // 保存新实体
+            await db.saveEntity(newEntity);
+            finalEntityId = newEntityId;
+        }
+
+        // 创建关系
+        const sourceId = prediction.sourceNode.id;
+        const relationId = `${sourceId}_${prediction.relation}_${finalEntityId}_${Date.now().toString(36)}`;
+        const newRelation = {
+            id: relationId,
+            source: sourceId,
+            target: finalEntityId,
+            type: prediction.relation || '关联',
+            directed: false,
+            description: prediction.reason || '',
+            fact: `${prediction.sourceNode.name} --[${prediction.relation}]--> ${prediction.name}`,
+            episodes: [{
+                memory_id: null,
+                snippet: prediction.reason || '',
+                timestamp: new Date().toISOString()
+            }],
+            memory_ids: [],
+            memory_summaries: [],
+            strength: prediction.confidence || 0.5,
+            created_at: new Date().toISOString(),
+            confidence: prediction.confidence || 0.5
+        };
+
+        await db.saveRelation(newRelation);
+
+        showToast(`已成功添加 "${prediction.name}"`, 'success');
+
+        // 标记为已采纳（视觉反馈）
+        if (itemEl) {
+            itemEl.classList.add('adopted');
+            itemEl.style.opacity = '0.5';
+            itemEl.style.pointerEvents = 'none';
+        }
+
+        // 刷新图谱显示新节点
+        await loadGraphData();
+
+        // 高亮新添加的节点
+        const newNode = graphData.nodes.find(n => n.id === finalEntityId);
+        if (newNode) {
+            setTimeout(() => {
+                d3.selectAll('.node-group').classed('selected', false);
+                d3.selectAll('.node-group').filter(d => d.id === finalEntityId)
+                    .classed('selected', true)
+                    .select('circle')
+                    .attr('stroke', '#E91E63')
+                    .attr('stroke-width', 3);
+            }, 100);
+        }
+
+        // 检查是否全部已采纳
+        const remaining = currentPredictions.filter((p, i) => {
+            const el = document.getElementById(`prediction-item-${i}`);
+            return el && !el.classList.contains('adopted');
+        });
+
+        if (remaining.length === 0) {
+            setTimeout(() => {
+                rejectAllPredictions();
+                showToast('全部预测已采纳', 'success');
+            }, 1500);
         }
     } catch (error) {
         console.error('[预测] 采纳预测失败:', error);

@@ -58,6 +58,13 @@ def create_app():
     from socket_handlers.events import register_handlers
     register_handlers(socketio)
 
+    # 示例数据路由
+    from flask import send_from_directory
+
+    @app.route('/data/<path:filename>')
+    def serve_sample_data(filename):
+        return send_from_directory(os.path.join(os.path.dirname(__file__), 'data'), filename)
+
     logger.info("MemoryWeaver 应用已创建（计算引擎模式）")
     return app
 

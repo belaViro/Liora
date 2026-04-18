@@ -570,9 +570,9 @@ class MemoryWeaverDB {
 
         // 保存关系
         for (const relation of relations) {
-            // 查找源和目标实体（可能是刚创建的）
-            const sourceEntity = await this._findEntityByName(relation.source_name || '', relation.source_type);
-            const targetEntity = await this._findEntityByName(relation.target_name || '', relation.target_type);
+            // 查找源和目标实体（LLM 返回 source/target 为实体 ID）
+            const sourceEntity = await this._findEntityById(relation.source);
+            const targetEntity = await this._findEntityById(relation.target);
 
             if (!sourceEntity || !targetEntity) {
                 console.warn('[DB] Relation entity not found:', relation);
@@ -926,6 +926,13 @@ class MemoryWeaverDB {
         }
 
         return null;
+    }
+
+    /**
+     * 通过 ID 查找实体
+     */
+    async _findEntityById(entityId) {
+        return this._get('entities', entityId);
     }
 
     /**

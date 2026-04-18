@@ -44,8 +44,8 @@ class ClientVectorSearch {
         try {
             // 调用服务器获取向量
             const response = await this.computeApi.embed(text);
-            if (response && response.vector) {
-                const vector = new Float32Array(response.vector);
+            if (response && response.data && response.data.vector) {
+                const vector = new Float32Array(response.data.vector);
 
                 // 调整维度（首次获取时）
                 if (this.dimension === 384 && vector.length !== 384) {
@@ -103,11 +103,11 @@ class ClientVectorSearch {
         try {
             // 获取查询向量
             const response = await this.computeApi.embed(query);
-            if (!response || !response.vector) {
+            if (!response || !response.data || !response.data.vector) {
                 return [];
             }
 
-            const queryVector = new Float32Array(response.vector);
+            const queryVector = new Float32Array(response.data.vector);
             const results = [];
 
             for (const [memoryId, data] of this.vectors) {

@@ -347,6 +347,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     initSocket();
     initGraph();
+    initSidebar();
     loadGraphData();
     loadMemories();
     loadStats();
@@ -1951,7 +1952,28 @@ async function loadGraphData(entityTypes = null, centerEntity = null) {
 
 // 图例折叠状态
 let legendCollapsed = false;
+let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 let legendExpandedSections = { nodes: false, edges: false };
+
+// 侧边栏折叠
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggleBtn = document.querySelector('.sidebar-toggle');
+    sidebarCollapsed = !sidebarCollapsed;
+    sidebar.classList.toggle('collapsed', sidebarCollapsed);
+    toggleBtn.textContent = sidebarCollapsed ? '▶' : '◀';
+    localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
+}
+
+// 初始化侧边栏状态
+function initSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggleBtn = document.querySelector('.sidebar-toggle');
+    if (sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        toggleBtn.textContent = '▶';
+    }
+}
 
 function toggleLegend() {
     const legendEl = document.getElementById('graphLegend');
@@ -2698,6 +2720,20 @@ function showNodeDetail(nodeData) {
 
     content.innerHTML = html;
     panel.classList.add('show');
+    // 移动端显示探索区块
+    const exploreSection = document.getElementById('detailExploreSection');
+    if (exploreSection) {
+        exploreSection.style.display = window.innerWidth <= 768 ? 'block' : 'none';
+    }
+    // 移动端 Persona 按钮显示/隐藏
+    const detailPersonaBtn = document.getElementById('btn-detail-persona');
+    const detailPersonaIndicator = document.getElementById('detailPersonaIndicator');
+    if (detailPersonaBtn) {
+        detailPersonaBtn.style.display = (window.innerWidth <= 768 && nodeData.type === 'PERSON') ? 'block' : 'none';
+    }
+    if (detailPersonaIndicator) {
+        detailPersonaIndicator.style.display = 'none';
+    }
 
     // 更新探索面板
     updateExplorePanel(nodeData);
@@ -3265,7 +3301,19 @@ function switchToPersonaMode() {
     isPersonaMode = true;
     personaNodeName = currentSelectedNode.name;
 
-    // 显示 persona 指示器
+    // 显示面板内的 persona 指示器
+    const detailIndicator = document.getElementById('detailPersonaIndicator');
+    const detailNameSpan = document.getElementById('detailPersonaName');
+    if (detailIndicator) {
+        detailIndicator.style.display = 'block';
+        if (detailNameSpan) detailNameSpan.textContent = personaNodeName;
+    }
+
+    // 隐藏面板内的 persona 按钮
+    const detailPersonaBtn = document.getElementById('btn-detail-persona');
+    if (detailPersonaBtn) detailPersonaBtn.style.display = 'none';
+
+    // 显示原有的 persona 指示器
     const indicator = document.getElementById('personaIndicator');
     const nameSpan = document.getElementById('personaName');
     if (indicator) {
@@ -3273,7 +3321,7 @@ function switchToPersonaMode() {
         if (nameSpan) nameSpan.textContent = personaNodeName;
     }
 
-    // 隐藏 persona 按钮
+    // 隐藏原有的 persona 按钮
     const personaBtn = document.getElementById('btn-persona');
     if (personaBtn) personaBtn.style.display = 'none';
 
@@ -3285,25 +3333,26 @@ function switchToPersonaMode() {
 
 // 退出人物视角模式
 function exitPersonaMode() {
-    const formerPersonaName = personaNodeName;
     isPersonaMode = false;
     personaNodeName = '';
 
-    // 隐藏 persona 指示器
+    // 隐藏面板内的 persona 指示器
+    const detailIndicator = document.getElementById('detailPersonaIndicator');
+    if (detailIndicator) detailIndicator.style.display = 'none';
+
+    // 显示面板内的 persona 按钮
+    const detailPersonaBtn = document.getElementById('btn-detail-persona');
+    if (detailPersonaBtn) detailPersonaBtn.style.display = 'block';
+
+    // 隐藏原有的 persona 指示器
     const indicator = document.getElementById('personaIndicator');
     if (indicator) indicator.style.display = 'none';
 
-    // 如果是 PERSON 节点则重新显示 persona 按钮
-    if (currentSelectedNode && currentSelectedNode.type === 'PERSON') {
-        const personaBtn = document.getElementById('btn-persona');
-        if (personaBtn) personaBtn.style.display = 'inline-block';
-    }
+    // 显示原有的 persona 按钮
+    const personaBtn = document.getElementById('btn-persona');
+    if (personaBtn) personaBtn.style.display = 'none';
 
-    // 清空聊天历史
-    exploreChatHistory = [];
-    renderExploreChat();
-
-    showToast(`🎭 洛忆已退出「${formerPersonaName}」视角`, 'info');
+    showToast('已退出视角模式', 'info');
 }
 
 // 设置探索问题
@@ -3312,6 +3361,59 @@ function setExploreQuestion(question) {
     if (input) {
         input.value = question;
         input.focus();
+    }
+}
+
+// 详情面板探索 - 设置问题
+function setDetailExploreQuestion(question) {
+    const input = document.getElementById('detailExploreInput');
+    if (input) {
+        input.value = question;
+        input.focus();
+        sendDetailExploreQuestion();
+    }
+}
+
+// 详情面板探索 - 发送问题
+async function sendDetailExploreQuestion() {
+    const input = document.getElementById('detailExploreInput');
+    if (!input) return;
+    const question = input.value.trim();
+    if (!question) return;
+    if (!currentSelectedNode) {
+        showToast('请先选择一个节点', 'warning');
+        return;
+    }
+    const chatDiv = document.getElementById('detailExploreChat');
+    if (chatDiv) {
+        chatDiv.innerHTML += `<div style="text-align: right; margin-bottom: 6px;"><span style="background: var(--color-memory-light); padding: 4px 8px; border-radius: 8px; font-size: 12px;">${question}</span></div>`;
+    }
+    input.value = '';
+
+    // 显示加载状态
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'text-align: left; margin-bottom: 6px;';
+    loadingDiv.innerHTML = `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px; display: inline-block;">思考中...</span>`;
+    if (chatDiv) chatDiv.appendChild(loadingDiv);
+
+    try {
+        // 构建基于节点记忆的上下文
+        const memories = currentSelectedNode.memory_ids || [];
+        const graphSummary = { node: currentSelectedNode };
+
+        const result = await computeApi.chat(question, [], memories, graphSummary);
+        if (chatDiv) loadingDiv.remove();
+        if (result.success && result.reply) {
+            if (chatDiv) {
+                chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px;">${result.reply}</span></div>`;
+            }
+        } else {
+            throw new Error(result.error || '未知错误');
+        }
+    } catch (e) {
+        if (chatDiv) {
+            chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #fee; padding: 4px 8px; border-radius: 8px; font-size: 12px; color: #c00;">${e.message}</span></div>`;
+        }
     }
 }
 
@@ -3727,7 +3829,9 @@ function toggleSelfLoopItem(loopId) {
 
 function closeDetailPanel() {
     const panel = document.getElementById('detailPanel');
+    const overlay = document.getElementById('detailPanelOverlay');
     panel.classList.remove('show');
+    if (overlay) overlay.style.display = 'none';
     expandedSelfLoops.clear();  // 重置自环展开状态
     
     // 清空头部操作区
