@@ -97,6 +97,8 @@ def _build_memory_context(memories, max_chars=30000):
     )
 
     for m in sorted_memories:
+        if not isinstance(m, dict):
+            continue
         content = m.get('content', '')
         created = m.get('created_at', '')[:10] if m.get('created_at') else '未知时间'
         emotion = m.get('emotion', {})
@@ -181,6 +183,8 @@ def _analyze_emotions(memories):
     counted = 0
 
     for m in memories:
+        if not isinstance(m, dict):
+            continue
         emotion = m.get('emotion', {})
         if not emotion:
             continue

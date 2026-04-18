@@ -331,6 +331,8 @@ def compute_chat():
         if memories:
             memory_contexts = []
             for m in memories[:5]:  # 限制数量
+                if not isinstance(m, dict):
+                    continue
                 content = m.get('content', '')[:200]
                 understanding = m.get('understanding', {})
                 if isinstance(understanding, str):

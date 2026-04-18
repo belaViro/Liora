@@ -263,7 +263,7 @@ This project is released under the **GNU Affero General Public License v3.0 (AGP
 
 作为网络服务软件，如果你修改并部署了 Liora，你必须向访问该服务的用户提供修改后的完整源代码。
 
-For the full license, see the [LICENSE](LICENSE) file.
+For the full license, see the [LICENSE](LICENSE) file.x
 
 <p align="center">
   <i>“时间会流逝，但织网永存。Remember well. Connect everything.”</i>

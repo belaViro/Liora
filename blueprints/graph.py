@@ -68,6 +68,8 @@ def explore_node():
         if memories:
             memory_lines = []
             for m in memories[:5]:
+                if not isinstance(m, dict):
+                    continue
                 content = m.get('content', '')[:200]
                 understanding = m.get('understanding', {})
                 if isinstance(understanding, str):
@@ -137,6 +139,8 @@ def explore_node():
                 total_chars = 0
                 max_chars = 30000
                 for m in memories:
+                    if not isinstance(m, dict):
+                        continue
                     content = m.get('content', '')
                     created = m.get('created_at', '')[:10] if m.get('created_at') else '未知时间'
                     if content:

@@ -3462,8 +3462,13 @@ async function sendDetailExploreQuestion() {
     if (chatDiv) chatDiv.appendChild(loadingDiv);
 
     try {
-        // 构建基于节点记忆的上下文
-        const memories = currentSelectedNode.memory_ids || [];
+        // 构建基于节点记忆的上下文（将 memory_ids 转换为记忆对象数组）
+        const memoryIds = currentSelectedNode.memory_ids || [];
+        const memories = [];
+        for (const mid of memoryIds.slice(0, 5)) {
+            const mem = await db.getMemory(mid);
+            if (mem) memories.push(mem);
+        }
         const graphSummary = { node: currentSelectedNode };
 
         const result = await computeApi.chat(question, [], memories, graphSummary);
