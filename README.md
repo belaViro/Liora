@@ -13,7 +13,7 @@
   <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge&logo=d3.js" alt="D3.js"></a>
   <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
   <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
-  <a href="#"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge&logo=opensourceinitiative" alt="License"></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=for-the-badge&logo=gnu" alt="License"></a>
 </p>
 
 <p align="center">
@@ -259,10 +259,11 @@ MemoryWeaver/
 
 
 ## License
-This project is released under the **MIT License**.
-You are free to use, modify, and distribute this software, as long as the original copyright notice is retained.
+This project is released under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
-For the full license, see the [LICENSE](sslocal://flow/file_open?url=LICENSE&flow_extra=eyJsaW5rX3R5cGUiOiJjb2RlX2ludGVycHJldGVyIn0=) file.
+作为网络服务软件，如果你修改并部署了 Liora，你必须向访问该服务的用户提供修改后的完整源代码。
+
+For the full license, see the [LICENSE](LICENSE) file.
 
 <p align="center">
   <i>“时间会流逝，但织网永存。Remember well. Connect everything.”</i>
