@@ -7,13 +7,14 @@ let currentTab = 'create';
 let graphData = { nodes: [], edges: [] };
 let simulation = null;
 let socket = null;
-let showEdgeLabels = false;  // MiroFish: 默认隐藏边标签，更简洁
+let showEdgeLabels = localStorage.getItem('lioraShowEdgeLabels') === 'true';  // MiroFish: 默认隐藏边标签，更简洁，支持持久化
 let linkLabelsRef = null;
 let linkLabelBgRef = null;
 let highlightedNodeIds = new Set(); // 搜索时高亮的节点ID
 let expandedSelfLoops = new Set();  // 自环展开状态
 let graphZoom = null;               // D3 zoom 行为引用
 let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set, edgeIds: Set}
+let closeDetailTimeout = null;      // 移动端详情面板关闭动画定时器
 let luoyiChatHistory = [];          // 洛忆聊天历史
 
 // ==================== IndexedDB 服务初始化 ====================
@@ -394,8 +395,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 边标签开关事件
     const edgeLabelsToggle = document.getElementById('showEdgeLabels');
     if (edgeLabelsToggle) {
+        edgeLabelsToggle.checked = showEdgeLabels;
         edgeLabelsToggle.addEventListener('change', function(e) {
             showEdgeLabels = e.target.checked;
+            localStorage.setItem('lioraShowEdgeLabels', showEdgeLabels);
             toggleEdgeLabels(showEdgeLabels);
         });
     }
@@ -431,6 +434,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
     }
+
+    // 移动端详情面板探索输入框回车发送
+    const detailExploreInput = document.getElementById('detailExploreInput');
+    if (detailExploreInput) {
+        detailExploreInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendDetailExploreQuestion();
+            }
+        });
+    }
+
+    // 初始化移动端详情面板手势
+    initDetailPanelGesture();
 });
 
 // Socket.IO 连接
@@ -2594,6 +2611,10 @@ function renderGraph() {
             d3.select(event.target)
                 .attr('stroke', isPathNode ? '#E91E63' : (isHighlighted ? '#FFD700' : '#fff'))
                 .attr('stroke-width', isPathNode ? 5 : (isHighlighted ? 4 : 2.5));
+        })
+        .on('contextmenu', (event, d) => {
+            event.preventDefault();
+            showNodeContextMenu(event, d.rawData);
         });
 
     // 节点标签
@@ -2687,7 +2708,8 @@ function dragended(event, d) {
 // 当前选中的节点数据（用于探索面板）
 let currentSelectedNode = null;
 let currentSelectedEdge = null;
-let exploreChatHistory = []; // 探索面板的聊天历史
+let exploreChatHistory = []; // 桌面端探索面板的聊天历史
+let detailExploreHistory = []; // 移动端详情面板探索的聊天历史
 
 // 人物视角模式
 let isPersonaMode = false;
@@ -2782,13 +2804,43 @@ function showNodeDetail(nodeData) {
     }
 
     content.innerHTML = html;
+
+    // 移动端：清空探索聊天记录和历史
+    if (window.innerWidth <= 768) {
+        const detailExploreChat = document.getElementById('detailExploreChat');
+        if (detailExploreChat) {
+            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此节点</p></div>';
+        }
+        detailExploreHistory = [];
+    }
+
+    // 清除可能存在的关闭动画定时器，防止快速切换时面板被意外关闭
+    if (closeDetailTimeout) {
+        clearTimeout(closeDetailTimeout);
+        closeDetailTimeout = null;
+    }
+
     panel.classList.add('show');
+    panel.style.transform = '';  // 清除可能的关闭动画残留
     const overlay = document.getElementById('detailPanelOverlay');
-    if (overlay) overlay.classList.add('show');
-    // 移动端显示探索区块
-    const exploreSection = document.getElementById('detailExploreSection');
-    if (exploreSection) {
-        exploreSection.style.display = window.innerWidth <= 768 ? 'block' : 'none';
+    if (overlay) {
+        overlay.classList.add('show');
+        overlay.style.opacity = '';
+    }
+
+    // 移动端：初始化 Tab、锁定背景、隐藏 IO 按钮
+    if (window.innerWidth <= 768) {
+        switchDetailTab('info');
+        // 锁定背景图缩放
+        const svg = d3.select('#graph-svg');
+        if (svg && graphZoom) svg.on('.zoom', null);
+        // 隐藏 IO 按钮
+        const ioBtns = document.querySelector('.graph-io-buttons');
+        if (ioBtns) ioBtns.style.display = 'none';
+    } else {
+        // 桌面端隐藏详情面板内的探索区块（桌面端探索在侧边栏）
+        const exploreSection = document.getElementById('detailExploreSection');
+        if (exploreSection) exploreSection.style.display = 'none';
     }
     // 移动端 Persona 按钮显示/隐藏
     const detailPersonaBtn = document.getElementById('btn-detail-persona');
@@ -3390,8 +3442,18 @@ function switchToPersonaMode() {
     const personaBtn = document.getElementById('btn-persona');
     if (personaBtn) personaBtn.style.display = 'none';
 
-    // 自动填充问题
+    // 自动填充问题（桌面端）
     setExploreQuestion(`${personaNodeName}你为什么要这样做？`);
+
+    // 移动端：自动切换到探索 Tab，并填充移动端输入框
+    if (window.innerWidth <= 768) {
+        switchDetailTab('explore');
+        const detailInput = document.getElementById('detailExploreInput');
+        if (detailInput) {
+            detailInput.value = `${personaNodeName}你为什么要这样做？`;
+            detailInput.focus();
+        }
+    }
 
     showToast(`🎭 洛忆已进入「${personaNodeName}」视角`, 'info');
 }
@@ -3416,6 +3478,11 @@ function exitPersonaMode() {
     // 显示原有的 persona 按钮
     const personaBtn = document.getElementById('btn-persona');
     if (personaBtn) personaBtn.style.display = 'none';
+
+    // 移动端：切回详情 Tab
+    if (window.innerWidth <= 768) {
+        switchDetailTab('info');
+    }
 
     showToast('已退出视角模式', 'info');
 }
@@ -3445,45 +3512,68 @@ async function sendDetailExploreQuestion() {
     if (!input) return;
     const question = input.value.trim();
     if (!question) return;
-    if (!currentSelectedNode) {
-        showToast('请先选择一个节点', 'warning');
+    if (!currentSelectedNode && !currentSelectedEdge) {
+        showToast('请先选择一个节点或关系', 'warning');
         return;
     }
     const chatDiv = document.getElementById('detailExploreChat');
     if (chatDiv) {
         chatDiv.innerHTML += `<div style="text-align: right; margin-bottom: 6px;"><span style="background: var(--color-memory-light); padding: 4px 8px; border-radius: 8px; font-size: 12px;">${question}</span></div>`;
+        chatDiv.scrollTop = chatDiv.scrollHeight;
     }
     input.value = '';
+
+    // 记录历史
+    detailExploreHistory.push({ role: 'user', content: question });
 
     // 显示加载状态
     const loadingDiv = document.createElement('div');
     loadingDiv.style.cssText = 'text-align: left; margin-bottom: 6px;';
     loadingDiv.innerHTML = `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px; display: inline-block;">思考中...</span>`;
-    if (chatDiv) chatDiv.appendChild(loadingDiv);
+    if (chatDiv) {
+        chatDiv.appendChild(loadingDiv);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
 
     try {
-        // 构建基于节点记忆的上下文（将 memory_ids 转换为记忆对象数组）
-        const memoryIds = currentSelectedNode.memory_ids || [];
-        const memories = [];
-        for (const mid of memoryIds.slice(0, 5)) {
-            const mem = await db.getMemory(mid);
-            if (mem) memories.push(mem);
-        }
-        const graphSummary = { node: currentSelectedNode };
-
-        const result = await computeApi.chat(question, [], memories, graphSummary);
+        // 统一使用 /api/graph/explore（和桌面端一致），支持节点/关系和 persona 模式
+        const res = await fetch('/api/graph/explore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question: question,
+                context: {
+                    node: currentSelectedNode,
+                    edge: currentSelectedEdge,
+                    memories: [],
+                    graph_summary: {}
+                },
+                history: detailExploreHistory,
+                persona_mode: isPersonaMode,
+                persona_node_name: personaNodeName
+            })
+        });
+        const data = await res.json();
         if (chatDiv) loadingDiv.remove();
-        const reply = result.data?.reply;
-        if (result.success && reply) {
-            if (chatDiv) {
-                chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px;">${reply}</span></div>`;
+
+        if (data.success) {
+            const reply = data.data?.answer || data.data?.response || data.data?.reply || data.response;
+            if (reply) {
+                detailExploreHistory.push({ role: 'assistant', content: reply });
+                if (chatDiv) {
+                    chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px;">${reply}</span></div>`;
+                    chatDiv.scrollTop = chatDiv.scrollHeight;
+                }
+            } else {
+                throw new Error('返回内容为空');
             }
         } else {
-            throw new Error(result.message || result.error || '未知错误');
+            throw new Error(data.message || data.error || '探索失败');
         }
     } catch (e) {
         if (chatDiv) {
             chatDiv.innerHTML += `<div style="text-align: left; margin-bottom: 6px;"><span style="background: #fee; padding: 4px 8px; border-radius: 8px; font-size: 12px; color: #c00;">${e.message}</span></div>`;
+            chatDiv.scrollTop = chatDiv.scrollHeight;
         }
     }
 }
@@ -3673,10 +3763,48 @@ function showEdgeDetail(edgeData) {
     html += renderRelationTimeline(edgeData);
 
     content.innerHTML = html;
+
+    // 移动端：清空探索聊天记录和历史
+    if (window.innerWidth <= 768) {
+        const detailExploreChat = document.getElementById('detailExploreChat');
+        if (detailExploreChat) {
+            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此关系</p></div>';
+        }
+        detailExploreHistory = [];
+    }
+
+    // 清除可能存在的关闭动画定时器
+    if (closeDetailTimeout) {
+        clearTimeout(closeDetailTimeout);
+        closeDetailTimeout = null;
+    }
+
     panel.classList.add('show');
+    panel.style.transform = '';
     const overlay = document.getElementById('detailPanelOverlay');
-    if (overlay) overlay.classList.add('show');
-    
+    if (overlay) {
+        overlay.classList.add('show');
+        overlay.style.opacity = '';
+    }
+
+    // 移动端：初始化 Tab、锁定背景、隐藏 IO 按钮
+    if (window.innerWidth <= 768) {
+        switchDetailTab('info');
+        const svg = d3.select('#graph-svg');
+        if (svg && graphZoom) svg.on('.zoom', null);
+        const ioBtns = document.querySelector('.graph-io-buttons');
+        if (ioBtns) ioBtns.style.display = 'none';
+    } else {
+        const exploreSection = document.getElementById('detailExploreSection');
+        if (exploreSection) exploreSection.style.display = 'none';
+    }
+
+    // 移动端隐藏 Persona 按钮（关系不支持视角模式）
+    const detailPersonaBtn = document.getElementById('btn-detail-persona');
+    if (detailPersonaBtn) detailPersonaBtn.style.display = 'none';
+    const detailPersonaIndicator = document.getElementById('detailPersonaIndicator');
+    if (detailPersonaIndicator) detailPersonaIndicator.style.display = 'none';
+
     // 更新探索面板
     updateExplorePanelForEdge(edgeData);
 }
@@ -3728,9 +3856,47 @@ function renderSelfLoopDetail(edgeData, content, panel) {
     }
 
     content.innerHTML = html;
+
+    // 移动端：清空探索聊天记录和历史
+    if (window.innerWidth <= 768) {
+        const detailExploreChat = document.getElementById('detailExploreChat');
+        if (detailExploreChat) {
+            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此节点</p></div>';
+        }
+        detailExploreHistory = [];
+    }
+
+    // 清除可能存在的关闭动画定时器
+    if (closeDetailTimeout) {
+        clearTimeout(closeDetailTimeout);
+        closeDetailTimeout = null;
+    }
+
     panel.classList.add('show');
+    panel.style.transform = '';
     const overlay = document.getElementById('detailPanelOverlay');
-    if (overlay) overlay.classList.add('show');
+    if (overlay) {
+        overlay.classList.add('show');
+        overlay.style.opacity = '';
+    }
+
+    // 移动端：初始化 Tab、锁定背景、隐藏 IO 按钮
+    if (window.innerWidth <= 768) {
+        switchDetailTab('info');
+        const svg = d3.select('#graph-svg');
+        if (svg && graphZoom) svg.on('.zoom', null);
+        const ioBtns = document.querySelector('.graph-io-buttons');
+        if (ioBtns) ioBtns.style.display = 'none';
+    } else {
+        const exploreSection = document.getElementById('detailExploreSection');
+        if (exploreSection) exploreSection.style.display = 'none';
+    }
+
+    // 移动端隐藏 Persona 按钮（自环不支持视角模式）
+    const detailPersonaBtn = document.getElementById('btn-detail-persona');
+    if (detailPersonaBtn) detailPersonaBtn.style.display = 'none';
+    const detailPersonaIndicator = document.getElementById('detailPersonaIndicator');
+    if (detailPersonaIndicator) detailPersonaIndicator.style.display = 'none';
 }
 
 // 计算关系密度 (0-100)
@@ -3909,26 +4075,44 @@ function toggleSelfLoopItem(loopId) {
 function closeDetailPanel() {
     const panel = document.getElementById('detailPanel');
     const overlay = document.getElementById('detailPanelOverlay');
-    panel.classList.remove('show');
-    if (overlay) overlay.classList.remove('show');
+
+    // 移动端：先播放下滑动画再真正关闭
+    if (window.innerWidth <= 768 && panel) {
+        panel.style.transform = 'translateY(100%)';
+        if (overlay) overlay.style.opacity = '0';
+        if (closeDetailTimeout) clearTimeout(closeDetailTimeout);
+        closeDetailTimeout = setTimeout(() => {
+            closeDetailTimeout = null;
+            panel.classList.remove('show');
+            panel.style.transform = '';
+            if (overlay) {
+                overlay.classList.remove('show');
+                overlay.style.opacity = '';
+            }
+        }, 300);
+    } else {
+        panel.classList.remove('show');
+        if (overlay) overlay.classList.remove('show');
+    }
+
     expandedSelfLoops.clear();  // 重置自环展开状态
-    
+
     // 清空头部操作区
     const headerActions = document.getElementById('detailHeaderActions');
     if (headerActions) headerActions.innerHTML = '';
-    
+
     // 隐藏探索选项卡，切回录入记忆
     const exploreTab = document.getElementById('tab-explore');
     if (exploreTab) {
         exploreTab.style.display = 'none';
     }
-    
+
     // 清空选中状态
     currentSelectedNode = null;
     currentSelectedEdge = null;
     pathTargetNode = null;
     exploreChatHistory = [];
-    
+
     // 隐藏路径侦探器和结果
     const pathFinder = document.getElementById('pathFinder');
     if (pathFinder) pathFinder.style.display = 'none';
@@ -3936,7 +4120,7 @@ function closeDetailPanel() {
     if (pathResult) pathResult.classList.remove('show');
     const storyResult = document.getElementById('storyResult');
     if (storyResult) storyResult.classList.remove('show');
-    
+
     // 清除路径高亮
     highlightedPath = null;
 
@@ -3948,6 +4132,14 @@ function closeDetailPanel() {
     if (personaBtn) personaBtn.style.display = 'none';
     const personaIndicator = document.getElementById('personaIndicator');
     if (personaIndicator) personaIndicator.style.display = 'none';
+
+    // 移动端：恢复背景图缩放和 IO 按钮
+    if (window.innerWidth <= 768) {
+        const svg = d3.select('#graph-svg');
+        if (svg && graphZoom) svg.call(graphZoom);
+        const ioBtns = document.querySelector('.graph-io-buttons');
+        if (ioBtns) ioBtns.style.display = '';
+    }
 
     // 切回录入记忆面板
     switchTab('create');
@@ -4609,4 +4801,189 @@ function hideLuoyiTyping() {
     if (indicator) {
         indicator.remove();
     }
+}
+
+
+// ==================== 移动端专属功能 ====================
+
+/**
+ * 移动端边标签开关
+ */
+function toggleMobileEdgeLabels() {
+    showEdgeLabels = !showEdgeLabels;
+    localStorage.setItem('lioraShowEdgeLabels', showEdgeLabels);
+    toggleEdgeLabels(showEdgeLabels);
+    const btn = document.getElementById('mobileEdgeLabelsBtn');
+    if (btn) btn.classList.toggle('active', showEdgeLabels);
+    showToast(showEdgeLabels ? '已显示边标签' : '已隐藏边标签', 'info');
+}
+
+/**
+ * 初始化移动端边标签按钮状态
+ */
+function initMobileEdgeLabelsBtn() {
+    const btn = document.getElementById('mobileEdgeLabelsBtn');
+    if (btn) btn.classList.toggle('active', showEdgeLabels);
+}
+
+/**
+ * 移动端详情面板 Tab 切换
+ */
+function switchDetailTab(tab, btn) {
+    const content = document.getElementById('detailContent');
+    const exploreSection = document.getElementById('detailExploreSection');
+    const tabs = document.querySelectorAll('.detail-tab');
+
+    tabs.forEach(t => t.classList.remove('active'));
+    if (btn) {
+        btn.classList.add('active');
+    } else if (tabs.length >= 2) {
+        // 未传入按钮时，根据 tab 名称自动激活对应按钮
+        const idx = tab === 'info' ? 0 : 1;
+        tabs[idx].classList.add('active');
+    }
+
+    if (tab === 'info') {
+        if (content) content.style.display = 'block';
+        if (exploreSection) exploreSection.style.display = 'none';
+    } else {
+        if (content) content.style.display = 'none';
+        if (exploreSection) exploreSection.style.display = 'block';
+    }
+
+    hapticFeedback(15);
+}
+
+/**
+ * 初始化移动端详情面板手势（拖拽关闭、键盘适配）
+ */
+function initDetailPanelGesture() {
+    if (window.innerWidth > 768) return;
+
+    const panel = document.getElementById('detailPanel');
+    const header = panel ? panel.querySelector('.detail-panel-header') : null;
+    if (!header || !panel) return;
+
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+
+    header.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+        isDragging = true;
+        panel.style.transition = 'none';
+    }, { passive: true });
+
+    header.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        if (deltaY > 0) {
+            panel.style.transform = `translateY(${deltaY}px)`;
+        }
+    }, { passive: true });
+
+    header.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        panel.style.transition = '';
+        const deltaY = currentY - startY;
+        if (deltaY > 80) {
+            closeDetailPanel();
+        } else {
+            panel.style.transform = '';
+        }
+    });
+
+    // visualViewport 键盘高度适配
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            if (window.innerWidth > 768) return;
+            const vv = window.visualViewport;
+            const panel = document.getElementById('detailPanel');
+            if (panel && panel.classList.contains('show')) {
+                const keyboardHeight = window.innerHeight - vv.height;
+                if (keyboardHeight > 100) {
+                    panel.style.maxHeight = `calc(85vh - ${keyboardHeight}px)`;
+                    // 自动滚动聊天到底部
+                    const chatDiv = document.getElementById('detailExploreChat');
+                    if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
+                } else {
+                    panel.style.maxHeight = '';
+                }
+            }
+        });
+    }
+
+    // 全局点击关闭节点长按菜单
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('nodeContextMenu');
+        if (menu && !menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+
+    // 初始化移动端边标签按钮状态
+    initMobileEdgeLabelsBtn();
+}
+
+/**
+ * 触觉反馈（如果设备支持）
+ */
+function hapticFeedback(ms = 10) {
+    if (navigator.vibrate) {
+        navigator.vibrate(ms);
+    }
+}
+
+/**
+ * 显示节点长按上下文菜单
+ */
+function showNodeContextMenu(event, nodeData) {
+    event.preventDefault();
+    hapticFeedback(20);
+
+    let menu = document.getElementById('nodeContextMenu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'nodeContextMenu';
+        menu.className = 'node-context-menu';
+        document.body.appendChild(menu);
+    }
+
+    menu.innerHTML = `
+        <div class="node-menu-item" onclick="hideNodeContextMenu(); showNodeDetail(window._ctxMenuNodeData); updatePathFinder();">
+            <span>👁</span> 查看详情
+        </div>
+        <div class="node-menu-item" onclick="hideNodeContextMenu(); generateNodeStory(window._ctxMenuNodeData.id);">
+            <span>✨</span> 生成记忆故事
+        </div>
+        <div class="node-menu-item danger" onclick="hideNodeContextMenu(); deleteNode(window._ctxMenuNodeData.id, window._ctxMenuNodeData.name || '未知');">
+            <span>🗑</span> 删除节点
+        </div>
+    `;
+
+    window._ctxMenuNodeData = nodeData;
+    menu.style.display = 'block';
+
+    const x = event.clientX || (event.touches && event.touches[0].clientX) || 0;
+    const y = event.clientY || (event.touches && event.touches[0].clientY) || 0;
+
+    // 防止菜单超出视口
+    const rect = menu.getBoundingClientRect();
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth) left = window.innerWidth - rect.width - 8;
+    if (top + rect.height > window.innerHeight) top = window.innerHeight - rect.height - 8;
+
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+}
+
+/**
+ * 隐藏节点长按上下文菜单
+ */
+function hideNodeContextMenu() {
+    const menu = document.getElementById('nodeContextMenu');
+    if (menu) menu.style.display = 'none';
 }

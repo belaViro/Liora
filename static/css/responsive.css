@@ -170,30 +170,136 @@
         display: none;
     }
 
-    .detail-panel {
-        position: fixed;
-        width: calc(100% - 24px) !important;
-        left: 12px !important;
-        right: 12px !important;
-        top: 70px !important;
-        max-height: calc(100vh - 90px);
-        font-size: 12px;
-        z-index: 55;
+    /* 移动端边标签开关按钮 */
+    .mobile-edge-label-btn {
+        display: inline-block !important;
     }
 
+    .mobile-edge-label-btn.active {
+        background-color: var(--color-memory) !important;
+        color: #fff !important;
+        border-color: var(--color-memory) !important;
+    }
+
+    /* ========== 移动端底部抽屉（Bottom Sheet）========== */
+    .detail-panel {
+        position: fixed;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        max-height: 85vh;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+        font-size: 12px;
+        z-index: 55;
+        /* 通过 transform 控制显隐，覆盖桌面端的 display:none */
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        display: flex;
+        /* iOS 底部安全区适配 + 橡皮筋效果抑制 */
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .detail-panel.show {
+        transform: translateY(0);
+    }
+
+    /* 拖拽手柄 */
+    .drag-handle {
+        display: block;
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 4px;
+        background: #ddd;
+        border-radius: 2px;
+        pointer-events: none;
+    }
+
+    .detail-panel-header {
+        position: relative;
+        padding: 20px 12px 10px;
+        gap: 6px;
+    }
+
+    /* Tab 栏 */
+    .detail-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--color-border);
+        background: #fafafa;
+        flex-shrink: 0;
+    }
+
+    .detail-tab {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        background: none;
+        font-size: 13px;
+        color: #888;
+        cursor: pointer;
+        position: relative;
+        font-family: var(--font-mono);
+        transition: color 0.2s;
+    }
+
+    .detail-tab.active {
+        color: var(--color-memory);
+        font-weight: 600;
+    }
+
+    .detail-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 25%;
+        right: 25%;
+        height: 2px;
+        background: var(--color-memory);
+        border-radius: 1px;
+    }
+
+    /* 遮罩层：毛玻璃效果 */
     .detail-panel-overlay {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.25);
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
         z-index: 50;
         display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
 
     .detail-panel-overlay.show {
         display: block;
+        opacity: 1;
+    }
+
+    /* 内容区滚动 */
+    .detail-content {
+        padding: 12px;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    /* 探索区块在移动端由 Tab 控制，去掉顶部边框和固定高度限制 */
+    .detail-explore-section {
+        border-top: none !important;
+        padding: 12px;
+        max-height: none !important;
+        overflow-y: auto;
+        flex: 1;
     }
 
     .form-group {
@@ -223,10 +329,7 @@
         font-size: 10px;
     }
 
-    .detail-panel-header {
-        padding: 10px 12px;
-        gap: 6px;
-    }
+    /* .detail-panel-header padding 已在上方定义为 20px 12px 10px，此处不再覆盖 */
 
     .detail-header-left {
         flex: 1;
@@ -400,18 +503,19 @@
 
     /* 小屏详情面板进一步优化 */
     .detail-panel {
-        max-height: 70vh;
+        max-height: 80vh;
+        border-radius: 12px 12px 0 0;
     }
 
     .detail-panel-header {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        padding: 18px 10px 8px;
     }
 
     .detail-header-actions {
-        order: 3;
-        width: 100%;
-        justify-content: flex-end;
-        margin-top: 8px;
+        order: 0;
+        width: auto;
+        margin-top: 0;
     }
 
     .btn-header-edit,
@@ -454,6 +558,12 @@
     .form-textarea {
         min-height: 60px;
     }
+
+    /* 横屏时底部抽屉缩小，避免遮挡整个图谱 */
+    .detail-panel {
+        max-height: 55vh;
+        border-radius: 12px 12px 0 0;
+    }
 }
 
 /* 触控优化 */
@@ -474,4 +584,49 @@
         width: 44px;
         height: 44px;
     }
+}
+
+/* ========== 节点长按快捷菜单 ========== */
+.node-context-menu {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid var(--color-border-light);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    min-width: 160px;
+    font-size: 13px;
+    overflow: hidden;
+    animation: menuPop 0.15s ease-out;
+}
+
+@keyframes menuPop {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.node-menu-item {
+    padding: 11px 16px;
+    cursor: pointer;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.node-menu-item:active {
+    background: var(--color-memory-light);
+    color: var(--color-memory);
+}
+
+.node-menu-item.danger {
+    color: #e74c3c;
+}
+
+.node-menu-item.danger:active {
+    background: #fdf2f0;
 }

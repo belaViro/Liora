@@ -6,7 +6,7 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <title>Liora - 个人记忆网络</title>
 
@@ -113,6 +113,7 @@
 
                 <!-- 右下角导入导出按钮 -->
                 <div class="graph-io-buttons">
+                    <button class="control-btn mobile-edge-label-btn" id="mobileEdgeLabelsBtn" onclick="toggleMobileEdgeLabels()" title="显示边标签">标签</button>
                     <button class="control-btn" onclick="exportMemories()" title="导出记忆">导出</button>
                     <button class="control-btn" onclick="document.getElementById('importFile').click()" title="导入记忆">导入</button>
                     <button class="control-btn" onclick="loadSampleData()" title="加载示例数据" style="background:#E8F5E9;">示例</button>
@@ -164,6 +165,7 @@
                 <div class="detail-panel" id="detailPanel">
 
                     <div class="detail-panel-header">
+                        <div class="drag-handle"></div>
 
                         <div class="detail-header-left">
 
@@ -181,6 +183,12 @@
 
                         <button class="detail-close" onclick="closeDetailPanel()">×</button>
 
+                    </div>
+
+                    <!-- 移动端 Tab 切换（桌面端 CSS 隐藏） -->
+                    <div class="detail-tabs" id="detailTabs">
+                        <button class="detail-tab active" onclick="switchDetailTab('info', this)">详情</button>
+                        <button class="detail-tab" onclick="switchDetailTab('explore', this)">探索</button>
                     </div>
 
                     <div class="detail-content" id="detailContent"></div>

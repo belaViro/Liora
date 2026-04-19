@@ -727,6 +727,13 @@ input:checked + .slider:before {
 
 }
 
+/* 桌面端隐藏移动端专属元素 */
+.detail-tabs,
+.drag-handle,
+.mobile-edge-label-btn {
+    display: none;
+}
+
 
 
 .detail-panel-header {
