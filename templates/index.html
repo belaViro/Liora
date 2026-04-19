@@ -13,11 +13,16 @@
     <!-- 预加载关键资源，减少阻塞 -->
     <link rel="preload" href="{{ url_for('static', filename='logo.png') }}" as="image">
     <link rel="preload" href="{{ url_for('static', filename='css/variables.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/base.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/layout.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='js/d3.min.js') }}" as="script">
+    <link rel="preload" href="{{ url_for('static', filename='js/app.js') }}?v=2026041404" as="script">
 
     <!-- Fonts: 数字花园风格（display=swap 避免阻塞渲染） -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+    <!-- 使用国内镜像加速，避免 Google Fonts 被墙导致白屏 -->
+    <link rel="preconnect" href="https://fonts.loli.net">
+    <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
+    <link href="https://fonts.loli.net/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
 
     <!-- 核心库 defer 加载，不阻塞渲染 -->
     <script src="{{ url_for('static', filename='js/socket.io.min.js') }}" defer></script>

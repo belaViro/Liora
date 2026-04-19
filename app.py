@@ -5,7 +5,9 @@ Flask 应用工厂（无状态计算引擎模式）
 """
 
 import os
-from flask import Flask
+import gzip
+from io import BytesIO
+from flask import Flask, request, after_this_request
 from flask_socketio import SocketIO
 from loguru import logger
 from dotenv import load_dotenv
@@ -24,8 +26,14 @@ def create_app():
     # 配置
     from config.settings import SECRET_KEY, UPLOAD_FOLDER
     app.config['SECRET_KEY'] = SECRET_KEY
-    app.config['TEMPLATES_AUTO_RELOAD'] = True
-    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # 禁用静态文件缓存
+    # Flask 2.3+ 已移除 FLASK_ENV，改用 app.debug 判断运行环境
+    is_production = not app.debug
+    app.config['TEMPLATES_AUTO_RELOAD'] = app.debug
+    # 生产环境开启静态文件缓存，开发环境禁用
+    if is_production:
+        app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 86400 * 30  # 30天
+    else:
+        app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # 确保上传目录存在（仅用于临时文件）
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -64,6 +72,35 @@ def create_app():
     @app.route('/data/<path:filename>')
     def serve_sample_data(filename):
         return send_from_directory(os.path.join(os.path.dirname(__file__), 'data'), filename)
+
+    # 生产环境启用 Gzip 压缩（减少 JS/CSS/JSON 传输体积 60%-80%）
+    if is_production:
+        @app.after_request
+        def gzip_response(response):
+            accept_encoding = request.headers.get('Accept-Encoding', '')
+            if 'gzip' not in accept_encoding:
+                return response
+            # 跳过已压缩的内容、小内容、WebSocket 升级请求
+            if response.status_code < 200 or response.status_code >= 300:
+                return response
+            if response.direct_passthrough:
+                return response
+            content_type = response.content_type or ''
+            if not any(ct in content_type for ct in
+                       ['text/', 'application/json', 'application/javascript',
+                        'application/css', 'application/xml']):
+                return response
+            data = response.get_data()
+            if len(data) < 1024:  # 小于1KB不压缩，节省CPU
+                return response
+            gzip_buffer = BytesIO()
+            with gzip.GzipFile(mode='wb', compresslevel=6, fileobj=gzip_buffer) as f:
+                f.write(data)
+            response.set_data(gzip_buffer.getvalue())
+            response.headers['Content-Encoding'] = 'gzip'
+            response.headers['Content-Length'] = len(response.get_data())
+            response.headers.add('Vary', 'Accept-Encoding')
+            return response
 
     logger.info("MemoryWeaver 应用已创建（计算引擎模式）")
     return app

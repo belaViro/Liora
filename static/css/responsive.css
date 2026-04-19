@@ -291,6 +291,9 @@
         padding: 12px;
         flex: 1;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        touch-action: pan-y;
     }
 
     /* 探索区块在移动端由 Tab 控制，去掉顶部边框和固定高度限制 */
@@ -300,6 +303,9 @@
         max-height: none !important;
         overflow-y: auto;
         flex: 1;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        touch-action: pan-y;
     }
 
     .form-group {
@@ -414,8 +420,24 @@
 
     /* 热力图移动端适配 */
     .heatmap-container {
-        grid-template-columns: repeat(14, 1fr);
-        gap: 3px;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .heatmap-row {
+        display: flex;
+        gap: 2px;
+        min-width: max-content;
+    }
+
+    .heatmap-cell {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex-shrink: 0;
     }
 
     /* 洛忆面板边距修复 */

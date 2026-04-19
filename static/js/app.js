@@ -955,10 +955,16 @@ async function submitMemory(event) {
             document.getElementById('fileTypeHint').textContent = '';
             document.getElementById('charCount').textContent = '0 字';
 
-            // 刷新图谱和列表
-            loadGraphData();
-            loadMemories();
-            loadStats();
+            // 乐观更新：立刻把新记忆 prepend 到列表
+            prependMemoryToList(result.memory);
+
+            // 后台并行刷新列表、统计
+            const refreshTasks = [loadMemories(), loadStats()];
+            // 只有新记忆有实体/关系时才重建图谱
+            if (result.memory.entities?.length > 0 || result.memory.relations?.length > 0) {
+                refreshTasks.push(loadGraphData());
+            }
+            Promise.all(refreshTasks).catch(err => console.error('后台刷新失败:', err));
         } else {
             showToast(result.error || '保存失败', 'error');
         }
@@ -1437,6 +1443,65 @@ function getEmotionColor(valence) {
     if (valence > 0.3) return '#27ae60'; // 积极 - 绿
     if (valence < -0.3) return '#e74c3c'; // 消极 - 红
     return '#f39c12'; // 中性 - 黄
+}
+
+/**
+ * 乐观更新：将新记忆 prepend 到记忆列表（不重新渲染整个列表）
+ */
+function prependMemoryToList(memory) {
+    const listEl = document.getElementById('memoryList');
+    if (!listEl) return;
+
+    // 移除"暂无记忆"占位
+    const emptyPlaceholder = listEl.querySelector('.memory-group');
+    if (!emptyPlaceholder && listEl.children.length === 1 && listEl.children[0]?.textContent?.includes('暂无记忆')) {
+        listEl.innerHTML = '';
+    }
+
+    // 查找"今天"分组
+    const groups = listEl.querySelectorAll('.memory-group');
+    let todayGroup = null;
+    for (const group of groups) {
+        const title = group.querySelector('.memory-group-title');
+        if (title && title.textContent === '今天') {
+            todayGroup = group;
+            break;
+        }
+    }
+
+    // 如果没有"今天"分组，创建一个
+    if (!todayGroup) {
+        todayGroup = document.createElement('div');
+        todayGroup.className = 'memory-group';
+        todayGroup.innerHTML = '<div class="memory-group-title">今天</div>';
+        listEl.insertBefore(todayGroup, listEl.firstChild);
+    }
+
+    // 生成新记忆的 HTML
+    const itemHtml = renderMemoryItem(memory);
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = itemHtml;
+    const newItem = tempDiv.firstElementChild;
+
+    // 添加淡入动画
+    newItem.style.opacity = '0';
+    newItem.style.transform = 'translateY(-12px)';
+    newItem.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+
+    // 插入到"今天"分组的标题后面
+    const titleEl = todayGroup.querySelector('.memory-group-title');
+    titleEl.after(newItem);
+
+    // 触发重排后播放动画
+    requestAnimationFrame(() => {
+        newItem.style.opacity = '1';
+        newItem.style.transform = 'translateY(0)';
+    });
+
+    // 同步更新原始记忆数组
+    if (!originalMemories.find(m => m.id === memory.id)) {
+        originalMemories.unshift(memory);
+    }
 }
 
 // 搜索记忆
@@ -2837,6 +2902,9 @@ function showNodeDetail(nodeData) {
         // 隐藏 IO 按钮
         const ioBtns = document.querySelector('.graph-io-buttons');
         if (ioBtns) ioBtns.style.display = 'none';
+        // 锁定页面滚动，防止面板滑动时背景跟着动
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
     } else {
         // 桌面端隐藏详情面板内的探索区块（桌面端探索在侧边栏）
         const exploreSection = document.getElementById('detailExploreSection');
@@ -3794,6 +3862,9 @@ function showEdgeDetail(edgeData) {
         if (svg && graphZoom) svg.on('.zoom', null);
         const ioBtns = document.querySelector('.graph-io-buttons');
         if (ioBtns) ioBtns.style.display = 'none';
+        // 锁定页面滚动，防止面板滑动时背景跟着动
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
     } else {
         const exploreSection = document.getElementById('detailExploreSection');
         if (exploreSection) exploreSection.style.display = 'none';
@@ -3887,6 +3958,9 @@ function renderSelfLoopDetail(edgeData, content, panel) {
         if (svg && graphZoom) svg.on('.zoom', null);
         const ioBtns = document.querySelector('.graph-io-buttons');
         if (ioBtns) ioBtns.style.display = 'none';
+        // 锁定页面滚动，防止面板滑动时背景跟着动
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
     } else {
         const exploreSection = document.getElementById('detailExploreSection');
         if (exploreSection) exploreSection.style.display = 'none';
@@ -4075,6 +4149,10 @@ function toggleSelfLoopItem(loopId) {
 function closeDetailPanel() {
     const panel = document.getElementById('detailPanel');
     const overlay = document.getElementById('detailPanelOverlay');
+
+    // 恢复页面滚动（无论是否移动端都恢复，保险起见）
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
 
     // 移动端：先播放下滑动画再真正关闭
     if (window.innerWidth <= 768 && panel) {
@@ -4876,12 +4954,14 @@ function initDetailPanelGesture() {
 
     header.addEventListener('touchmove', (e) => {
         if (!isDragging) return;
+        // 阻止默认行为，防止拖拽 header 时整个页面滚动
+        e.preventDefault();
         currentY = e.touches[0].clientY;
         const deltaY = currentY - startY;
         if (deltaY > 0) {
             panel.style.transform = `translateY(${deltaY}px)`;
         }
-    }, { passive: true });
+    }, { passive: false });
 
     header.addEventListener('touchend', () => {
         if (!isDragging) return;

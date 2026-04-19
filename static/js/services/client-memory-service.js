@@ -39,6 +39,9 @@ class ClientMemoryService {
                 // 不再依赖服务器存储文件路径，前端自己处理
             }
 
+            // 预读文件为 Blob，可与 LLM 调用并行执行
+            const fileReadPromise = file ? this._readFileAsBlob(file) : Promise.resolve(null);
+
             // 2. 提取时间信息
             const temporalResult = await this.computeApi.extractTemporal(memoryContent, type);
             const temporalInfo = temporalResult.success ? temporalResult.data?.temporal_info : {};
@@ -83,28 +86,37 @@ class ClientMemoryService {
             // 5. 保存到 IndexedDB
             await this.db.saveMemory(memory);
 
+            // 获取预读的文件数据
+            const fileData = await fileReadPromise;
+
+            // 6/7/8. 更新图谱、向量索引、保存文件 —— 并行执行
+            const parallelTasks = [];
+
             // 6. 更新图谱
             if (memory.entities.length > 0 || memory.relations.length > 0) {
-                await this.db.updateGraph(memory);
+                parallelTasks.push(this.db.updateGraph(memory));
             }
 
             // 7. 添加向量索引
             if (this.vectorSearch) {
                 const textForEmbedding = memory.understanding?.description || memoryContent;
                 if (textForEmbedding) {
-                    await this.vectorSearch.addMemory(memoryId, textForEmbedding);
+                    parallelTasks.push(this.vectorSearch.addMemory(memoryId, textForEmbedding));
                 }
             }
 
-            // 8. 保存文件到 IndexedDB
-            if (file) {
-                const fileData = await this._readFileAsBlob(file);
-                await this.db.saveFile(memoryId, fileData, {
+            // 8. 保存文件到 IndexedDB（文件已在前面预读）
+            if (fileData) {
+                parallelTasks.push(this.db.saveFile(memoryId, fileData, {
                     name: file.name,
                     type: type,
                     size: file.size,
                     mime: file.type
-                });
+                }));
+            }
+
+            if (parallelTasks.length > 0) {
+                await Promise.all(parallelTasks);
             }
 
             console.log('[ClientMemoryService] Memory created:', memoryId);

@@ -157,8 +157,27 @@ class LLMService:
             }
     
     def _build_rich_prompt(self, text: str) -> str:
-        """构建丰富的 Prompt"""
+        """构建丰富的 Prompt（按内容长度动态调整抽取数量要求）"""
         truncated = text[:2000] if len(text) > 2000 else text
+        text_len = len(text)
+        
+        # 根据内容长度动态调整实体/关系数量要求，减少短内容的 LLM 输出量
+        if text_len < 100:
+            min_entities, max_entities = 3, 6
+            min_relations, max_relations = 3, 8
+            entity_desc = "抽取核心实体即可"
+        elif text_len < 300:
+            min_entities, max_entities = 5, 10
+            min_relations, max_relations = 5, 12
+            entity_desc = "覆盖主要人物、地点、事件"
+        elif text_len < 500:
+            min_entities, max_entities = 8, 14
+            min_relations, max_relations = 10, 18
+            entity_desc = "覆盖所有提到的人物、地点、事件、情感"
+        else:
+            min_entities, max_entities = 10, 18
+            min_relations, max_relations = 15, 25
+            entity_desc = "深度抽取，不要遗漏任何提到的人、地点、事件、情感"
         
         lines = [
             "你是一个专业的记忆分析和知识图谱抽取专家。请深度分析以下记忆内容。",
@@ -171,11 +190,11 @@ class LLMService:
             "### 1. 理解分析",
             "提取核心内容、关键词、人物、地点、事件、情感等丰富信息。",
             "",
-            "### 2. 实体抽取（至少10-15个）",
-            "必须覆盖所有提到的人物、地点、组织、事件、物品、概念和情感。特别注意：如果文本中包含情感描述（如孤独、喜悦、愧疚、怀念等），必须将情感作为 EMOTION 类型实体抽取，并与相关人物/事件建立关系。",
+            f"### 2. 实体抽取（{min_entities}-{max_entities}个）",
+            f"{entity_desc}。特别注意：如果文本中包含情感描述（如孤独、喜悦、愧疚、怀念等），必须将情感作为 EMOTION 类型实体抽取，并与相关人物/事件建立关系。",
             "每个实体包含：id(英文小写下划线)、name(原名)、type(PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION)、description、attributes(属性字典)、aliases(别名列表)。",
             "",
-            "### 3. 关系抽取（至少15-20条）",
+            f"### 3. 关系抽取（{min_relations}-{max_relations}条）",
             "尽可能丰富地抽取实体间的关系：",
             "- 家族关系、朋友、同事、领导、下属",
             "- 位于、居住于、出生于、工作于",
@@ -210,8 +229,8 @@ class LLMService:
             '}',
             "",
             "## 重要规则",
-            "1. **至少10-15个实体**，不要遗漏任何提到的人、地点、事件",
-            "2. **至少15-20条关系**，每对实体间可以有多种关系",
+            f"1. **{min_entities}-{max_entities}个实体**，不要硬凑数量，根据内容实际信息密度抽取",
+            f"2. **{min_relations}-{max_relations}条关系**，每对实体间可以有多种关系",
             "3. 充分利用文本中的隐含关系进行推断",
             "4. 关系 type 必须使用中文",
             "5. fact 字段用一句话陈述关系事实",

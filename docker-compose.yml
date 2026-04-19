@@ -12,7 +12,8 @@ services:
       - ./static/uploads:/app/static/uploads
     environment:
       # 从宿主机的 .env 文件读取（需要创建 .env.docker）
-      - FLASK_ENV=development
+      # Flask 2.3+ 已移除 FLASK_ENV，改用 FLASK_DEBUG
+      - FLASK_DEBUG=0
       - SECRET_KEY=${SECRET_KEY:-liora-secret-key}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-default}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
