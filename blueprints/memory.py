@@ -119,9 +119,12 @@ def generate_ai_quote():
         memory_content = data.get('content', '')
         days_ago = data.get('days_ago', 365)
         emotion = data.get('emotion', {})
+        language = data.get('language', 'Chinese')
+        answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
 
         if not memory_content:
-            return jsonify({'success': False, 'message': '记忆内容不能为空'})
+            message = 'Memory content cannot be empty' if answer_language == 'English' else '记忆内容不能为空'
+            return jsonify({'success': False, 'message': message})
 
         # 构建提示
         emotion_desc = ""
@@ -152,7 +155,20 @@ def generate_ai_quote():
             tone_instruction = """用户当时心情比较平静。你的回应要温和、像伙伴,像一起慢慢生活的朋友。
 例如:"这种日子挺好的" "看着就觉得安静" "这样的时光最轻松了"""
 
-        prompt = f"""你是洛忆，用户最好的朋友。看到了用户{days_ago}天前的这条记忆：
+        if answer_language == 'English':
+            prompt = f"""You are Luoyi, the user's close friend. You saw this memory from {days_ago} days ago:
+
+{memory_content[:300]}
+
+Return exactly two lines:
+
+Line 1 (SUMMARY): summarize the core facts in one sentence, about 20-35 words. Do not judge; state what happened.
+
+Line 2 (QUOTE): your response as a friend. Keep it natural, direct, and under 25 words.
+Respond in English."""
+            system_content = "You are Luoyi, the user's friend. You speak directly, sincerely, and naturally."
+        else:
+            prompt = f"""你是洛忆，用户最好的朋友。看到了用户{days_ago}天前的这条记忆：
 
 {memory_content[:300]}
 
@@ -163,11 +179,12 @@ def generate_ai_quote():
 
 第二行(QUOTE)：你的回应。不要用大词，不要教育用户，不要超过25字。
 {tone_instruction}"""
+            system_content = "你是洛忆，用户的朋友。你说话直接、真诚，不喜欢用大词。你很会观察细节，总能看到别人看不到的点。"
 
         response = llm_service.client.chat.completions.create(
             model=llm_service.model_name,
             messages=[
-                {"role": "system", "content": "你是洛忆，用户的朋友。你说话直接、真诚，不喜欢用大词。你很会观察细节，总能看到别人看不到的点。"},
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.9,
@@ -177,19 +194,20 @@ def generate_ai_quote():
         result_text = response.choices[0].message.content.strip()
 
         quote = ""
+        parsed_summary = ""
+        lines = [line.strip() for line in result_text.split('\n') if line.strip()]
+        for line in lines:
+            if line.startswith('SUMMARY') or line.startswith('摘要'):
+                parsed_summary = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
+            elif line.startswith('QUOTE') or line.startswith('回应'):
+                quote = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
+
         if summary is None:
-            lines = [line.strip() for line in result_text.split('\n') if line.strip()]
-            for line in lines:
-                if line.startswith('SUMMARY') or line.startswith('摘要'):
-                    summary = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
-                elif line.startswith('QUOTE') or line.startswith('回应'):
-                    quote = line.split('：', 1)[-1].split(':', 1)[-1].strip().strip('"').strip("'")
-            if not quote and result_text:
-                quote = result_text.split('\n')[0].strip().strip('"')
-            if not summary:
-                summary = memory_content[:80] + '...' if len(memory_content) > 80 else memory_content
-        else:
-            quote = result_text.split('\n')[0].strip().strip('"') if result_text else "这个细节我还记得。"
+            summary = parsed_summary or (memory_content[:80] + '...' if len(memory_content) > 80 else memory_content)
+
+        if not quote:
+            fallback_quote = "I still remember this detail." if answer_language == 'English' else "这个细节我还记得。"
+            quote = lines[-1].strip().strip('"') if lines else fallback_quote
 
         return jsonify({
             'success': True,
@@ -205,6 +223,6 @@ def generate_ai_quote():
         return jsonify({
             'success': True,
             'data': {
-                'quote': "时间会淡去伤痛，留下的都是成长的印记。"
+                'quote': "Time softens the pain and leaves the growth behind." if answer_language == 'English' else "时间会淡去伤痛，留下的都是成长的印记。"
             }
         })

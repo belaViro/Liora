@@ -235,7 +235,8 @@ class ClientGraphService {
                 body: JSON.stringify({
                     question,
                     context,
-                    history
+                    history,
+                    language: window.i18n ? window.i18n.currentAiLanguage() : 'Chinese'
                 })
             });
 

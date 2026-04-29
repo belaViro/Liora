@@ -226,6 +226,8 @@ def compute_predict():
         node = data.get('node', {})
         related_nodes = data.get('related_nodes', [])
         max_predictions = data.get('max_predictions', 5)
+        language = data.get('language', 'Chinese')
+        answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
 
         llm_service = current_app.services.llm_service
 
@@ -253,6 +255,7 @@ def compute_predict():
 
         prompt = type_prompts.get(node_type, type_prompts['PERSON'])
 
+        language_instruction = "Use English for name, relation_type, and reasoning when possible." if answer_language == 'English' else "使用中文填写 name、relation_type 和 reasoning。"
         system_prompt = """你是一个关系预测专家。基于已有的实体关系，预测可能的下一个关系节点。
 请返回合法的JSON数组格式:
 {
@@ -266,7 +269,7 @@ def compute_predict():
     }
   ]
 }
-"""
+""" + "\n" + language_instruction
 
         response = llm_service.client.chat.completions.create(
             model=llm_service.model_name,
@@ -321,6 +324,9 @@ def compute_chat():
         history = data.get('history', [])
         memories = data.get('memories', [])
         graph_summary = data.get('graph_summary', {})
+        language = data.get('language', 'Chinese')
+        answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
+        language_instruction = 'Please answer in English.' if answer_language == 'English' else '请用中文回答。'
 
         llm_service = current_app.services.llm_service
 
@@ -360,7 +366,7 @@ def compute_chat():
 当前对话上下文：
 {context}
 
-请基于上下文回复。如果用户问的是记忆相关内容，结合上面的记忆和图谱信息回答。"""}
+请基于上下文回复。如果用户问的是记忆相关内容，结合上面的记忆和图谱信息回答。{language_instruction}"""}
         ]
 
         # 添加历史

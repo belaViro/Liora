@@ -26,9 +26,13 @@ def explore_node():
         chat_history = data.get('history', [])
         persona_mode = data.get('persona_mode', False)
         persona_node_name = data.get('persona_node_name', '')
+        language = data.get('language', 'Chinese')
+        answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
+        language_instruction = 'Please answer in English.' if answer_language == 'English' else '请用中文回答。'
 
         if not question:
-            return jsonify({'success': False, 'error': '问题不能为空'}), 400
+            error = 'Question cannot be empty' if answer_language == 'English' else '问题不能为空'
+            return jsonify({'success': False, 'error': error}), 400
 
         # 从 context 中提取节点/边信息
         node_data = context.get('node', {})
@@ -97,11 +101,11 @@ def explore_node():
 回答风格：
 - 第一人称"我"来叙述
 - 自然、简洁，像在和人聊天，不要啰嗦
-- 用中文回答
+- {language_instruction}
 - 回答尽量简短，100字以内
 """
         else:
-            system_prompt = """你是 Liora 记忆网络的智能助手。Liora 是一个个人记忆管理系统，用户存储的所有内容都是 TA 的记忆。
+            system_prompt = f"""你是 Liora 记忆网络的智能助手。Liora 是一个个人记忆管理系统，用户存储的所有内容都是 TA 的记忆。
 
 当前情境：
 - 用户正在查看自己记忆网络中的一个节点/关系
@@ -117,7 +121,7 @@ def explore_node():
 回答风格：
 - 自然、友好、像在聊天
 - 不要机械地重复"根据节点信息"
-- 用中文回答
+- {language_instruction}
 """
 
         # 构建对话历史
@@ -158,19 +162,19 @@ def explore_node():
 
 用户问题：{question}
 
-请以第一人称「{persona_node_name}」的视角，基于上述记忆内容回答。如果记忆中没有相关信息，请诚实说明。"""
+请以第一人称「{persona_node_name}」的视角，基于上述记忆内容回答。如果记忆中没有相关信息，请诚实说明。{language_instruction}"""
             elif context_str:
                 prompt = f"""你扮演「{persona_node_name}」这个人物。
 
 {context_str}
 
-请基于上述记忆网络中的信息，以第一人称的视角回答。如果信息不足，请诚实说明。"""
+请基于上述记忆网络中的信息，以第一人称的视角回答。如果信息不足，请诚实说明。{language_instruction}"""
             else:
                 prompt = f"""你扮演「{persona_node_name}」这个人物。
 
 用户问题：{question}
 
-请基于你的角色设定回答。"""
+请基于你的角色设定回答。{language_instruction}"""
         else:
             prompt = f"""基于以下节点/关系信息：
 
@@ -178,7 +182,7 @@ def explore_node():
 
 用户问题：{question}
 
-请基于上述信息回答。如果问题与节点无关，请诚实告知。"""
+请基于上述信息回答。如果问题与节点无关，请诚实告知。{language_instruction}"""
 
         messages.append({"role": "user", "content": prompt})
 

@@ -25,9 +25,12 @@ def chat():
         history = data.get('history', [])
         memories = data.get('memories', [])  # 客户端传入的记忆数据
         graph_summary = data.get('graph_summary', {})  # 客户端传入的图谱摘要
+        language = data.get('language', 'Chinese')
+        answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
 
         if not message:
-            return jsonify({'success': False, 'error': '消息不能为空'}), 400
+            error = 'Message cannot be empty' if answer_language == 'English' else '消息不能为空'
+            return jsonify({'success': False, 'error': error}), 400
 
         # 构建记忆上下文
         memory_context, context_used = _build_memory_context(memories)
@@ -42,7 +45,7 @@ def chat():
         emotion_stats = _analyze_emotions(memories)
 
         # 构建系统提示词
-        system_prompt = _build_system_prompt(memory_context, graph_context, context_used, emotion_stats)
+        system_prompt = _build_system_prompt(memory_context, graph_context, context_used, emotion_stats, answer_language)
 
         # 构建消息列表
         messages = [
@@ -68,7 +71,7 @@ def chat():
             reply = response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM 调用失败: {e}")
-            reply = "抱歉,我现在有点累了...稍后再和我聊天吧。"
+            reply = "Sorry, I am a little tired right now. Let's talk later." if answer_language == 'English' else "抱歉,我现在有点累了...稍后再和我聊天吧。"
 
         return jsonify({
             'success': True,
@@ -218,13 +221,28 @@ def _analyze_emotions(memories):
     }
 
 
-def _get_tone_instruction(emotion_stats):
+def _get_tone_instruction(emotion_stats, answer_language="Chinese"):
     """根据情感分布生成语气指导"""
     if emotion_stats["total"] == 0:
         return ""
 
     dominant = emotion_stats["dominant"]
     valence_avg = emotion_stats["valence_avg"]
+
+    if answer_language == "English":
+        if dominant == "positive":
+            return """[Tone] The user's memories lean positive.
+Use a light, warm, slightly playful tone, like an old friend sharing good news."""
+        elif dominant == "negative":
+            return """[Tone] The user's memories lean heavy or low.
+Use a gentle, grounding tone. Listen more than you lecture."""
+        elif dominant == "neutral":
+            if valence_avg > 0:
+                return """[Tone] The user's memories are calm with some warmth.
+Keep the reply natural, peaceful, and friendly."""
+            return """[Tone] The user's memories are calm but somewhat complex.
+Keep the reply steady, concise, and empathetic."""
+        return ""
 
     # 根据主导情感选择语气
     if dominant == "positive":
@@ -249,11 +267,34 @@ def _get_tone_instruction(emotion_stats):
         return ""
 
 
-def _build_system_prompt(memory_context, graph_context, context_used, emotion_stats):
+def _build_system_prompt(memory_context, graph_context, context_used, emotion_stats, answer_language="Chinese"):
     """构建洛忆的系统提示词"""
 
     # 获取语气指导
-    tone_instruction = _get_tone_instruction(emotion_stats)
+    tone_instruction = _get_tone_instruction(emotion_stats, answer_language)
+
+    if answer_language == "English":
+        base_prompt = f"""You are Luoyi, the AI companion in the Liora memory network.
+
+{tone_instruction}
+
+Personality:
+- Warm and companion-like, as if you are the user's old friend
+- You may connect related memories when helpful
+- Adjust tone based on the emotional context
+
+Response rules:
+- Reply in English
+- Keep it natural and under 100 words
+- Avoid robotic phrasing
+- Do not simply repeat what the user said"""
+
+        if context_used == "memories" and memory_context:
+            return base_prompt + f"\n\n{memory_context}"
+        elif context_used == "graph" and graph_context:
+            return base_prompt + f"\n\n{graph_context}\n\n(The user's memory set is large, so this is a graph summary.)"
+        else:
+            return base_prompt + "\n\n(The user has not added any memories yet. You may greet them briefly.)"
 
     base_prompt = f"""你是洛忆，Liora 记忆网络的 AI 伙伴。
 

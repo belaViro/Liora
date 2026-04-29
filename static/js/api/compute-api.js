@@ -133,7 +133,12 @@ class ComputeAPI {
             const response = await fetch(`${this.baseUrl}/predict`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ node, related_nodes: relatedNodes, max_predictions: maxPredictions })
+                body: JSON.stringify({
+                    node,
+                    related_nodes: relatedNodes,
+                    max_predictions: maxPredictions,
+                    language: window.i18n ? window.i18n.currentAiLanguage() : 'Chinese'
+                })
             });
             const data = await response.json();
             return data;
@@ -156,7 +161,13 @@ class ComputeAPI {
             const response = await fetch(`${this.baseUrl}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, history, memories, graph_summary: graphSummary })
+                body: JSON.stringify({
+                    message,
+                    history,
+                    memories,
+                    graph_summary: graphSummary,
+                    language: window.i18n ? window.i18n.currentAiLanguage() : 'Chinese'
+                })
             });
             const data = await response.json();
             return data;
@@ -178,7 +189,12 @@ class ComputeAPI {
             const response = await fetch('/api/memories/ai-quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: memoryContent, days_ago: daysAgo, emotion })
+                body: JSON.stringify({
+                    content: memoryContent,
+                    days_ago: daysAgo,
+                    emotion,
+                    language: window.i18n ? window.i18n.currentAiLanguage() : 'Chinese'
+                })
             });
             const data = await response.json();
             return data;

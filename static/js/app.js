@@ -17,6 +17,32 @@ let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set
 let closeDetailTimeout = null;      // 移动端详情面板关闭动画定时器
 let luoyiChatHistory = [];          // 洛忆聊天历史
 
+function tx(key, params = {}) {
+    return window.i18n ? window.i18n.t(key, params) : key;
+}
+
+function trx(value) {
+    return window.i18n ? window.i18n.tr(value) : value;
+}
+
+function currentLocale() {
+    return window.i18n ? window.i18n.locale() : 'zh-CN';
+}
+
+function currentAiLanguage() {
+    return window.i18n ? window.i18n.currentAiLanguage() : 'Chinese';
+}
+
+function localizeDynamicContent(root = document) {
+    if (window.i18n) {
+        requestAnimationFrame(() => window.i18n.applyI18n(root));
+    }
+}
+
+function getEntityTypeName(type) {
+    return tx(`entityType.${type || 'ENTITY'}`) || type || tx('entityType.ENTITY');
+}
+
 // ==================== IndexedDB 服务初始化 ====================
 // db 在 indexeddb.js 中初始化
 // memoryService, graphService, vectorSearch 在 client-*.js 中声明
@@ -91,17 +117,17 @@ function getEmotionIcon(valence) {
 // 格式化相对时间
 function formatTimeAgo(days) {
     if (days < 30) {
-        return `${days} 天前`;
+        return tx('time.daysAgo', { count: days });
     } else if (days < 365) {
         const months = Math.floor(days / 30);
-        return `${months} 个月前`;
+        return tx('time.monthsAgo', { count: months });
     } else {
         const years = Math.floor(days / 365);
         const remainingMonths = Math.floor((days % 365) / 30);
         if (remainingMonths === 0) {
-            return `${years} 年前`;
+            return tx('time.yearsAgo', { count: years });
         } else {
-            return `${years} 年 ${remainingMonths} 个月前`;
+            return tx('time.yearsMonthsAgo', { years, months: remainingMonths });
         }
     }
 }
@@ -133,9 +159,9 @@ function renderLinkedMemories(memoryIds) {
         
         return `
             <div class="detail-section">
-                <div class="section-title">关联记忆 (${memoryIds.length})</div>
+                <div class="section-title">${tx('memory.linked', { count: memoryIds.length })}</div>
                 <div style="font-size: 12px; color: #999; padding: 10px; text-align: center;">
-                    加载中...
+                    ${tx('memory.loading')}
                 </div>
             </div>
         `;
@@ -147,9 +173,9 @@ function renderLinkedMemories(memoryIds) {
     if (linkedMemories.length === 0) {
         return `
             <div class="detail-section">
-                <div class="section-title">关联记忆 (${memoryIds.length})</div>
+                <div class="section-title">${tx('memory.linked', { count: memoryIds.length })}</div>
                 <div style="font-size: 12px; color: #999; padding: 10px;">
-                    暂无记忆详情
+                    ${tx('memory.noDetail')}
                 </div>
             </div>
         `;
@@ -157,11 +183,11 @@ function renderLinkedMemories(memoryIds) {
     
     return `
         <div class="detail-section">
-            <div class="section-title">关联记忆 (${linkedMemories.length})</div>
+            <div class="section-title">${tx('memory.linked', { count: linkedMemories.length })}</div>
             <div class="linked-memories-list">
                 ${linkedMemories.slice(0, 5).map(m => {
                     const preview = (m.understanding?.description || m.content || '').substring(0, 60);
-                    const date = m.created_at ? new Date(m.created_at).toLocaleDateString('zh-CN', {month: 'short', day: 'numeric'}) : '';
+                    const date = m.created_at ? new Date(m.created_at).toLocaleDateString(currentLocale(), {month: 'short', day: 'numeric'}) : '';
                     const hasEmotion = m.emotion?.label;
                     const emotionIcon = hasEmotion ? getEmotionIcon(m.emotion.valence) : '';
                     return `
@@ -171,7 +197,7 @@ function renderLinkedMemories(memoryIds) {
                         </div>
                     `;
                 }).join('')}
-                ${linkedMemories.length > 5 ? `<div class="linked-memory-more">还有 ${linkedMemories.length - 5} 条记忆...</div>` : ''}
+                ${linkedMemories.length > 5 ? `<div class="linked-memory-more">${tx('memory.moreLinked', { count: linkedMemories.length - 5 })}</div>` : ''}
             </div>
         </div>
     `;
@@ -279,6 +305,105 @@ const defaultEdgeTypeNames = {
     'related': '相关',
 };
 
+const englishEdgeTypeNames = {
+    '家族关系': 'Family',
+    '血缘关系': 'Blood relation',
+    '夫妻关系': 'Spouse',
+    '夫妻': 'Spouse',
+    '朋友': 'Friend',
+    '友谊': 'Friendship',
+    '合作关系': 'Collaboration',
+    '合作': 'Collaboration',
+    '同事': 'Colleague',
+    '工作伙伴': 'Work partner',
+    '领导': 'Leads',
+    '下属': 'Subordinate',
+    '对抗': 'Conflict',
+    '敌对': 'Opposition',
+    '竞争': 'Competition',
+    '救援': 'Rescue',
+    '帮助': 'Help',
+    '位于': 'Located in',
+    '居住于': 'Lives in',
+    '出生于': 'Born in',
+    '工作于': 'Works at',
+    '发生于': 'Happened at',
+    '起因': 'Cause',
+    '导致': 'Caused',
+    '结果': 'Result',
+    '关联': 'Related',
+    '相关': 'Related',
+    '参与': 'Participated',
+    '涉及': 'Involved',
+    '属于': 'Belongs to',
+    '成员': 'Member of',
+    '部分': 'Part of',
+    '包含': 'Contains',
+    '拥有': 'Owns',
+    '创建': 'Created',
+    '创立': 'Founded',
+    '使用': 'Used',
+    '学习': 'Studied',
+    '教授': 'Taught',
+    '影响': 'Influenced',
+    '继承': 'Inherited',
+    'family_of': 'Family',
+    'related_to': 'Family',
+    'spouse_of': 'Spouse',
+    'married_to': 'Spouse',
+    'friend_of': 'Friend',
+    'colleague_with': 'Colleague',
+    'co-worker': 'Colleague',
+    'worked_with': 'Collaboration',
+    'partner_with': 'Partner',
+    'collaborated_with': 'Collaboration',
+    'led': 'Led',
+    'managed': 'Managed',
+    'subordinate_to': 'Subordinate',
+    'opposed': 'Opposed',
+    'enemy_of': 'Enemy',
+    'competed_with': 'Competed',
+    'rival_of': 'Rival',
+    'fought_with': 'Fought',
+    'rescued': 'Rescued',
+    'saved': 'Saved',
+    'helped': 'Helped',
+    'assisted': 'Assisted',
+    'located_in': 'Located in',
+    'lived_in': 'Lived in',
+    'born_in': 'Born in',
+    'works_at': 'Works at',
+    'employed_by': 'Employed by',
+    'happened_at': 'Happened at',
+    'happened_in': 'Happened in',
+    'occurred_at': 'Occurred at',
+    'participated_in': 'Participated in',
+    'involved_in': 'Involved in',
+    'caused': 'Caused',
+    'caused_by': 'Caused by',
+    'led_to': 'Led to',
+    'resulted_in': 'Resulted in',
+    'associated_with': 'Associated with',
+    'connected_to': 'Connected to',
+    'linked_to': 'Linked to',
+    'related': 'Related',
+    'belongs_to': 'Belongs to',
+    'part_of': 'Part of',
+    'member_of': 'Member of',
+    'contains': 'Contains',
+    'owns': 'Owns',
+    'created': 'Created',
+    'founded': 'Founded',
+    'established': 'Established',
+    'used': 'Used',
+    'studied': 'Studied',
+    'studied_at': 'Studied at',
+    'taught': 'Taught',
+    'influenced': 'Influenced',
+    'influenced_by': 'Influenced by',
+    'inherited': 'Inherited'
+};
+
 // 加载关系类型配置
 async function loadRelationTypes() {
     try {
@@ -306,7 +431,10 @@ function addRelationType(key, chineseName) {
 
 // 获取关系类型的中文名称（带fallback）
 function getRelationTypeName(type) {
-    if (!type) return '相关';
+    if (!type) return tx('relationType.fallback');
+    if (currentLocale() === 'en-US' && englishEdgeTypeNames[type]) {
+        return englishEdgeTypeNames[type];
+    }
     // 直接命中映射表
     if (edgeTypeNames[type]) {
         return edgeTypeNames[type];
@@ -332,7 +460,7 @@ function formatDateTime(dateStr) {
     try {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return dateStr;
-        return date.toLocaleString('zh-CN', {
+        return date.toLocaleString(currentLocale(), {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -349,8 +477,8 @@ function formatTemporalInfoForDisplay(temporalInfo) {
     // 暂时显示开发中
     return `
         <div class="detail-row">
-            <span class="detail-label">时间信息:</span>
-            <span style="color: #999; font-style: italic;">开发中...</span>
+            <span class="detail-label">${tx('detail.temporalInfo')}</span>
+            <span style="color: #999; font-style: italic;">${tx('detail.inProgress')}</span>
         </div>
     `;
 }
@@ -450,6 +578,29 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDetailPanelGesture();
 });
 
+document.addEventListener('languagechange', function() {
+    if (currentTab === 'memories') {
+        loadMemories();
+    } else if (currentTab === 'stats') {
+        loadStats();
+    } else if (currentTab === 'timetravel') {
+        loadTimeTravelMemories();
+    }
+
+    if (currentSelectedNode) {
+        showNodeDetail(currentSelectedNode);
+        updateExplorePanel(currentSelectedNode);
+    } else if (currentSelectedEdge) {
+        showEdgeDetail(currentSelectedEdge);
+        updateExplorePanelForEdge(currentSelectedEdge);
+    }
+
+    updateLegend();
+    renderLuoyiMessages();
+    renderExploreChat();
+    localizeDynamicContent();
+});
+
 // Socket.IO 连接
 function initSocket() {
     socket = io({
@@ -519,7 +670,7 @@ function openTimeTravelPanel() {
     switchTab('timetravel', null, true);
     // 显示时光选项卡
     document.querySelectorAll('.tab').forEach(t => {
-        if (t.textContent.includes('录入')) {
+        if ((t.getAttribute('onclick') || '').includes("'create'")) {
             t.classList.remove('active');
         }
     });
@@ -536,7 +687,7 @@ async function showMemoryCard(memoryId, daysDiff) {
     // 填充卡片内容
     const content = memory.understanding?.description || memory.content || '';
     const date = new Date(memory.created_at);
-    const dateStr = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+    const dateStr = date.toLocaleDateString(currentLocale(), { month: 'long', day: 'numeric' });
     
     // 情感图标
     const emotionIcon = memory.emotion ? getEmotionIcon(memory.emotion.valence) : '😐';
@@ -550,7 +701,7 @@ async function showMemoryCard(memoryId, daysDiff) {
     if (content.length <= 80) {
         contentEl.textContent = content;
     } else {
-        contentEl.textContent = "正在生成摘要...";
+        contentEl.textContent = trx("正在生成摘要...");
     }
     
     // 获取AI评价和摘要
@@ -566,7 +717,8 @@ async function showMemoryCard(memoryId, daysDiff) {
             body: JSON.stringify({
                 content: content,
                 days_ago: daysDiff,
-                emotion: memory.emotion
+                emotion: memory.emotion,
+                language: currentAiLanguage()
             })
         });
         
@@ -576,15 +728,15 @@ async function showMemoryCard(memoryId, daysDiff) {
             if (content.length > 80) {
                 contentEl.textContent = result.data.summary || content.substring(0, 80) + '...';
             }
-            aiQuoteEl.textContent = result.data.quote || "这个细节我还记得。";
+            aiQuoteEl.textContent = result.data.quote || trx("这个细节我还记得。");
         } else {
             contentEl.textContent = content.length > 80 ? content.substring(0, 80) + '...' : content;
-            aiQuoteEl.textContent = "这个细节我还记得。";
+            aiQuoteEl.textContent = trx("这个细节我还记得。");
         }
     } catch (error) {
         console.error('获取AI评价失败:', error);
         contentEl.textContent = content.length > 80 ? content.substring(0, 80) + '...' : content;
-        aiQuoteEl.textContent = "挺好的。";
+        aiQuoteEl.textContent = trx("挺好的。");
     }
 }
 
@@ -605,7 +757,7 @@ async function downloadMemoryCard() {
     }
     
     try {
-        showToast('正在生成卡片...', 'info');
+        showToast(tx('toast.cardGenerating'), 'info');
         
         const canvas = await html2canvas(exportCard, {
             scale: 3,
@@ -630,10 +782,10 @@ async function downloadMemoryCard() {
         link.href = canvas.toDataURL('image/png');
         link.click();
         
-        showToast('卡片已保存', 'success');
+        showToast(tx('toast.cardSaved'), 'success');
     } catch (error) {
         console.error('导出卡片失败:', error);
-        showToast('导出失败，请重试', 'error');
+        showToast(tx('toast.cardExportFailed'), 'error');
     }
 }
 
@@ -657,14 +809,14 @@ async function loadTimeTravelMemories() {
     if (!listEl) return;
 
     // 显示加载状态
-    listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载中...</div>';
+    listEl.innerHTML = `<div style="text-align: center; padding: 20px; color: #999;">${tx('memory.loading')}</div>`;
 
     try {
         const result = await memoryService.getOnThisDay();
 
         // 更新日期
         const today = new Date();
-        if (dateEl) dateEl.textContent = today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+        if (dateEl) dateEl.textContent = today.toLocaleDateString(currentLocale(), { month: 'long', day: 'numeric' });
 
         // 合并往年今日和普通记忆
         const memories = [...(result.onThisDay || []), ...(result.other || [])];
@@ -672,7 +824,7 @@ async function loadTimeTravelMemories() {
         if (memories.length === 0) {
             listEl.style.display = 'none';
             if (emptyEl) emptyEl.style.display = 'block';
-            if (quoteEl) quoteEl.textContent = '暂无记忆';
+            if (quoteEl) quoteEl.textContent = tx('memory.noMemories');
         } else {
             listEl.style.display = 'flex';
             if (emptyEl) emptyEl.style.display = 'none';
@@ -692,20 +844,20 @@ async function loadTimeTravelMemories() {
                 } else {
                     // 普通记忆显示具体日期
                     const memDate = new Date(memory.created_at);
-                    timeDisplay = memDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+                    timeDisplay = memDate.toLocaleDateString(currentLocale(), { year: 'numeric', month: 'long', day: 'numeric' });
                 }
 
                 return `
                         <div class="timetravel-item">
                             <div class="timetravel-year">
                                 ${timeDisplay}
-                                <button class="btn-card-share" onclick="event.stopPropagation(); showMemoryCard('${memory.id}', ${item.days_diff || 0})" title="生成精美卡片">
+                                <button class="btn-card-share" onclick="event.stopPropagation(); showMemoryCard('${memory.id}', ${item.days_diff || 0})" title="${trx('生成精美卡片')}">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                         <polyline points="21 15 16 10 5 21"></polyline>
                                     </svg>
-                                    分享卡片
+                                    ${trx('分享卡片')}
                                 </button>
                             </div>
                             <div class="timetravel-content" onclick="viewMemory('${memory.id}')">${content.substring(0, 120)}${content.length > 120 ? '...' : ''}</div>
@@ -718,7 +870,7 @@ async function loadTimeTravelMemories() {
         }
     } catch (error) {
         console.error('加载往年今日记忆失败:', error);
-        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">加载失败</div>';
+        listEl.innerHTML = `<div style="text-align: center; padding: 20px; color: #999;">${tx('memory.loadFailed')}</div>`;
     }
 }
 
@@ -728,7 +880,7 @@ async function loadTimeTravelMemories() {
 function onContentInput(textarea) {
     // 字数统计
     const count = textarea.value.length;
-    document.getElementById('charCount').textContent = count + ' 字';
+    document.getElementById('charCount').textContent = tx('memory.charCount', { count });
     
     // 检测 @ / # 触发
     checkForMentions(textarea);
@@ -858,14 +1010,14 @@ function onFileSelect(event) {
 
     if (file) {
         const type = detectFileType(file);
-        const typeNames = { text: '文字', image: '图片', audio: '音频', video: '视频' };
-        hint.textContent = `（自动识别为${typeNames[type]}）`;
-        preview.textContent = `已选择: ${file.name} (${formatFileSize(file.size)})`;
+        const typeName = tx(`fileType.${type}`);
+        hint.textContent = tx('memory.detectedType', { type: typeName });
+        preview.textContent = tx('memory.selectedFile', { name: file.name, size: formatFileSize(file.size) });
         preview.style.display = 'block';
 
         // 图片或音频文件：预处理提取描述内容
         if (type === 'image' || type === 'audio') {
-            hint.textContent = `（自动识别为${typeNames[type]}，正在提取内容...）`;
+            hint.textContent = tx('memory.extractingType', { type: typeName });
             const formData = new FormData();
             formData.append('file', file);
 
@@ -878,16 +1030,16 @@ function onFileSelect(event) {
                 if (data.success && data.data.content) {
                     contentArea.value = data.data.content;
                     onContentInput(contentArea);
-                    hint.textContent = `（自动识别为${typeNames[type]}，已提取内容）`;
+                    hint.textContent = tx('memory.extractedType', { type: typeName });
                 } else {
-                    hint.textContent = `（自动识别为${typeNames[type]}）`;
-                    showToast('内容提取失败，请手动输入描述', 'warning');
+                    hint.textContent = tx('memory.detectedType', { type: typeName });
+                    showToast(tx('toast.extractionFailed'), 'warning');
                 }
             })
             .catch(err => {
                 console.error('预处理失败:', err);
-                hint.textContent = `（自动识别为${typeNames[type]}）`;
-                showToast('内容提取失败，请手动输入描述', 'warning');
+                hint.textContent = tx('memory.detectedType', { type: typeName });
+                showToast(tx('toast.extractionFailed'), 'warning');
             });
         }
     } else {
@@ -924,7 +1076,7 @@ async function submitMemory(event) {
     const submitBtn = document.getElementById('submitBtn');
 
     if (!content && !fileInput.files[0]) {
-        showToast('请填写内容或上传文件', 'error');
+        showToast(tx('toast.contentRequired'), 'error');
         return;
     }
 
@@ -936,7 +1088,7 @@ async function submitMemory(event) {
 
     // 禁用按钮
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="loading"></span>保存中...';
+    submitBtn.innerHTML = `<span class="loading"></span>${tx('action.saving')}`;
 
     try {
         // 使用客户端服务创建记忆（数据存储在 IndexedDB）
@@ -947,13 +1099,13 @@ async function submitMemory(event) {
         });
 
         if (result.success) {
-            showToast('记忆保存成功！', 'success');
+            showToast(tx('toast.memorySaved'), 'success');
 
             // 清空表单
             document.getElementById('memoryForm').reset();
             document.getElementById('filePreview').style.display = 'none';
             document.getElementById('fileTypeHint').textContent = '';
-            document.getElementById('charCount').textContent = '0 字';
+            document.getElementById('charCount').textContent = tx('memory.charCount', { count: 0 });
 
             // 乐观更新：立刻把新记忆 prepend 到列表
             prependMemoryToList(result.memory);
@@ -966,14 +1118,14 @@ async function submitMemory(event) {
             }
             Promise.all(refreshTasks).catch(err => console.error('后台刷新失败:', err));
         } else {
-            showToast(result.error || '保存失败', 'error');
+            showToast(result.error || tx('toast.saveFailed'), 'error');
         }
     } catch (error) {
         console.error('保存记忆失败:', error);
-        showToast('保存失败，请检查网络', 'error');
+        showToast(tx('toast.saveNetworkFailed'), 'error');
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '保存记忆';
+        submitBtn.textContent = tx('action.save');
     }
 }
 
@@ -1017,11 +1169,11 @@ async function searchMemories() {
             };
             renderSearchResults(compatResult, query);
         } else {
-            showToast(result.error || '搜索失败', 'error');
+            showToast(result.error || tx('toast.searchFailed'), 'error');
         }
     } catch (error) {
         console.error('搜索失败:', error);
-        showToast('搜索失败，请检查网络', 'error');
+        showToast(tx('toast.searchNetworkFailed'), 'error');
     }
 }
 
@@ -1037,10 +1189,10 @@ function renderSearchResults(result, query) {
     if (memories.length === 0 && matchedNodes.length === 0) {
         listEl.innerHTML = `
             <div style="text-align: center; padding: 20px; color: #666;">
-                <div>未找到与 "${query}" 相关的记忆或节点</div>
+                <div>${currentLocale() === 'en-US' ? `No memories or nodes matching "${query}"` : `未找到与 "${query}" 相关的记忆或节点`}</div>
                 <div style="font-size: 11px; margin-top: 8px; color: #999;">
-                    向量搜索: ${searchInfo.vector_enabled ? '✓' : '✗'} | 
-                    关键词搜索: ${searchInfo.keyword_enabled ? '✓' : '✗'}
+                    ${currentLocale() === 'en-US' ? 'Vector search' : '向量搜索'}: ${searchInfo.vector_enabled ? '✓' : '✗'} |
+                    ${currentLocale() === 'en-US' ? 'Keyword search' : '关键词搜索'}: ${searchInfo.keyword_enabled ? '✓' : '✗'}
                 </div>
             </div>
         `;
@@ -1050,19 +1202,19 @@ function renderSearchResults(result, query) {
     // 构建搜索信息提示
     let searchInfoHtml = '';
     if (searchInfo.vector_enabled && searchInfo.keyword_enabled) {
-        searchInfoHtml = `<span style="color: #4a6741;">✓ 向量+关键词混合搜索</span>`;
+        searchInfoHtml = `<span style="color: #4a6741;">✓ ${currentLocale() === 'en-US' ? 'Vector + keyword search' : '向量+关键词混合搜索'}</span>`;
     } else if (searchInfo.vector_enabled) {
-        searchInfoHtml = `<span style="color: #f39c12;">⚠ 仅向量搜索</span>`;
+        searchInfoHtml = `<span style="color: #f39c12;">⚠ ${currentLocale() === 'en-US' ? 'Vector search only' : '仅向量搜索'}</span>`;
     } else if (searchInfo.keyword_enabled) {
-        searchInfoHtml = `<span style="color: #f39c12;">⚠ 仅关键词搜索</span>`;
+        searchInfoHtml = `<span style="color: #f39c12;">⚠ ${currentLocale() === 'en-US' ? 'Keyword search only' : '仅关键词搜索'}</span>`;
     } else {
-        searchInfoHtml = `<span style="color: #e74c3c;">✗ 搜索服务异常</span>`;
+        searchInfoHtml = `<span style="color: #e74c3c;">✗ ${currentLocale() === 'en-US' ? 'Search service error' : '搜索服务异常'}</span>`;
     }
 
     let html = `
         <div style="padding: 10px 12px; background: #f8f8f8; border-radius: 6px; margin-bottom: 12px; font-size: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>找到 ${memories.length} 个记忆${matchedNodes.length > 0 ? '，' + matchedNodes.length + ' 个节点' : ''}</span>
+                <span>${currentLocale() === 'en-US' ? `Found ${memories.length} memories${matchedNodes.length > 0 ? ` and ${matchedNodes.length} nodes` : ''}` : `找到 ${memories.length} 个记忆${matchedNodes.length > 0 ? '，' + matchedNodes.length + ' 个节点' : ''}`}</span>
                 <span>${searchInfoHtml}</span>
             </div>
         </div>
@@ -1075,7 +1227,7 @@ function renderSearchResults(result, query) {
             html += `
                 <div class="memory-item" style="border-left: 3px solid #8b7355; background: #faf8f5;" onclick="focusNodeById('${node.id}')">
                     <div class="memory-item-header">
-                        <span class="memory-type" style="background: transparent; border: 1px solid #8b7355; color: #8b7355;">节点</span>
+                        <span class="memory-type" style="background: transparent; border: 1px solid #8b7355; color: #8b7355;">${tx('detail.node')}</span>
                         <span style="font-weight: 500; color: #4a3c2e;">${node.name}</span>
                         <span style="margin-left: auto; color: #999; font-size: 11px;">${node.type}</span>
                     </div>
@@ -1088,9 +1240,9 @@ function renderSearchResults(result, query) {
 
     html += memories.map((memory, idx) => {
         const typeLabels = {
-            'text': '文字',
-            'image': '图片',
-            'audio': '音频'
+            'text': tx('fileType.text'),
+            'image': tx('fileType.image'),
+            'audio': tx('fileType.audio')
         };
 
         const matchType = matchTypes[idx] || 'unknown';
@@ -1099,19 +1251,19 @@ function renderSearchResults(result, query) {
         // 匹配类型标签
         let matchBadge = '';
         if (matchType === 'vector' || matchType === 'both') {
-            matchBadge += `<span style="background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 4px;">向量</span>`;
+            matchBadge += `<span style="background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 4px;">${currentLocale() === 'en-US' ? 'Vector' : '向量'}</span>`;
         }
         if (matchType === 'keyword' || matchType === 'both') {
-            matchBadge += `<span style="background: #f3e5f5; color: #7b1fa2; padding: 2px 6px; border-radius: 4px; font-size: 10px;">关键词</span>`;
+            matchBadge += `<span style="background: #f3e5f5; color: #7b1fa2; padding: 2px 6px; border-radius: 4px; font-size: 10px;">${currentLocale() === 'en-US' ? 'Keyword' : '关键词'}</span>`;
         }
 
-        const date = new Date(memory.created_at).toLocaleString('zh-CN');
-        const content = memory.understanding?.description || memory.content || '无内容';
+        const date = new Date(memory.created_at).toLocaleString(currentLocale());
+        const content = memory.understanding?.description || memory.content || (currentLocale() === 'en-US' ? 'No content' : '无内容');
         const entities = memory.entities || [];
 
         return `
             <div class="memory-item">
-                <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="删除记忆">×</button>
+                <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="${trx('删除记忆')}">×</button>
                 <div class="memory-item-header" onclick="viewMemory('${memory.id}')">
                     <span class="memory-type">${typeLabels[memory.type] || memory.type}</span>
                     <span class="memory-date">${date}</span>
@@ -1352,7 +1504,7 @@ function renderMemoryList(memories) {
     allMemories = memories; // 保存原始列表
 
     if (memories.length === 0) {
-        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">暂无记忆</div>';
+        listEl.innerHTML = `<div style="text-align: center; padding: 20px; color: #666;">${tx('memory.noMemories')}</div>`;
         return;
     }
 
@@ -1375,11 +1527,11 @@ function groupMemoriesByDate(memories) {
     yesterday.setDate(yesterday.getDate() - 1);
     
     const groups = {
-        'today': { title: '今天', memories: [] },
-        'yesterday': { title: '昨天', memories: [] },
-        'week': { title: '本周', memories: [] },
-        'month': { title: '本月', memories: [] },
-        'earlier': { title: '更早', memories: [] }
+        'today': { key: 'today', title: currentLocale() === 'en-US' ? 'Today' : '今天', memories: [] },
+        'yesterday': { key: 'yesterday', title: currentLocale() === 'en-US' ? 'Yesterday' : '昨天', memories: [] },
+        'week': { key: 'week', title: currentLocale() === 'en-US' ? 'This Week' : '本周', memories: [] },
+        'month': { key: 'month', title: currentLocale() === 'en-US' ? 'This Month' : '本月', memories: [] },
+        'earlier': { key: 'earlier', title: currentLocale() === 'en-US' ? 'Earlier' : '更早', memories: [] }
     };
     
     memories.forEach(memory => {
@@ -1406,14 +1558,14 @@ function groupMemoriesByDate(memories) {
 // 渲染单个记忆项
 function renderMemoryItem(memory) {
     const typeLabels = {
-        'text': '文字',
-        'image': '图片',
-        'audio': '音频'
+        'text': tx('fileType.text'),
+        'image': tx('fileType.image'),
+        'audio': tx('fileType.audio')
     };
 
     const date = new Date(memory.created_at);
-    const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    const content = memory.understanding?.description || memory.content || '无内容';
+    const timeStr = date.toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' });
+    const content = memory.understanding?.description || memory.content || (currentLocale() === 'en-US' ? 'No content' : '无内容');
     const entities = memory.entities || [];
     
     // 情感颜色
@@ -1422,7 +1574,7 @@ function renderMemoryItem(memory) {
 
     return `
         <div class="memory-item">
-            <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="删除记忆">×</button>
+            <button class="memory-delete-btn" onclick="confirmDeleteMemory(event, '${memory.id}')" title="${trx('删除记忆')}">×</button>
             <div class="memory-item-header" onclick="viewMemory('${memory.id}')">
                 <span class="memory-type">${typeLabels[memory.type] || memory.type}</span>
                 <span class="memory-date">${timeStr}</span>
@@ -1454,7 +1606,7 @@ function prependMemoryToList(memory) {
 
     // 移除"暂无记忆"占位
     const emptyPlaceholder = listEl.querySelector('.memory-group');
-    if (!emptyPlaceholder && listEl.children.length === 1 && listEl.children[0]?.textContent?.includes('暂无记忆')) {
+    if (!emptyPlaceholder && listEl.children.length === 1 && [tx('memory.noMemories'), '暂无记忆', 'No memories yet'].includes(listEl.children[0]?.textContent?.trim())) {
         listEl.innerHTML = '';
     }
 
@@ -1463,7 +1615,7 @@ function prependMemoryToList(memory) {
     let todayGroup = null;
     for (const group of groups) {
         const title = group.querySelector('.memory-group-title');
-        if (title && title.textContent === '今天') {
+        if (title && ['今天', 'Today'].includes(title.textContent.trim())) {
             todayGroup = group;
             break;
         }
@@ -1473,7 +1625,7 @@ function prependMemoryToList(memory) {
     if (!todayGroup) {
         todayGroup = document.createElement('div');
         todayGroup.className = 'memory-group';
-        todayGroup.innerHTML = '<div class="memory-group-title">今天</div>';
+        todayGroup.innerHTML = `<div class="memory-group-title">${currentLocale() === 'en-US' ? 'Today' : '今天'}</div>`;
         listEl.insertBefore(todayGroup, listEl.firstChild);
     }
 
@@ -1572,13 +1724,13 @@ function showMemoryModal(memory) {
     const body = document.getElementById('memoryModalBody');
     
     const typeLabels = {
-        'text': '文字',
-        'image': '图片',
-        'audio': '音频'
+        'text': tx('fileType.text'),
+        'image': tx('fileType.image'),
+        'audio': tx('fileType.audio')
     };
     
-    const date = new Date(memory.created_at).toLocaleString('zh-CN');
-    const content = memory.content || '无内容';
+    const date = new Date(memory.created_at).toLocaleString(currentLocale());
+    const content = memory.content || (currentLocale() === 'en-US' ? 'No content' : '无内容');
     const understanding = memory.understanding || {};
     const entities = memory.entities || [];
     const emotion = memory.emotion || {};
@@ -1599,14 +1751,14 @@ function showMemoryModal(memory) {
 
         ${understanding.summary ? `
             <div class="memory-modal-section">
-                <div class="memory-modal-section-title">摘要</div>
+                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? 'Summary' : '摘要'}</div>
                 <div>${understanding.summary}</div>
             </div>
         ` : ''}
 
         ${understanding.keywords?.length ? `
             <div class="memory-modal-section">
-                <div class="memory-modal-section-title">关键词</div>
+                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? 'Keywords' : '关键词'}</div>
                 <div class="memory-modal-entities">
                     ${understanding.keywords.map(k => `<span class="entity-tag">${k}</span>`).join('')}
                 </div>
@@ -1615,7 +1767,7 @@ function showMemoryModal(memory) {
 
         ${entities.length ? `
             <div class="memory-modal-section">
-                <div class="memory-modal-section-title">识别实体 (${entities.length})</div>
+                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? `Entities (${entities.length})` : `识别实体 (${entities.length})`}</div>
                 <div class="memory-modal-entities">
                     ${entities.map(e => `<span class="entity-tag" onclick="jumpToEntity(event, '${e.name}'); closeMemoryModal();">${e.name} (${e.type})</span>`).join('')}
                 </div>
@@ -1624,7 +1776,7 @@ function showMemoryModal(memory) {
 
         ${emotion.dominant_emotion ? `
             <div class="memory-modal-section">
-                <div class="memory-modal-section-title">情感</div>
+                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? 'Emotion' : '情感'}</div>
                 <div class="memory-modal-emotion">
                     <span class="emotion-indicator" style="background: ${emotionColor};"></span>
                     <span>${emotion.dominant_emotion}</span>
@@ -1639,7 +1791,7 @@ function showMemoryModal(memory) {
                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
                     <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
-                生成记忆卡片
+                ${currentLocale() === 'en-US' ? 'Generate Memory Card' : '生成记忆卡片'}
             </button>
         </div>
     `;
@@ -1667,13 +1819,13 @@ function jumpToEntity(event, entityName) {
         highlightedNodeIds.add(node.id);
         updateGraphStyles();
     } else {
-        showToast('未找到该实体', 'warning');
+        showToast(tx('toast.entityNotFound'), 'warning');
     }
 }
 
 function confirmDeleteMemory(event, memoryId) {
     event.stopPropagation();
-    if (confirm('确定删除这条记忆吗？删除后无法恢复。')) {
+    if (confirm(tx('confirm.deleteMemory'))) {
         deleteMemory(memoryId);
     }
 }
@@ -1683,16 +1835,16 @@ async function deleteMemory(memoryId) {
         const result = await memoryService.deleteMemory(memoryId);
 
         if (result.success) {
-            showToast('记忆已删除', 'success');
+            showToast(tx('toast.memoryDeleted'), 'success');
             loadMemories();
             loadGraphData();
             loadStats();
         } else {
-            showToast(result.error || '删除失败', 'error');
+            showToast(result.error || tx('toast.deleteFailed'), 'error');
         }
     } catch (error) {
         console.error('删除记忆失败:', error);
-        showToast('删除失败', 'error');
+        showToast(tx('toast.deleteFailed'), 'error');
     }
 }
 
@@ -1783,7 +1935,7 @@ function renderEntityTypeChart(entityTypes) {
     const total = Object.values(entityTypes).reduce((a, b) => a + b, 0);
     
     if (total === 0) {
-        container.innerHTML = '<div class="chart-placeholder">暂无数据</div>';
+        container.innerHTML = `<div class="chart-placeholder">${currentLocale() === 'en-US' ? 'No data' : '暂无数据'}</div>`;
         return;
     }
 
@@ -1844,7 +1996,7 @@ function renderTopEntities(topEntities) {
     if (!container) return;
 
     if (!topEntities || topEntities.length === 0) {
-        container.innerHTML = '<div class="top-entity-item placeholder">暂无数据</div>';
+        container.innerHTML = `<div class="top-entity-item placeholder">${currentLocale() === 'en-US' ? 'No data' : '暂无数据'}</div>`;
         return;
     }
 
@@ -1928,8 +2080,8 @@ function renderMemoryHeatmap(dailyStats) {
     // 更新头部信息
     const totalEl = document.getElementById('heatmapTotal');
     const streakEl = document.getElementById('heatmapStreak');
-    if (totalEl) totalEl.textContent = `${activeDays} 天有记忆`;
-    if (streakEl) streakEl.textContent = currentStreak > 0 ? `连续记录 ${currentStreak} 天 🔥` : '今天还没记忆哦';
+    if (totalEl) totalEl.textContent = tx('time.activeDays', { count: activeDays });
+    if (streakEl) streakEl.textContent = currentStreak > 0 ? tx('time.streak', { count: currentStreak }) : tx('time.noMemoryToday');
 
     // 计算每天的强度等级 (0-4)
     const counts = Object.values(dailyStats).filter(c => c > 0);
@@ -1970,8 +2122,8 @@ function renderMemoryHeatmap(dailyStats) {
             const dayData = week.find(d => d.dayOfWeek === day);
             if (dayData) {
                 const level = getLevel(dayData.count);
-                const dateStr = new Date(dayData.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-                const title = dayData.count > 0 ? `${dateStr}: ${dayData.count} 条记忆` : dateStr;
+                const dateStr = new Date(dayData.date).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
+                const title = dayData.count > 0 ? `${dateStr}: ${tx('memory.densityCount', { count: dayData.count })}` : dateStr;
                 html += `<div class="heatmap-cell level-${level}" title="${title}"></div>`;
             } else {
                 html += '<div class="heatmap-cell level-0"></div>';
@@ -1993,7 +2145,7 @@ function renderRelationTags(relationTypes) {
         .slice(0, 8); // 只显示前8个
 
     if (sortedRelations.length === 0) {
-        container.innerHTML = '<span class="relation-tag-placeholder">暂无数据</span>';
+        container.innerHTML = `<span class="relation-tag-placeholder">${currentLocale() === 'en-US' ? 'No data' : '暂无数据'}</span>`;
         return;
     }
 
@@ -2631,7 +2783,7 @@ function renderGraph() {
             // Shift+点击设置路径终点
             if (event.shiftKey && currentSelectedNode && currentSelectedNode.id !== d.id) {
                 pathTargetNode = d.rawData;
-                showToast(`已设置终点: ${d.name}，点击"探索关联路径"`, 'info');
+                showToast(tx('toast.pathTargetSet', { name: d.name }), 'info');
                 updatePathFinder();
                 return;
             }
@@ -2787,19 +2939,19 @@ function showNodeDetail(nodeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = '节点详情';
+    title.textContent = tx('detail.nodeTitle');
     badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
     if (headerActions) {
         headerActions.innerHTML = `
-            <button class="btn-header-edit" onclick="enableNodeEdit('${nodeData.id}')" title="修改">
+            <button class="btn-header-edit" onclick="enableNodeEdit('${nodeData.id}')" title="${tx('action.edit')}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
             </button>
-            <button class="btn-header-delete" onclick="deleteNode('${nodeData.id}', '${nodeData.name || '未知'}')" title="删除">
+            <button class="btn-header-delete" onclick="deleteNode('${nodeData.id}', '${nodeData.name || tx('detail.unknown')}')" title="${tx('action.delete')}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -2808,22 +2960,13 @@ function showNodeDetail(nodeData) {
         `;
     }
 
-    const typeNameMap = {
-        'PERSON': '人物',
-        'LOCATION': '地点',
-        'EVENT': '事件',
-        'OBJECT': '物品',
-        'CONCEPT': '概念',
-        'EMOTION': '情感',
-        'ENTITY': '实体'
-    };
-    const typeName = typeNameMap[nodeData.type] || nodeData.type || '实体';
+    const typeName = getEntityTypeName(nodeData.type);
 
     let html = `
         <div class="detail-row">
-            <span class="detail-label">名称:</span>
+            <span class="detail-label">${tx('detail.name')}</span>
             <span class="detail-value">
-                <span style="font-weight: 600; font-size: 16px; margin-right: 8px;">${nodeData.name || '未知'}</span>
+                <span style="font-weight: 600; font-size: 16px; margin-right: 8px;">${nodeData.name || tx('detail.unknown')}</span>
                 <span class="type-badge-inline" style="background: ${colorMap[nodeData.type] || '#999'}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${typeName}</span>
             </span>
         </div>
@@ -2833,7 +2976,7 @@ function showNodeDetail(nodeData) {
     if (nodeData.aliases && nodeData.aliases.length > 0) {
         html += `
             <div class="detail-row">
-                <span class="detail-label">别名:</span>
+                <span class="detail-label">${tx('detail.alias')}</span>
                 <span class="detail-value">${nodeData.aliases.join(', ')}</span>
             </div>
         `;
@@ -2843,7 +2986,7 @@ function showNodeDetail(nodeData) {
     if (nodeData.attributes && Object.keys(nodeData.attributes).length > 0) {
         html += `
             <div class="detail-section">
-                <div class="section-title">属性</div>
+                <div class="section-title">${tx('detail.properties')}</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                     ${Object.entries(nodeData.attributes).map(([key, value]) => `
                         <span style="background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-size: 12px; color: #555;">
@@ -2858,7 +3001,7 @@ function showNodeDetail(nodeData) {
     if (nodeData.description) {
         html += `
             <div class="detail-section">
-                <div class="section-title">描述</div>
+                <div class="section-title">${tx('detail.description')}</div>
                 <div style="line-height: 1.5; color: #444;">${nodeData.description}</div>
             </div>
         `;
@@ -2874,7 +3017,7 @@ function showNodeDetail(nodeData) {
     if (window.innerWidth <= 768) {
         const detailExploreChat = document.getElementById('detailExploreChat');
         if (detailExploreChat) {
-            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此节点</p></div>';
+            detailExploreChat.innerHTML = `<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">${trx('点击快捷按钮或输入问题探索此节点')}</p></div>`;
         }
         detailExploreHistory = [];
     }
@@ -2954,32 +3097,32 @@ function enableNodeEdit(nodeId) {
     let html = `
         <div class="edit-form">
             <div class="form-group">
-                <label>名称</label>
-                <input type="text" id="editNodeName" value="${node.name || ''}" placeholder="实体名称">
+                <label>${currentLocale() === 'en-US' ? 'Name' : '名称'}</label>
+                <input type="text" id="editNodeName" value="${node.name || ''}" placeholder="${currentLocale() === 'en-US' ? 'Entity name' : '实体名称'}">
             </div>
             <div class="form-group">
-                <label>类型</label>
+                <label>${currentLocale() === 'en-US' ? 'Type' : '类型'}</label>
                 <select id="editNodeType">
-                    <option value="PERSON" ${node.type === 'PERSON' ? 'selected' : ''}>人物</option>
-                    <option value="LOCATION" ${node.type === 'LOCATION' ? 'selected' : ''}>地点</option>
-                    <option value="EVENT" ${node.type === 'EVENT' ? 'selected' : ''}>事件</option>
-                    <option value="OBJECT" ${node.type === 'OBJECT' ? 'selected' : ''}>物品</option>
-                    <option value="CONCEPT" ${node.type === 'CONCEPT' ? 'selected' : ''}>概念</option>
-                    <option value="EMOTION" ${node.type === 'EMOTION' ? 'selected' : ''}>情感</option>
-                    <option value="ENTITY" ${node.type === 'ENTITY' ? 'selected' : ''}>其他</option>
+                    <option value="PERSON" ${node.type === 'PERSON' ? 'selected' : ''}>${tx('entityType.PERSON')}</option>
+                    <option value="LOCATION" ${node.type === 'LOCATION' ? 'selected' : ''}>${tx('entityType.LOCATION')}</option>
+                    <option value="EVENT" ${node.type === 'EVENT' ? 'selected' : ''}>${tx('entityType.EVENT')}</option>
+                    <option value="OBJECT" ${node.type === 'OBJECT' ? 'selected' : ''}>${tx('entityType.OBJECT')}</option>
+                    <option value="CONCEPT" ${node.type === 'CONCEPT' ? 'selected' : ''}>${tx('entityType.CONCEPT')}</option>
+                    <option value="EMOTION" ${node.type === 'EMOTION' ? 'selected' : ''}>${tx('entityType.EMOTION')}</option>
+                    <option value="ENTITY" ${node.type === 'ENTITY' ? 'selected' : ''}>${currentLocale() === 'en-US' ? 'Other' : '其他'}</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>描述</label>
-                <textarea id="editNodeDesc" rows="3" placeholder="描述这个实体...">${node.description || ''}</textarea>
+                <label>${currentLocale() === 'en-US' ? 'Description' : '描述'}</label>
+                <textarea id="editNodeDesc" rows="3" placeholder="${currentLocale() === 'en-US' ? 'Describe this entity...' : '描述这个实体...'}">${node.description || ''}</textarea>
             </div>
             <div class="form-group">
-                <label>属性（每行一个，格式：键: 值）</label>
-                <textarea id="editNodeAttrs" rows="3" placeholder="例如：\n职业: 程序员\n城市: 北京">${attrText}</textarea>
+                <label>${currentLocale() === 'en-US' ? 'Properties (one per line, key: value)' : '属性（每行一个，格式：键: 值）'}</label>
+                <textarea id="editNodeAttrs" rows="3" placeholder="${currentLocale() === 'en-US' ? 'Example:\nRole: Engineer\nCity: Beijing' : '例如：\n职业: 程序员\n城市: 北京'}">${attrText}</textarea>
             </div>
             <div class="form-actions">
-                <button class="btn-save" onclick="saveNodeEdit()">保存</button>
-                <button class="btn-cancel" onclick="cancelEdit()">取消</button>
+                <button class="btn-save" onclick="saveNodeEdit()">${currentLocale() === 'en-US' ? 'Save' : '保存'}</button>
+                <button class="btn-cancel" onclick="cancelEdit()">${currentLocale() === 'en-US' ? 'Cancel' : '取消'}</button>
             </div>
         </div>
     `;
@@ -2997,7 +3140,7 @@ async function saveNodeEdit() {
     const attrText = document.getElementById('editNodeAttrs')?.value.trim() || '';
     
     if (!name) {
-        showToast('名称不能为空', 'warning');
+        showToast(tx('toast.nodeNameRequired'), 'warning');
         return;
     }
     
@@ -3018,18 +3161,18 @@ async function saveNodeEdit() {
         const result = await graphService.updateNode(editingNodeId, updates);
 
         if (result.success) {
-            showToast('实体已更新', 'success');
+            showToast(tx('toast.entityUpdated'), 'success');
             // 刷新图谱数据
             await loadGraphData();
             // 重新显示详情
             const node = graphData.nodes.find(n => n.id === editingNodeId);
             if (node) showNodeDetail(node);
         } else {
-            showToast(result.error || '更新失败', 'error');
+            showToast(result.error || tx('toast.updateFailed'), 'error');
         }
     } catch (error) {
         console.error('更新实体失败:', error);
-        showToast('更新失败', 'error');
+        showToast(tx('toast.updateFailed'), 'error');
     }
 
     editingNodeId = null;
@@ -3051,26 +3194,26 @@ function enableEdgeEdit(edgeId, sourceId, targetId) {
     let html = `
         <div class="edit-form">
             <div class="form-group">
-                <label>源节点</label>
-                <input type="text" value="${sourceNode?.name || '未知'}" disabled>
+                <label>${tx('detail.sourceNode')}</label>
+                <input type="text" value="${sourceNode?.name || tx('detail.unknown')}" disabled>
             </div>
             <div class="form-group">
-                <label>目标节点</label>
-                <input type="text" value="${targetNode?.name || '未知'}" disabled>
+                <label>${tx('detail.targetNode')}</label>
+                <input type="text" value="${targetNode?.name || tx('detail.unknown')}" disabled>
             </div>
             <div class="form-group">
-                <label>关系类型</label>
+                <label>${currentLocale() === 'en-US' ? 'Relation Type' : '关系类型'}</label>
                 <select id="editEdgeType">
                     ${relationTypes.map(t => `<option value="${t}" ${edge.type === t ? 'selected' : ''}>${getRelationTypeName(t)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
-                <label>关系陈述（可选）</label>
-                <textarea id="editEdgeFact" rows="3" placeholder="描述这个关系...">${edge.fact || ''}</textarea>
+                <label>${currentLocale() === 'en-US' ? 'Relation statement (optional)' : '关系陈述（可选）'}</label>
+                <textarea id="editEdgeFact" rows="3" placeholder="${currentLocale() === 'en-US' ? 'Describe this relation...' : '描述这个关系...'}">${edge.fact || ''}</textarea>
             </div>
             <div class="form-actions">
-                <button class="btn-save" onclick="saveEdgeEdit()">保存</button>
-                <button class="btn-cancel" onclick="cancelEdit()">取消</button>
+                <button class="btn-save" onclick="saveEdgeEdit()">${currentLocale() === 'en-US' ? 'Save' : '保存'}</button>
+                <button class="btn-cancel" onclick="cancelEdit()">${currentLocale() === 'en-US' ? 'Cancel' : '取消'}</button>
             </div>
         </div>
     `;
@@ -3095,17 +3238,17 @@ async function saveEdgeEdit() {
         const result = await response.json();
         
         if (result.success) {
-            showToast('关系已更新', 'success');
+            showToast(tx('toast.relationUpdated'), 'success');
             // 刷新图谱数据
             await loadGraphData();
             // 关闭详情面板
             closeDetailPanel();
         } else {
-            showToast(result.message || '更新失败', 'error');
+            showToast(result.message || tx('toast.updateFailed'), 'error');
         }
     } catch (error) {
         console.error('更新关系失败:', error);
-        showToast('更新失败', 'error');
+        showToast(tx('toast.updateFailed'), 'error');
     }
     
     editingEdgeId = null;
@@ -3114,11 +3257,11 @@ async function saveEdgeEdit() {
 // 删除边
 async function deleteEdge(edgeId) {
     if (!edgeId) {
-        showToast('无效的关系ID', 'warning');
+        showToast(tx('toast.invalidRelationId'), 'warning');
         return;
     }
     
-    if (!confirm('确定要删除这个关系吗？此操作不可恢复。')) {
+    if (!confirm(tx('confirm.deleteRelation'))) {
         return;
     }
     
@@ -3126,17 +3269,17 @@ async function deleteEdge(edgeId) {
         const result = await graphService.deleteEdge(edgeId);
 
         if (result.success) {
-            showToast('关系已删除', 'success');
+            showToast(tx('toast.relationDeleted'), 'success');
             // 刷新图谱
             await loadGraphData();
             // 关闭详情面板
             closeDetailPanel();
         } else {
-            showToast(result.error || '删除失败', 'error');
+            showToast(result.error || tx('toast.deleteFailed'), 'error');
         }
     } catch (error) {
         console.error('删除关系失败:', error);
-        showToast('删除失败', 'error');
+        showToast(tx('toast.deleteFailed'), 'error');
     }
 }
 
@@ -3159,17 +3302,17 @@ function cancelEdit() {
 // 删除实体节点
 async function deleteNode(nodeId, nodeName) {
     // 确认对话框
-    if (!confirm(`确定要删除实体 "${nodeName}" 吗？\n\n注意：这将同时删除所有与该实体相关的关系。`)) {
+    if (!confirm(tx('confirm.deleteNamedNode', { name: nodeName }))) {
         return;
     }
     
     try {
-        showToast(`正在删除 "${nodeName}"...`, 'info');
+        showToast(tx('toast.deletingNode', { name: nodeName }), 'info');
 
         const result = await graphService.deleteNode(nodeId);
 
         if (result.success) {
-            showToast(`"${nodeName}" 已删除`, 'success');
+            showToast(tx('toast.nodeDeleted', { name: nodeName }), 'success');
             // 关闭详情面板
             closeDetailPanel();
             // 清除当前选中状态
@@ -3177,28 +3320,28 @@ async function deleteNode(nodeId, nodeName) {
             // 刷新图谱数据
             await loadGraphData();
         } else {
-            showToast(result.error || '删除失败', 'error');
+            showToast(result.error || tx('toast.deleteFailed'), 'error');
         }
     } catch (error) {
         console.error('删除实体失败:', error);
-        showToast('删除失败，请重试', 'error');
+        showToast(tx('toast.deleteRetryFailed'), 'error');
     }
 }
 
 // 删除关系边
 async function deleteEdge(edgeId, sourceName, targetName) {
     // 确认对话框
-    if (!confirm(`确定要删除这条关系吗？\n\n${sourceName} → ${targetName}`)) {
+    if (!confirm(tx('confirm.deleteNamedRelation', { source: sourceName, target: targetName }))) {
         return;
     }
     
     try {
-        showToast('正在删除关系...', 'info');
+        showToast(tx('toast.relationDeleting'), 'info');
         
         const result = await graphService.deleteEdge(edgeId);
 
         if (result.success) {
-            showToast('关系已删除', 'success');
+            showToast(tx('toast.relationDeleted'), 'success');
             // 关闭详情面板
             closeDetailPanel();
             // 清除当前选中状态
@@ -3206,11 +3349,11 @@ async function deleteEdge(edgeId, sourceName, targetName) {
             // 刷新图谱数据
             await loadGraphData();
         } else {
-            showToast(result.error || '删除失败', 'error');
+            showToast(result.error || tx('toast.deleteFailed'), 'error');
         }
     } catch (error) {
         console.error('删除关系失败:', error);
-        showToast('删除失败', 'error');
+        showToast(tx('toast.deleteFailed'), 'error');
     }
 }
 
@@ -3221,11 +3364,11 @@ async function deleteAllSelfLoops(nodeName) {
     const loops = currentSelectedEdge.selfLoopEdges || [];
     if (loops.length === 0) return;
     
-    if (!confirm(`确定要删除 ${nodeName} 的全部 ${loops.length} 条自环关系吗？此操作不可恢复。`)) {
+    if (!confirm(tx('confirm.deleteSelfLoops', { name: nodeName, count: loops.length }))) {
         return;
     }
     
-    showToast('正在删除自环关系...', 'info');
+    showToast(currentLocale() === 'en-US' ? 'Deleting self-loop relations...' : '正在删除自环关系...', 'info');
     let successCount = 0;
     let failCount = 0;
     
@@ -3250,13 +3393,13 @@ async function deleteAllSelfLoops(nodeName) {
     }
     
     if (successCount > 0) {
-        showToast(`已删除 ${successCount} 条自环关系`, 'success');
+        showToast(currentLocale() === 'en-US' ? `Deleted ${successCount} self-loop relations` : `已删除 ${successCount} 条自环关系`, 'success');
         await loadGraphData();
         closeDetailPanel();
         currentSelectedEdge = null;
     }
     if (failCount > 0) {
-        showToast(`${failCount} 条自环关系删除失败`, 'error');
+        showToast(currentLocale() === 'en-US' ? `${failCount} self-loop relations failed to delete` : `${failCount} 条自环关系删除失败`, 'error');
     }
 }
 
@@ -3283,7 +3426,7 @@ function findDuplicateNodes(nodeId) {
     });
     
     if (duplicates.length === 0) {
-        showToast('未发现重复实体', 'info');
+        showToast(tx('toast.duplicateNone'), 'info');
         return;
     }
     
@@ -3316,9 +3459,9 @@ function showMergeDialog(keepNode, duplicates) {
     let html = `
         <div class="edit-form">
             <div class="merge-section">
-                <div class="merge-title">⚠️ 发现 ${duplicates.length} 个可能重复的实体</div>
+                <div class="merge-title">⚠️ ${currentLocale() === 'en-US' ? `Found ${duplicates.length} possible duplicate entities` : `发现 ${duplicates.length} 个可能重复的实体`}</div>
                 <div class="merge-desc">
-                    选择要与 "${keepNode.name}" 合并的实体。合并后，选中的实体将被删除，其记忆和关系将转移到 "${keepNode.name}" 。
+                    ${currentLocale() === 'en-US' ? `Choose an entity to merge into "${keepNode.name}". The selected entity will be deleted, and its memories and relations will move to "${keepNode.name}".` : `选择要与 "${keepNode.name}" 合并的实体。合并后，选中的实体将被删除，其记忆和关系将转移到 "${keepNode.name}" 。`}
                 </div>
     `;
     
@@ -3328,9 +3471,9 @@ function showMergeDialog(keepNode, duplicates) {
                 <span class="entity-rank">${idx + 1}</span>
                 <div class="entity-avatar" style="background: ${colorMap[dup.type] || '#999'};">${dup.type === 'PERSON' ? '人' : dup.type === 'LOCATION' ? '地' : dup.type === 'EVENT' ? '事' : dup.type === 'OBJECT' ? '物' : dup.type === 'CONCEPT' ? '念' : dup.type === 'EMOTION' ? '情' : '实'}</div>
                 <span class="entity-name">${dup.name}</span>
-                <span class="entity-count">${dup.memory_ids?.length || 0} 条记忆</span>
+                <span class="entity-count">${tx('memory.densityCount', { count: dup.memory_ids?.length || 0 })}</span>
                 <button class="btn-edit" style="margin-left: auto;" onclick="confirmMergeNodes('${keepNode.id}', '${dup.id}', '${dup.name}')">
-                    合并
+                    ${currentLocale() === 'en-US' ? 'Merge' : '合并'}
                 </button>
             </div>
         `;
@@ -3338,7 +3481,7 @@ function showMergeDialog(keepNode, duplicates) {
     
     html += `
                 <div class="merge-actions" style="margin-top: 16px;">
-                    <button class="btn-cancel" onclick="cancelEdit()" style="flex: 1;">取消</button>
+                    <button class="btn-cancel" onclick="cancelEdit()" style="flex: 1;">${currentLocale() === 'en-US' ? 'Cancel' : '取消'}</button>
                 </div>
             </div>
         </div>
@@ -3349,7 +3492,7 @@ function showMergeDialog(keepNode, duplicates) {
 
 // 确认合并实体
 async function confirmMergeNodes(keepId, removeId, removeName) {
-    if (!confirm(`确定要将 "${removeName}" 合并到当前实体吗？\n\n此操作不可恢复。`)) {
+    if (!confirm(tx('confirm.mergeNode', { name: removeName }))) {
         return;
     }
     
@@ -3357,18 +3500,18 @@ async function confirmMergeNodes(keepId, removeId, removeName) {
         const result = await graphService.mergeNodes(keepId, removeId);
 
         if (result.success) {
-            showToast('已合并', 'success');
+            showToast(tx('toast.merged'), 'success');
             // 刷新图谱
             await loadGraphData();
             // 重新显示保留的节点
             const keepNode = graphData.nodes.find(n => n.id === keepId);
             if (keepNode) showNodeDetail(keepNode);
         } else {
-            showToast(result.error || '合并失败', 'error');
+            showToast(result.error || tx('toast.mergeFailed'), 'error');
         }
     } catch (error) {
         console.error('合并实体失败:', error);
-        showToast('合并失败', 'error');
+        showToast(tx('toast.mergeFailed'), 'error');
     }
 }
 
@@ -3390,20 +3533,20 @@ function updateExplorePanel(nodeData) {
     const memoryCountEl = document.getElementById('exploreNodeMemoryCount');
     const connectionCountEl = document.getElementById('exploreNodeConnectionCount');
     
-    if (nameEl) nameEl.textContent = nodeData.name || '未知';
-    if (typeEl) typeEl.textContent = (nodeData.type || 'ENTITY').toUpperCase();
+    if (nameEl) nameEl.textContent = nodeData.name || tx('detail.unknown');
+    if (typeEl) typeEl.textContent = getEntityTypeName(nodeData.type || 'ENTITY');
     if (avatarEl) {
         // 根据类型设置不同的头像文字
         const typeIcons = {
-            'PERSON': '人',
-            'LOCATION': '地',
-            'EVENT': '事',
-            'OBJECT': '物',
-            'CONCEPT': '念',
-            'EMOTION': '情',
-            'ENTITY': '实'
+            'PERSON': currentLocale() === 'en-US' ? 'P' : '人',
+            'LOCATION': currentLocale() === 'en-US' ? 'L' : '地',
+            'EVENT': currentLocale() === 'en-US' ? 'E' : '事',
+            'OBJECT': currentLocale() === 'en-US' ? 'O' : '物',
+            'CONCEPT': currentLocale() === 'en-US' ? 'C' : '念',
+            'EMOTION': currentLocale() === 'en-US' ? 'M' : '情',
+            'ENTITY': currentLocale() === 'en-US' ? 'N' : '实'
         };
-        avatarEl.textContent = typeIcons[nodeData.type] || '实';
+        avatarEl.textContent = typeIcons[nodeData.type] || (currentLocale() === 'en-US' ? 'N' : '实');
         avatarEl.style.background = colorMap[nodeData.type] || '#999';
     }
     if (memoryCountEl) memoryCountEl.textContent = nodeData.memory_ids?.length || 0;
@@ -3460,7 +3603,7 @@ function renderExploreChat() {
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
                 </div>
-                <p class="empty-text">问关于此节点的任何问题<br>AI 将基于记忆网络回答</p>
+                <p class="empty-text">${currentLocale() === 'en-US' ? 'Ask anything about this node<br>AI will answer from your memory network' : '问关于此节点的任何问题<br>AI 将基于记忆网络回答'}</p>
             </div>
         `;
         return;
@@ -3468,7 +3611,7 @@ function renderExploreChat() {
     
     container.innerHTML = exploreChatHistory.map(msg => `
         <div class="chat-message ${msg.role}">
-            <div class="message-avatar">${msg.role === 'user' ? '我' : 'AI'}</div>
+            <div class="message-avatar">${msg.role === 'user' ? (currentLocale() === 'en-US' ? 'Me' : '我') : 'AI'}</div>
             <div class="message-content">${escapeHtml(msg.content)}</div>
         </div>
     `).join('');
@@ -3480,7 +3623,7 @@ function renderExploreChat() {
 // 切换到人物视角模式
 function switchToPersonaMode() {
     if (!currentSelectedNode || currentSelectedNode.type !== 'PERSON') {
-        showToast('只有人物节点才能使用视角回忆', 'warning');
+        showToast(tx('toast.personaOnlyPerson'), 'warning');
         return;
     }
     isPersonaMode = true;
@@ -3511,19 +3654,22 @@ function switchToPersonaMode() {
     if (personaBtn) personaBtn.style.display = 'none';
 
     // 自动填充问题（桌面端）
-    setExploreQuestion(`${personaNodeName}你为什么要这样做？`);
+    const personaQuestion = currentLocale() === 'en-US'
+        ? `${personaNodeName}, why did you do that?`
+        : `${personaNodeName}你为什么要这样做？`;
+    setExploreQuestion(personaQuestion);
 
     // 移动端：自动切换到探索 Tab，并填充移动端输入框
     if (window.innerWidth <= 768) {
         switchDetailTab('explore');
         const detailInput = document.getElementById('detailExploreInput');
         if (detailInput) {
-            detailInput.value = `${personaNodeName}你为什么要这样做？`;
+            detailInput.value = personaQuestion;
             detailInput.focus();
         }
     }
 
-    showToast(`🎭 洛忆已进入「${personaNodeName}」视角`, 'info');
+    showToast(tx('toast.personaEntered', { name: personaNodeName }), 'info');
 }
 
 // 退出人物视角模式
@@ -3552,7 +3698,7 @@ function exitPersonaMode() {
         switchDetailTab('info');
     }
 
-    showToast('已退出视角模式', 'info');
+    showToast(tx('toast.personaExited'), 'info');
 }
 
 // 设置探索问题
@@ -3581,7 +3727,7 @@ async function sendDetailExploreQuestion() {
     const question = input.value.trim();
     if (!question) return;
     if (!currentSelectedNode && !currentSelectedEdge) {
-        showToast('请先选择一个节点或关系', 'warning');
+        showToast(tx('toast.needNodeOrRelation'), 'warning');
         return;
     }
     const chatDiv = document.getElementById('detailExploreChat');
@@ -3597,7 +3743,7 @@ async function sendDetailExploreQuestion() {
     // 显示加载状态
     const loadingDiv = document.createElement('div');
     loadingDiv.style.cssText = 'text-align: left; margin-bottom: 6px;';
-    loadingDiv.innerHTML = `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px; display: inline-block;">思考中...</span>`;
+    loadingDiv.innerHTML = `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 8px; font-size: 12px; display: inline-block;">${tx('prediction.thinking')}...</span>`;
     if (chatDiv) {
         chatDiv.appendChild(loadingDiv);
         chatDiv.scrollTop = chatDiv.scrollHeight;
@@ -3618,7 +3764,8 @@ async function sendDetailExploreQuestion() {
                 },
                 history: detailExploreHistory,
                 persona_mode: isPersonaMode,
-                persona_node_name: personaNodeName
+                persona_node_name: personaNodeName,
+                language: currentAiLanguage()
             })
         });
         const data = await res.json();
@@ -3633,10 +3780,10 @@ async function sendDetailExploreQuestion() {
                     chatDiv.scrollTop = chatDiv.scrollHeight;
                 }
             } else {
-                throw new Error('返回内容为空');
+                throw new Error(currentLocale() === 'en-US' ? 'Empty response' : '返回内容为空');
             }
         } else {
-            throw new Error(data.message || data.error || '探索失败');
+            throw new Error(data.message || data.error || (currentLocale() === 'en-US' ? 'Explore failed' : '探索失败'));
         }
     } catch (e) {
         if (chatDiv) {
@@ -3654,7 +3801,7 @@ async function sendExploreQuestion() {
     const question = input.value.trim();
     if (!question) return;
     if (!currentSelectedNode && !currentSelectedEdge) {
-        showToast('请先选择一个节点或关系', 'warning');
+        showToast(tx('toast.needNodeOrRelation'), 'warning');
         return;
     }
     
@@ -3672,9 +3819,9 @@ async function sendExploreQuestion() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'chat-message assistant';
     loadingDiv.innerHTML = `
-        <div class="message-avatar">AI</div>
-        <div class="message-content">
-            <div class="typing-indicator">思考中...</div>
+            <div class="message-avatar">AI</div>
+            <div class="message-content">
+            <div class="typing-indicator">${tx('prediction.thinking')}...</div>
         </div>
     `;
     container.appendChild(loadingDiv);
@@ -3697,7 +3844,8 @@ async function sendExploreQuestion() {
                 },
                 history: exploreChatHistory,
                 persona_mode: isPersonaMode,
-                persona_node_name: personaNodeName
+                persona_node_name: personaNodeName,
+                language: currentAiLanguage()
             })
         });
         
@@ -3714,12 +3862,12 @@ async function sendExploreQuestion() {
             });
             renderExploreChat();
         } else {
-            throw new Error(result.error || '未知错误');
+            throw new Error(result.error || (currentLocale() === 'en-US' ? 'Unknown error' : '未知错误'));
         }
         
     } catch (error) {
         loadingDiv.remove();
-        showToast('请求失败: ' + error.message, 'error');
+        showToast(tx('toast.requestFailed', { message: error.message }), 'error');
     }
 }
 
@@ -3737,22 +3885,22 @@ function showEdgeDetail(edgeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
-    title.textContent = '关系详情';
+    title.textContent = tx('detail.edgeTitle');
     badge.style.display = 'none';
 
     // 在头部添加编辑和删除按钮
     const edgeId = edgeData.id || edgeData.uuid || '';
-    const sourceName = edgeData.source_name || '未知';
-    const targetName = edgeData.target_name || '未知';
+    const sourceName = edgeData.source_name || tx('detail.unknown');
+    const targetName = edgeData.target_name || tx('detail.unknown');
     if (headerActions && edgeId) {
         headerActions.innerHTML = `
-            <button class="btn-header-edit" onclick="enableEdgeEdit('${edgeId}', '${edgeData.source}', '${edgeData.target}')" title="修改关系">
+            <button class="btn-header-edit" onclick="enableEdgeEdit('${edgeId}', '${edgeData.source}', '${edgeData.target}')" title="${currentLocale() === 'en-US' ? 'Edit relation' : '修改关系'}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
             </button>
-            <button class="btn-header-delete" onclick="deleteEdge('${edgeId}', '${sourceName}', '${targetName}')" title="删除关系">
+            <button class="btn-header-delete" onclick="deleteEdge('${edgeId}', '${sourceName}', '${targetName}')" title="${currentLocale() === 'en-US' ? 'Delete relation' : '删除关系'}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -3761,12 +3909,12 @@ function showEdgeDetail(edgeData) {
         `;
     } else if (headerActions && edgeData.isSelfLoopGroup) {
         headerActions.innerHTML = `
-            <button class="btn-header-delete" onclick="deleteAllSelfLoops('${escapeHtml(edgeData.source_name || '')}')" title="删除全部自环">
+            <button class="btn-header-delete" onclick="deleteAllSelfLoops('${escapeHtml(edgeData.source_name || '')}')" title="${currentLocale() === 'en-US' ? 'Delete all self-loops' : '删除全部自环'}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-                <span style="margin-left:4px;font-size:11px;">全部删除</span>
+                <span style="margin-left:4px;font-size:11px;">${currentLocale() === 'en-US' ? 'Delete all' : '全部删除'}</span>
             </button>
         `;
     } else if (headerActions) {
@@ -3794,21 +3942,21 @@ function showEdgeDetail(edgeData) {
     html += `
         <div class="edge-relation-header" style="background: linear-gradient(135deg, #f8f8f8 0%, #fff 100%); padding: 16px; border-radius: 8px; border: 2px solid ${emotionColor}20;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-                <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.source_name || '未知'}</span>
+                <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.source_name || tx('detail.unknown')}</span>
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <span style="color: ${edgeColor}; font-size: 18px;">→</span>
                     <span style="font-size: 11px; color: ${edgeColor}; font-weight: 500; white-space: nowrap;">${edgeTypeName}</span>
                 </div>
-                <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.target_name || '未知'}</span>
+                <span style="font-weight: 600; color: #333; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 6px; border: 1px solid #e0e0e0;">${edgeData.target_name || tx('detail.unknown')}</span>
             </div>
             
             <!-- 关系密度条 -->
             <div style="display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid #e0e0e0;">
-                <span style="font-size: 11px; color: #666;">记忆密度:</span>
+                <span style="font-size: 11px; color: #666;">${tx('detail.memoryDensity')}</span>
                 <div style="flex: 1; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
                     <div style="width: ${density}%; height: 100%; background: ${emotionColor}; border-radius: 3px; transition: width 0.3s;"></div>
                 </div>
-                <span style="font-size: 11px; color: ${emotionColor}; font-weight: 600;">${memoryCount} 条记忆</span>
+                <span style="font-size: 11px; color: ${emotionColor}; font-weight: 600;">${tx('memory.densityCount', { count: memoryCount })}</span>
             </div>
         </div>
 
@@ -3819,7 +3967,7 @@ function showEdgeDetail(edgeData) {
     if (edgeData.fact) {
         html += `
             <div class="detail-section">
-                <div class="section-title">关系陈述</div>
+                <div class="section-title">${tx('detail.relationStatement')}</div>
                 <div style="line-height: 1.6; color: #444; font-size: 13px; padding: 10px; background: #f8f9fa; border-left: 3px solid ${emotionColor}; border-radius: 0 6px 6px 0;">
                     ${edgeData.fact}
                 </div>
@@ -3836,7 +3984,7 @@ function showEdgeDetail(edgeData) {
     if (window.innerWidth <= 768) {
         const detailExploreChat = document.getElementById('detailExploreChat');
         if (detailExploreChat) {
-            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此关系</p></div>';
+            detailExploreChat.innerHTML = `<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">${trx('点击快捷按钮或输入问题探索此关系')}</p></div>`;
         }
         detailExploreHistory = [];
     }
@@ -3886,14 +4034,14 @@ function renderSelfLoopDetail(edgeData, content, panel) {
         <div class="edge-relation-header self-loop-header" style="background: linear-gradient(135deg, #fce4ec 0%, #fff 100%); border-left: 3px solid #E91E63;">
             <span style="font-weight: 600; color: #333;">${edgeData.source_name}</span>
             <span style="color: #E91E63; margin: 0 8px;">↻</span>
-            <span style="font-size: 12px; color: #666;">自我反思</span>
-            <span class="self-loop-count" style="background: #E91E63; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">${edgeData.selfLoopCount} 条记忆</span>
+            <span style="font-size: 12px; color: #666;">${currentLocale() === 'en-US' ? 'Self reflection' : '自我反思'}</span>
+            <span class="self-loop-count" style="background: #E91E63; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">${tx('memory.densityCount', { count: edgeData.selfLoopCount })}</span>
         </div>
     `;
 
     // 自环记忆时间轴
     if (edgeData.selfLoopEdges && edgeData.selfLoopEdges.length > 0) {
-        html += `<div class="detail-section"><div class="section-title">记忆时间轴</div><div class="relation-timeline">`;
+        html += `<div class="detail-section"><div class="section-title">${currentLocale() === 'en-US' ? 'Memory Timeline' : '记忆时间轴'}</div><div class="relation-timeline">`;
         
         // 按时间排序
         const sortedLoops = [...edgeData.selfLoopEdges].sort((a, b) => 
@@ -3901,24 +4049,24 @@ function renderSelfLoopDetail(edgeData, content, panel) {
         );
         
         sortedLoops.forEach((loop, idx) => {
-            const date = loop.created_at ? new Date(loop.created_at).toLocaleDateString('zh-CN') : '未知时间';
+            const date = loop.created_at ? new Date(loop.created_at).toLocaleDateString(currentLocale()) : tx('time.unknown');
             const loopId = loop.id || loop.uuid || '';
-            const loopSource = escapeHtml(loop.source_name || edgeData.source_name || '未知');
-            const loopTarget = escapeHtml(loop.target_name || edgeData.target_name || '未知');
+            const loopSource = escapeHtml(loop.source_name || edgeData.source_name || tx('detail.unknown'));
+            const loopTarget = escapeHtml(loop.target_name || edgeData.target_name || tx('detail.unknown'));
             html += `
                 <div class="timeline-item" style="align-items: flex-start;">
                     <div class="timeline-marker" style="background: #E91E63; margin-top: 4px;"></div>
                     <div class="timeline-content" style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div class="timeline-date">${date}</div>
-                            ${loopId ? `<button class="btn-header-delete" onclick="deleteEdge('${loopId}', '${loopSource}', '${loopTarget}')" title="删除此自环" style="padding: 2px 6px; font-size: 11px;">
+                            ${loopId ? `<button class="btn-header-delete" onclick="deleteEdge('${loopId}', '${loopSource}', '${loopTarget}')" title="${currentLocale() === 'en-US' ? 'Delete this self-loop' : '删除此自环'}" style="padding: 2px 6px; font-size: 11px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
                             </button>` : ''}
                         </div>
-                        <div class="timeline-text" style="margin-top: 4px;">${loop.fact || loop.description || getRelationTypeName(loop.type) || '自我反思'}</div>
+                        <div class="timeline-text" style="margin-top: 4px;">${loop.fact || loop.description || getRelationTypeName(loop.type) || (currentLocale() === 'en-US' ? 'Self reflection' : '自我反思')}</div>
                     </div>
                 </div>
             `;
@@ -3932,7 +4080,7 @@ function renderSelfLoopDetail(edgeData, content, panel) {
     if (window.innerWidth <= 768) {
         const detailExploreChat = document.getElementById('detailExploreChat');
         if (detailExploreChat) {
-            detailExploreChat.innerHTML = '<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">点击快捷按钮或输入问题探索此节点</p></div>';
+            detailExploreChat.innerHTML = `<div class="chat-empty" style="padding: 8px;"><p style="font-size: 12px; color: #888;">${trx('点击快捷按钮或输入问题探索此节点')}</p></div>`;
         }
         detailExploreHistory = [];
     }
@@ -4044,12 +4192,12 @@ function renderRelationTimeline(edgeData) {
     
     let html = `
         <div class="detail-section">
-            <div class="section-title">记忆时间轴 (${allEvidence.length})</div>
+            <div class="section-title">${currentLocale() === 'en-US' ? `Memory Timeline (${allEvidence.length})` : `记忆时间轴 (${allEvidence.length})`}</div>
             <div class="relation-timeline">
     `;
     
     allEvidence.forEach((ev, idx) => {
-        const date = ev.timestamp ? new Date(ev.timestamp).toLocaleDateString('zh-CN') : '时间未知';
+        const date = ev.timestamp ? new Date(ev.timestamp).toLocaleDateString(currentLocale()) : tx('time.unknown');
         const emotionColor = ev.valence > 0.3 ? '#27ae60' : ev.valence < -0.3 ? '#e74c3c' : '#999';
         const displayText = ev.content.length > 80 ? ev.content.substring(0, 80) + '...' : ev.content;
         
@@ -4092,9 +4240,9 @@ function updateExplorePanelForEdge(edgeData) {
     if (nameEl) nameEl.textContent = edgeData.isSelfLoopGroup 
         ? edgeData.source_name 
         : `${edgeData.source_name} → ${edgeData.target_name}`;
-    if (typeEl) typeEl.textContent = edgeData.isSelfLoopGroup ? '自环关系' : '关系';
+    if (typeEl) typeEl.textContent = edgeData.isSelfLoopGroup ? tx('detail.selfLoopRelation') : tx('detail.relation');
     if (avatarEl) {
-        avatarEl.textContent = edgeData.isSelfLoopGroup ? '自' : '关';
+        avatarEl.textContent = edgeData.isSelfLoopGroup ? (currentLocale() === 'en-US' ? 'S' : '自') : (currentLocale() === 'en-US' ? 'R' : '关');
         avatarEl.style.background = edgeData.isSelfLoopGroup ? '#E91E63' : '#3498db';
     }
     if (memoryCountEl) memoryCountEl.textContent = edgeData.memory_ids?.length || 0;
@@ -4376,7 +4524,7 @@ function findShortestPath(startId, endId) {
 // 查找关系路径
 async function findRelationPath() {
     if (!currentSelectedNode || !pathTargetNode) {
-        showToast('请先选择两个节点', 'warning');
+        showToast(tx('toast.needTwoNodes'), 'warning');
         return;
     }
     
@@ -4384,16 +4532,16 @@ async function findRelationPath() {
     const btn = document.querySelector('.btn-find-path');
     
     btn.disabled = true;
-    btn.textContent = '探索中...';
+    btn.textContent = tx('action.exploring');
     
     // 查找路径
     const path = findShortestPath(currentSelectedNode.id, pathTargetNode.id);
     
     if (!path) {
-        resultDiv.innerHTML = '<div style="color: #999; text-align: center;">未找到直接关联路径</div>';
+        resultDiv.innerHTML = `<div style="color: #999; text-align: center;">${tx('toast.noDirectPath')}</div>`;
         resultDiv.classList.add('show');
         btn.disabled = false;
-        btn.textContent = '探索关联路径';
+        btn.textContent = tx('action.explorePath');
         return;
     }
     
@@ -4423,7 +4571,7 @@ async function findRelationPath() {
         pathDetails.push({
             from: fromNode?.name || path[i],
             to: toNode?.name || path[i + 1],
-            relation: edge?.name || '关联'
+            relation: edge?.name || tx('relationType.fallback')
         });
     }
     
@@ -4440,15 +4588,16 @@ async function findRelationPath() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                question: `请解读以下关联路径，用侦探推理的方式描述这些节点如何联系在一起：\n${pathDetails.map((p, i) => `${i + 1}. ${p.from} ${p.relation} ${p.to}`).join('\n')}`,
+                question: tx('ai.pathPrompt', { path: pathDetails.map((p, i) => `${i + 1}. ${p.from} ${p.relation} ${p.to}`).join('\n') }),
                 node: currentSelectedNode,
-                history: []
+                history: [],
+                language: currentAiLanguage()
             })
         });
         
         const result = await response.json();
         
-        let html = '<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">🔍 侦探结果</div>';
+        let html = `<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">🔍 ${currentLocale() === 'en-US' ? 'Path Result' : '侦探结果'}</div>`;
         
         // 显示路径步骤
         pathDetails.forEach((step, idx) => {
@@ -4473,12 +4622,12 @@ async function findRelationPath() {
         resultDiv.classList.add('show');
         
     } catch (error) {
-        resultDiv.innerHTML = '<div style="color: #c62828;">探索失败: ' + error.message + '</div>';
+        resultDiv.innerHTML = `<div style="color: #c62828;">${currentLocale() === 'en-US' ? 'Explore failed' : '探索失败'}: ${error.message}</div>`;
         resultDiv.classList.add('show');
     }
     
     btn.disabled = false;
-    btn.textContent = '探索关联路径';
+    btn.textContent = tx('action.explorePath');
 }
 
 // 重置故事生成器状态（同时重置所有实例）
@@ -4495,14 +4644,14 @@ function resetStoryGenerator() {
                 <path d="M12 20h9"></path>
                 <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
             </svg>
-            生成关于此节点的记忆故事
+            ${trx('生成关于此节点的记忆故事')}
         `;
     });
 }
 
 async function generateMemoryStory(event) {
     if (!currentSelectedNode && !currentSelectedEdge) {
-        showToast('请先选择一个节点或关系', 'warning');
+        showToast(tx('toast.needNodeOrRelation'), 'warning');
         return;
     }
     
@@ -4525,7 +4674,7 @@ async function generateMemoryStory(event) {
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
             <circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"></circle>
         </svg>
-        <span class="loading-dots">创作中</span>
+        <span class="loading-dots">${currentLocale() === 'en-US' ? 'Writing' : '创作中'}</span>
     `;
     
     try {
@@ -4533,14 +4682,15 @@ async function generateMemoryStory(event) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                question: `请基于以下信息，创作一段关于"${targetName}"的记忆故事。这是用户记忆网络中的内容，请用第一人称"我"来叙述，像在回忆一段往事。文字要有情感、有画面感，控制在200字左右。`,
+                question: tx('ai.storyPrompt', { target: targetName }),
                 context: {
                     node: currentSelectedNode,
                     edge: currentSelectedEdge,
                     memories: [],
                     graph_summary: {}
                 },
-                history: []
+                history: [],
+                language: currentAiLanguage()
             })
         });
         
@@ -4556,26 +4706,26 @@ async function generateMemoryStory(event) {
             
             const html = `
                 <div class="story-result-header">
-                    <span class="story-result-title">关于「${targetName}」的记忆</span>
+                    <span class="story-result-title">${currentLocale() === 'en-US' ? `Memory about "${targetName}"` : `关于「${targetName}」的记忆`}</span>
                 </div>
                 <div class="story-result-content">
                     ${paragraphs}
                 </div>
                 <div class="story-result-footer">
-                    <span class="story-result-brand">Liora · 记忆网络</span>
+                    <span class="story-result-brand">Liora · ${currentLocale() === 'en-US' ? 'Memory Network' : '记忆网络'}</span>
                 </div>
             `;
             resultDiv.innerHTML = html;
             resultDiv.classList.add('show');
             resultDiv.style.display = 'block';
         } else {
-            throw new Error(result.error || '生成失败');
+            throw new Error(result.error || (currentLocale() === 'en-US' ? 'Generation failed' : '生成失败'));
         }
         
     } catch (error) {
         resultDiv.innerHTML = `
             <div class="story-error">
-                <strong>创作失败</strong><br>
+                <strong>${currentLocale() === 'en-US' ? 'Writing failed' : '创作失败'}</strong><br>
                 ${error.message}
             </div>
         `;
@@ -4589,7 +4739,7 @@ async function generateMemoryStory(event) {
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
         </svg>
-        重新生成记忆故事
+        ${tx('action.regenerateStory')}
     `;
 }
 
@@ -4603,7 +4753,7 @@ function setupPathFinder(nodeData) {
     // 如果按住 Shift 键，设为终点
     if (window.event && window.event.shiftKey) {
         pathTargetNode = nodeData;
-        showToast(`已设置终点: ${nodeData.name}，点击"探索关联路径"`, 'info');
+        showToast(tx('toast.pathTargetSet', { name: nodeData.name }), 'info');
         updatePathFinder();
     } else {
         // 清空之前的终点
@@ -4615,7 +4765,7 @@ function setupPathFinder(nodeData) {
 // ==================== 导入导出 ====================
 
 async function exportMemories() {
-    showToast('正在导出记忆...', 'info');
+    showToast(tx('toast.exportStarting'), 'info');
     try {
         const memories = await db.getAllMemories();
         const entities = await db.getAllEntities();
@@ -4638,10 +4788,10 @@ async function exportMemories() {
         a.click();
         URL.revokeObjectURL(url);
 
-        showToast(`已导出 ${memories.length} 条记忆`, 'success');
+        showToast(tx('toast.exported', { count: memories.length }), 'success');
     } catch (error) {
         console.error('导出失败:', error);
-        showToast('导出失败', 'error');
+        showToast(tx('toast.exportFailed'), 'error');
     }
 }
 
@@ -4649,14 +4799,14 @@ async function importMemories(input) {
     const file = input.files[0];
     if (!file) return;
 
-    showToast('正在导入记忆...', 'info');
+    showToast(tx('toast.importStarting'), 'info');
 
     try {
         const text = await file.text();
 
         // 验证是否为有效 JSON
         if (!text || text.trim().startsWith('PK')) {
-            showToast('文件格式错误：不是有效的 .loyi 文件', 'error');
+            showToast(tx('toast.importInvalidFile'), 'error');
             return;
         }
 
@@ -4664,12 +4814,12 @@ async function importMemories(input) {
         try {
             data = JSON.parse(text);
         } catch (e) {
-            showToast('文件格式错误：无法解析 JSON', 'error');
+            showToast(tx('toast.importJsonFailed'), 'error');
             return;
         }
 
         if (!data.memories && !data.entities && !data.relations) {
-            showToast('文件格式错误：不是有效的记忆文件', 'error');
+            showToast(tx('toast.importInvalidMemoryFile'), 'error');
             return;
         }
 
@@ -4692,12 +4842,12 @@ async function importMemories(input) {
             await db.saveRelation(relation);
         }
 
-        showToast(`已导入 ${memories.length} 条记忆`, 'success');
+        showToast(tx('toast.imported', { count: memories.length }), 'success');
         loadMemories();
         loadGraphData();
     } catch (error) {
         console.error('导入失败:', error);
-        showToast('导入失败: ' + error.message, 'error');
+        showToast(tx('toast.importFailed', { message: error.message }), 'error');
     } finally {
         input.value = '';
     }
@@ -4705,22 +4855,22 @@ async function importMemories(input) {
 
 // 加载示例数据
 async function loadSampleData() {
-    if (!confirm('确定要加载示例数据吗？这将添加示例记忆到现有数据中。')) {
+    if (!confirm(tx('confirm.loadSample'))) {
         return;
     }
 
-    showToast('正在加载示例数据...', 'info');
+    showToast(tx('toast.sampleLoading'), 'info');
     try {
         const response = await fetch('/data/memories_2026-04-16T16-56-51.loyi');
 
         if (!response.ok) {
-            throw new Error('文件不存在');
+            throw new Error(currentLocale() === 'en-US' ? 'File not found' : '文件不存在');
         }
 
         const text = await response.text();
 
         if (!text || text.trim().startsWith('PK')) {
-            showToast('示例数据文件格式错误', 'error');
+            showToast(tx('toast.sampleInvalid'), 'error');
             return;
         }
 
@@ -4741,13 +4891,13 @@ async function loadSampleData() {
             await db.saveRelation(relation);
         }
 
-        showToast(`已加载 ${memories.length} 条示例记忆`, 'success');
+        showToast(tx('toast.sampleLoaded', { count: memories.length }), 'success');
         loadMemories();
         loadGraphData();
         loadStats();
     } catch (error) {
         console.error('加载示例数据失败:', error);
-        showToast('加载示例数据失败: ' + error.message, 'error');
+        showToast(tx('toast.sampleFailed', { message: error.message }), 'error');
     }
 }
 
@@ -4782,7 +4932,8 @@ function sendLuoyiMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             message: message,
-            history: luoyiChatHistory
+            history: luoyiChatHistory,
+            language: currentAiLanguage()
         })
     })
     .then(r => r.json())
@@ -4797,13 +4948,13 @@ function sendLuoyiMessage() {
             renderLuoyiMessages();
         } else {
             // 添加错误消息
-            luoyiChatHistory.push({ role: 'assistant', content: '抱歉，我刚才走神了... ' + (data.error || '') });
+            luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.distracted', { message: data.error || '' }) });
             renderLuoyiMessages();
         }
     })
     .catch(err => {
         hideLuoyiTyping();
-        luoyiChatHistory.push({ role: 'assistant', content: '网络有点问题，稍后再试试？' });
+        luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.networkIssue') });
         renderLuoyiMessages();
     });
 }
@@ -4820,8 +4971,8 @@ function renderLuoyiMessages() {
         <div class="luoyi-welcome-card">
             <div class="luoyi-welcome-avatar">洛</div>
             <div class="luoyi-welcome-bubble">
-                <p>你好！我是洛忆，你记忆网络的小伙伴~</p>
-                <p>有什么想聊的，或者想回忆的？尽管问我吧！</p>
+                <p>${tx('luoyi.welcome1')}</p>
+                <p>${tx('luoyi.welcome2')}</p>
             </div>
         </div>
     `;
@@ -4893,7 +5044,7 @@ function toggleMobileEdgeLabels() {
     toggleEdgeLabels(showEdgeLabels);
     const btn = document.getElementById('mobileEdgeLabelsBtn');
     if (btn) btn.classList.toggle('active', showEdgeLabels);
-    showToast(showEdgeLabels ? '已显示边标签' : '已隐藏边标签', 'info');
+    showToast(showEdgeLabels ? tx('toast.edgeLabelsShown') : tx('toast.edgeLabelsHidden'), 'info');
 }
 
 /**
@@ -5033,13 +5184,13 @@ function showNodeContextMenu(event, nodeData) {
 
     menu.innerHTML = `
         <div class="node-menu-item" onclick="hideNodeContextMenu(); showNodeDetail(window._ctxMenuNodeData); updatePathFinder();">
-            <span>👁</span> 查看详情
+            <span>👁</span> ${currentLocale() === 'en-US' ? 'View details' : '查看详情'}
         </div>
         <div class="node-menu-item" onclick="hideNodeContextMenu(); generateNodeStory(window._ctxMenuNodeData.id);">
-            <span>✨</span> 生成记忆故事
+            <span>✨</span> ${trx('生成记忆故事')}
         </div>
-        <div class="node-menu-item danger" onclick="hideNodeContextMenu(); deleteNode(window._ctxMenuNodeData.id, window._ctxMenuNodeData.name || '未知');">
-            <span>🗑</span> 删除节点
+        <div class="node-menu-item danger" onclick="hideNodeContextMenu(); deleteNode(window._ctxMenuNodeData.id, window._ctxMenuNodeData.name || '${tx('detail.unknown')}');">
+            <span>🗑</span> ${currentLocale() === 'en-US' ? 'Delete node' : '删除节点'}
         </div>
     `;
 

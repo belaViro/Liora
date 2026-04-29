@@ -31,7 +31,7 @@ function showPredictionButton(node) {
             <path d="M12 16v-4"></path>
             <path d="M12 8h.01"></path>
         </svg>
-        <span class="predict-text">预测关联</span>
+        <span class="predict-text">${tx('prediction.button')}</span>
     `;
     predictBtn.onclick = () => loadPredictions(node, predictBtn);
     
@@ -46,11 +46,11 @@ async function loadPredictions(node, btnElement) {
         btnElement.classList.add('predict-loading');
         btnElement.innerHTML = `
             <span class="predict-dots">···</span>
-            <span class="predict-text">思考中</span>
+            <span class="predict-text">${tx('prediction.thinking')}</span>
         `;
     }
 
-    showToast('正在分析可能的关联节点...', 'info');
+    showToast(tx('prediction.analyzing'), 'info');
 
     try {
         // 获取关联节点
@@ -86,13 +86,13 @@ async function loadPredictions(node, btnElement) {
             }));
 
             showPredictionPanel(result.data.predictions);
-            showToast(`发现 ${currentPredictions.length} 个可能的关联`, 'success');
+            showToast(tx('prediction.found', { count: currentPredictions.length }), 'success');
         } else {
-            showToast('暂无预测结果', 'info');
+            showToast(tx('prediction.none'), 'info');
         }
     } catch (error) {
         console.error('加载预测失败:', error);
-        showToast('预测失败，请重试', 'error');
+        showToast(tx('prediction.failed'), 'error');
     } finally {
         // 恢复按钮状态
         if (btnElement) {
@@ -104,7 +104,7 @@ async function loadPredictions(node, btnElement) {
                     <path d="M12 16v-4"></path>
                     <path d="M12 8h.01"></path>
                 </svg>
-                <span class="predict-text">预测关联</span>
+                <span class="predict-text">${tx('prediction.button')}</span>
             `;
         }
     }
@@ -132,8 +132,8 @@ function showPredictionPanel(predictions) {
         <div class="prediction-section" id="predictionPanel">
             <div class="prediction-header">
                 <div class="prediction-title-wrap">
-                    <span class="prediction-label">联想</span>
-                    <span class="prediction-subtitle">基于现有记忆的延伸</span>
+                    <span class="prediction-label">${tx('prediction.sectionTitle')}</span>
+                    <span class="prediction-subtitle">${tx('prediction.subtitle')}</span>
                 </div>
                 <button class="btn-reject-all" onclick="rejectAllPredictions()">×</button>
             </div>
@@ -146,19 +146,19 @@ function showPredictionPanel(predictions) {
                             <div class="prediction-meta-line">
                                 ${p.type} · ${p.relation_type}
                                 <span class="prediction-confidence" style="color: ${getConfidenceColor(p.confidence)}">
-                                    概率 ${Math.round(p.confidence * 100)}%
+                                    ${tx('prediction.confidence', { percent: Math.round(p.confidence * 100) })}
                                 </span>
                             </div>
                             <div class="prediction-reason">${p.reasoning}</div>
                         </div>
                         <button class="btn-adopt" onclick="event.stopPropagation(); adoptPrediction(${idx})">
-                            加入
+                            ${tx('prediction.adopt')}
                         </button>
                     </div>
                 `).join('')}
             </div>
             <div class="prediction-footer">
-                点击"加入"按钮添加到记忆网络
+                ${tx('prediction.footer')}
             </div>
         </div>
     `;
@@ -186,7 +186,7 @@ async function adoptPrediction(index) {
         return;
     }
 
-    showToast(`正在添加 "${prediction.name}" 到图谱...`, 'info');
+    showToast(tx('prediction.adding', { name: prediction.name }), 'info');
 
     try {
         // 创建新实体
@@ -224,7 +224,7 @@ async function adoptPrediction(index) {
             id: relationId,
             source: sourceId,
             target: finalEntityId,
-            type: prediction.relation || '关联',
+            type: prediction.relation || tx('relationType.fallback'),
             directed: false,
             description: prediction.reason || '',
             fact: `${prediction.sourceNode.name} --[${prediction.relation}]--> ${prediction.name}`,
@@ -242,7 +242,7 @@ async function adoptPrediction(index) {
 
         await db.saveRelation(newRelation);
 
-        showToast(`已成功添加 "${prediction.name}"`, 'success');
+        showToast(tx('prediction.added', { name: prediction.name }), 'success');
 
         // 标记为已采纳（视觉反馈）
         if (itemEl) {
@@ -276,12 +276,12 @@ async function adoptPrediction(index) {
         if (remaining.length === 0) {
             setTimeout(() => {
                 rejectAllPredictions();
-                showToast('全部预测已采纳', 'success');
+                showToast(tx('prediction.allAdopted'), 'success');
             }, 1500);
         }
     } catch (error) {
         console.error('[预测] 采纳预测失败:', error);
-        showToast('添加失败，请重试', 'error');
+        showToast(tx('prediction.addFailed'), 'error');
     }
 }
 
@@ -300,7 +300,7 @@ function rejectAllPredictions() {
         panel.style.opacity = '0';
         setTimeout(() => panel.remove(), 300);
     }
-    showToast('已放弃全部预测', 'info');
+    showToast(tx('prediction.rejectedAll'), 'info');
 }
 
 // 清除预测并刷新（保留函数供其他代码使用）
