@@ -6,6 +6,7 @@ Compute Blueprint - 纯计算端点（无状态）
 import os
 import json
 import base64
+import httpx
 from flask import Blueprint, jsonify, request, current_app
 from loguru import logger
 
@@ -112,7 +113,11 @@ def compute_embed():
         model_name = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-zh-v1.5')
 
         from openai import OpenAI
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=httpx.Client(trust_env=False, timeout=60.0),
+        )
 
         # 调用 embedding 模型
         response = client.embeddings.create(
@@ -159,7 +164,11 @@ def compute_search_rank():
         model_name = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-zh-v1.5')
 
         from openai import OpenAI
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=httpx.Client(trust_env=False, timeout=60.0),
+        )
 
         # 获取查询向量
         query_response = client.embeddings.create(
@@ -491,3 +500,4 @@ def merge_chunks():
     except Exception as e:
         logger.exception(f'/merge-chunks failed: {e}')
         return jsonify({'success': False, 'message': str(e)})
+

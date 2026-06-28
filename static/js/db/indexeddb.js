@@ -534,6 +534,7 @@ class MemoryWeaverDB {
         const entities = memory.entities || [];
         const relations = memory.relations || [];
         const memoryId = memory.id;
+        const entityIdMap = new Map();
 
         // 保存实体
         for (const entity of entities) {
@@ -555,6 +556,7 @@ class MemoryWeaverDB {
                 }
                 existing.updated_at = new Date().toISOString();
                 await this.saveEntity(existing);
+                entityIdMap.set(entity.id, existing.id);
             } else {
                 // 新实体
                 const newEntity = {
@@ -565,14 +567,17 @@ class MemoryWeaverDB {
                     relation_count: 0
                 };
                 await this.saveEntity(newEntity);
+                entityIdMap.set(entity.id, newEntity.id);
             }
         }
 
         // 保存关系
         for (const relation of relations) {
             // 查找源和目标实体（LLM 返回 source/target 为实体 ID）
-            const sourceEntity = await this._findEntityById(relation.source);
-            const targetEntity = await this._findEntityById(relation.target);
+            const sourceLookupId = entityIdMap.get(relation.source) || relation.source;
+            const targetLookupId = entityIdMap.get(relation.target) || relation.target;
+            const sourceEntity = await this._findEntityById(sourceLookupId);
+            const targetEntity = await this._findEntityById(targetLookupId);
 
             if (!sourceEntity || !targetEntity) {
                 console.warn('[DB] Relation entity not found:', relation);
@@ -958,3 +963,4 @@ class MemoryWeaverDB {
 
 // 全局实例
 const db = new MemoryWeaverDB();
+
