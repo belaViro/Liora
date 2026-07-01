@@ -5,7 +5,7 @@ Liora 记忆网络的 AI 伙伴聊天接口（无状态版）
 """
 
 import json
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, Response, stream_with_context
 from loguru import logger
 
 luoyi_bp = Blueprint('luoyi', __name__)
@@ -20,13 +20,15 @@ def chat():
     try:
         llm_service = current_app.services.llm_service
 
-        data = request.json if isinstance(request.json, dict) else {}
+        data = request.get_json(silent=True) if request.is_json else {}
+        data = data if isinstance(data, dict) else {}
         message = data.get('message', '')
         history = data.get('history', [])
         memories = data.get('memories', [])  # 客户端传入的记忆数据
         graph_summary = data.get('graph_summary', {})  # 客户端传入的图谱摘要
         language = data.get('language', 'Chinese')
         answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
+        should_stream = bool(data.get('stream'))
 
         if not message:
             error = 'Message cannot be empty' if answer_language == 'English' else '消息不能为空'
@@ -60,6 +62,9 @@ def chat():
         # 添加当前消息
         messages.append({"role": "user", "content": message})
 
+        if should_stream:
+            return _stream_chat_response(llm_service, messages, context_used, answer_language)
+
         # 调用 LLM
         try:
             response = llm_service.client.chat.completions.create(
@@ -82,6 +87,103 @@ def chat():
     except Exception as e:
         logger.error(f"洛忆聊天失败: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _stream_chat_response(llm_service, messages, context_used, answer_language):
+    """以 SSE 形式流式返回洛忆回复。"""
+
+    @stream_with_context
+    def generate():
+        reply_parts = []
+        sent_content = False
+
+        yield _sse_event('metadata', {
+            'success': True,
+            'context_used': context_used
+        })
+
+        try:
+            stream = llm_service.client.chat.completions.create(
+                model=llm_service.model_name,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=500,
+                stream=True
+            )
+
+            for chunk in stream:
+                content = _extract_stream_content(chunk)
+                if not content:
+                    continue
+                sent_content = True
+                reply_parts.append(content)
+                yield _sse_event('delta', {'content': content})
+
+            yield _sse_event('done', {
+                'success': True,
+                'reply': ''.join(reply_parts),
+                'context_used': context_used
+            })
+        except Exception as e:
+            logger.error(f"LLM 流式调用失败: {e}")
+            fallback = (
+                "Sorry, I am a little tired right now. Let's talk later."
+                if answer_language == 'English'
+                else "抱歉,我现在有点累了...稍后再和我聊天吧。"
+            )
+            if not sent_content:
+                yield _sse_event('delta', {'content': fallback})
+                yield _sse_event('done', {
+                    'success': True,
+                    'reply': fallback,
+                    'context_used': context_used
+                })
+            else:
+                yield _sse_event('error', {
+                    'success': False,
+                    'error': fallback
+                })
+
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+
+def _sse_event(event, payload):
+    """序列化单个 SSE 事件。"""
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _extract_stream_content(chunk):
+    """兼容 OpenAI SDK 对象和字典形式的流式 chunk。"""
+    choices = _get_value(chunk, 'choices') or []
+    if not choices:
+        return ''
+
+    choice = choices[0]
+    delta = _get_value(choice, 'delta')
+    content = _get_value(delta, 'content') if delta is not None else None
+
+    if content is None:
+        content = _get_value(choice, 'text')
+    if isinstance(content, list):
+        content = ''.join(
+            part.get('text', '') if isinstance(part, dict) else str(part)
+            for part in content
+        )
+    return content or ''
+
+
+def _get_value(obj, key):
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
 
 
 def _build_memory_context(memories, max_chars=30000):

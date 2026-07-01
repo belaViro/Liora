@@ -86,6 +86,8 @@ def create_app():
             if response.direct_passthrough:
                 return response
             content_type = response.content_type or ''
+            if content_type.startswith('text/event-stream'):
+                return response
             if not any(ct in content_type for ct in
                        ['text/', 'application/json', 'application/javascript',
                         'application/css', 'application/xml']):

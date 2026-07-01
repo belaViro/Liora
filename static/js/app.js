@@ -4908,7 +4908,7 @@ async function loadSampleData() {
 /**
  * 发送消息给洛忆
  */
-function sendLuoyiMessage() {
+async function sendLuoyiMessage() {
     const input = document.getElementById('luoyiChatInput');
     const message = input.value.trim();
 
@@ -4916,6 +4916,7 @@ function sendLuoyiMessage() {
 
     // 添加用户消息到历史
     luoyiChatHistory.push({ role: 'user', content: message });
+    const requestHistory = luoyiChatHistory.slice(0, -1);
 
     // 清空输入框
     input.value = '';
@@ -4926,39 +4927,163 @@ function sendLuoyiMessage() {
     // 显示洛忆正在输入
     showLuoyiTyping();
 
-    // 调用 API
-    fetch('/api/luoyi/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            message: message,
-            history: luoyiChatHistory,
-            language: currentAiLanguage()
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        // 移除正在输入状态
+    let assistantMessage = null;
+
+    try {
+        const response = await fetch('/api/luoyi/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify({
+                message: message,
+                history: requestHistory,
+                language: currentAiLanguage(),
+                stream: true
+            })
+        });
+
         hideLuoyiTyping();
 
-        if (data.success) {
-            // 添加洛忆回复到历史
-            luoyiChatHistory.push({ role: 'assistant', content: data.reply });
-            // 渲染消息
+        if (!response.ok) {
+            const errorData = await readLuoyiErrorResponse(response);
+            throw new Error(errorData.error || errorData.message || response.statusText);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.body || !contentType.includes('text/event-stream')) {
+            const data = await response.json();
+            if (data.success) {
+                luoyiChatHistory.push({ role: 'assistant', content: data.reply || '' });
+            } else {
+                luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.distracted', { message: data.error || '' }) });
+            }
             renderLuoyiMessages();
-        } else {
-            // 添加错误消息
-            luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.distracted', { message: data.error || '' }) });
+            return;
+        }
+
+        assistantMessage = { role: 'assistant', content: '' };
+        luoyiChatHistory.push(assistantMessage);
+        renderLuoyiMessages();
+
+        let streamError = '';
+        await readLuoyiSseStream(response, (event, payload) => {
+            if (event === 'delta') {
+                const content = payload?.content || '';
+                if (!content) return;
+                assistantMessage.content += content;
+                renderLuoyiMessages();
+            } else if (event === 'done') {
+                if (payload?.reply && !assistantMessage.content) {
+                    assistantMessage.content = payload.reply;
+                    renderLuoyiMessages();
+                }
+            } else if (event === 'error') {
+                streamError = payload?.error || tx('luoyi.networkIssue');
+            }
+        });
+
+        if (streamError) {
+            if (assistantMessage.content) {
+                showToast(streamError, 'warning');
+            } else {
+                assistantMessage.content = tx('luoyi.distracted', { message: streamError });
+                renderLuoyiMessages();
+            }
+        }
+
+        if (!assistantMessage.content) {
+            assistantMessage.content = tx('luoyi.networkIssue');
             renderLuoyiMessages();
         }
-    })
-    .catch(err => {
+    } catch (err) {
+        console.error('洛忆聊天失败:', err);
         hideLuoyiTyping();
-        luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.networkIssue') });
+        if (assistantMessage) {
+            assistantMessage.content = assistantMessage.content || tx('luoyi.networkIssue');
+        } else {
+            luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.networkIssue') });
+        }
         renderLuoyiMessages();
-    });
+    }
 }
 
+async function readLuoyiErrorResponse(response) {
+    try {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            return await response.json();
+        }
+        return { error: await response.text() };
+    } catch (err) {
+        return {};
+    }
+}
+
+async function readLuoyiSseStream(response, onEvent) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() || '';
+
+        for (const rawEvent of events) {
+            dispatchLuoyiSseEvent(rawEvent, onEvent);
+        }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+        dispatchLuoyiSseEvent(buffer, onEvent);
+    }
+}
+
+function dispatchLuoyiSseEvent(rawEvent, onEvent) {
+    const parsed = parseLuoyiSseEvent(rawEvent);
+    if (parsed) {
+        onEvent(parsed.event, parsed.data);
+    }
+}
+
+function parseLuoyiSseEvent(rawEvent) {
+    let event = 'message';
+    const dataLines = [];
+
+    for (const line of rawEvent.split(/\r?\n/)) {
+        if (!line || line.startsWith(':')) continue;
+
+        const separator = line.indexOf(':');
+        const field = separator === -1 ? line : line.slice(0, separator);
+        let value = separator === -1 ? '' : line.slice(separator + 1);
+        if (value.startsWith(' ')) {
+            value = value.slice(1);
+        }
+
+        if (field === 'event') {
+            event = value;
+        } else if (field === 'data') {
+            dataLines.push(value);
+        }
+    }
+
+    if (!dataLines.length) {
+        return { event, data: null };
+    }
+
+    const dataText = dataLines.join('\n');
+    try {
+        return { event, data: JSON.parse(dataText) };
+    } catch (err) {
+        return { event, data: dataText };
+    }
+}
 /**
  * 渲染洛忆聊天消息
  */
