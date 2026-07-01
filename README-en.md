@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.4-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.5-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI--compatible-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
@@ -64,7 +64,7 @@ The current architecture keeps user data primarily in the browser through Indexe
 | Multimodal capture | Record text, upload images, and process audio with AI-assisted understanding |
 | Hybrid search | Combines keyword matching with client-side vector similarity |
 | AI exploration | Ask questions about selected nodes, relations, and paths |
-| Luoyi assistant | A memory-aware chat companion with emotion-sensitive responses |
+| Luoyi assistant | A memory-aware chat companion with emotion-sensitive SSE streaming responses |
 | Persona mode | Let Luoyi answer from the first-person perspective of a selected person node |
 | Smart prediction | Predict likely missing entities and relations from graph context |
 | Memory cards | Export polished visual memory cards as PNG images |
@@ -125,6 +125,14 @@ Or use Docker Compose:
 ```bash
 docker compose up --build
 ```
+
+---
+
+## Deployment Notes
+
+- **SSH operations**: For cloud servers, SSH can be used to pull code, configure environment variables, restart services, and inspect logs.
+- **Reverse proxy**: In production, use Nginx or Caddy for HTTPS and make sure `text/event-stream` responses are not buffered so Luoyi streaming stays real time.
+- **ICP filing**: For public deployments under mainland China domains, complete ICP filing through the cloud provider workflow and display the filing number as required.
 
 ---
 
@@ -193,6 +201,13 @@ Language preference is stored locally in the browser. Memory content is not auto
 ---
 
 ## Changelog
+
+### v1.0.5 · 2026-07-01
+
+- Added SSE streaming output for Luoyi chat.
+- Improved production handling for SSE responses to avoid gzip or proxy buffering.
+- Added SSH-based cloud deployment and operations notes.
+- Added ICP filing notes for mainland China public deployments.
 
 ### v1.0.4 · 2026-04-30
 

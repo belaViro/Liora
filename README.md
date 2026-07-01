@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.4-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.5-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
@@ -89,7 +89,7 @@ python app.py
 | 🔍 **混合搜索** | FAISS 向量 + BM25 关键词，既懂语义又懂精准 |
 | 📅 **记忆探索** | 沿时间线顺藤摸瓜，还原完整故事链 |
 | 🃏 **记忆卡片** | 复古档案风格，一键导出 PNG 珍藏 |
-| 🤖 **AI 洛忆** | 懂你情绪的智能伙伴，支持第一人称视角代述 |
+| 🤖 **AI 洛忆** | 懂你情绪的智能伙伴，支持 SSE 流式输出与第一人称视角代述 |
 | 📊 **统计面板** | 全局数据画像，洞察你的记忆构成 |
 | 🔮 **智能预测** | 基于图谱拓扑，预言你可能遗忘的关联 |
 | 🌐 **双语切换** | 支持中文 / English UI 文案与 AI 回复语言切换 |
@@ -166,6 +166,8 @@ python app.py
 
 >**🎭 视角切换**：点击图谱中的人物节点，洛忆将**化身该人物**，用第一人称“我”来讲述你们之间的往事。
 
+>**⚡ 流式输出**：洛忆聊天支持 SSE（Server-Sent Events）增量返回，回复生成时会逐段显示，不再等待整段回答完成。
+
 ---
 
 ## ❻ 7.智能预测 · 第六感
@@ -192,6 +194,14 @@ python app.py
 - `attachments/`：原始图片与音频文件
 
 > **一键迁移**：导入时智能比对哈希，自动跳过重复记忆。
+
+---
+
+## 🛠️ 部署与合规
+
+- **SSH 运维**：适合通过 SSH 登录云服务器完成代码拉取、环境变量配置、服务重启与日志排查。
+- **反向代理**：生产环境建议使用 Nginx / Caddy 托管 HTTPS，并确保 `text/event-stream` 不被代理缓存，保证洛忆 SSE 流式输出即时生效。
+- **ICP备案**：面向中国大陆公网域名部署时，请按云服务商流程完成 ICP 备案，并在站点页面按要求展示备案号。
 
 ---
 
@@ -226,6 +236,12 @@ MemoryWeaver/
 
 
 ## 📅 更新日志
+
+### v1.0.5 · 2026-07-01
+- ✨ 新增洛忆聊天 SSE 流式输出，回复生成时逐段显示
+- 🚀 优化生产环境 SSE 响应处理，避免 gzip / 代理缓存影响流式体验
+- 🛠️ 补充 SSH 云服务器部署与运维说明
+- 🧾 补充中国大陆公网部署的 ICP 备案合规说明
 
 ### v1.0.4 · 2026-04-30
 - ✨ 新增中英文界面切换，支持 UI 文案与 AI 回复语言切换
