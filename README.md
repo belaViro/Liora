@@ -15,10 +15,10 @@
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
-  <a href="#"><img src="https://img.shields.io/badge/vector-FAISS-E63946?style=for-the-badge" alt="FAISS"></a>
+  <a href="#"><img src="https://img.shields.io/badge/vector-cosine%20similarity-4ECDC4?style=for-the-badge" alt="Vector Search"></a>
   <a href="#"><img src="https://img.shields.io/badge/visualization-D3.js-F9A826?style=for-the-badge&logo=d3.js" alt="D3.js"></a>
-  <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-NetworkX-4ECDC4?style=for-the-badge" alt="NetworkX"></a>
-  <a href="#"><img src="https://img.shields.io/badge/rag-pipeline-FF8B94?style=for-the-badge" alt="RAG"></a>
+  <a href="#"><img src="https://img.shields.io/badge/knowledge--graph-D3.js-FF6B6B?style=for-the-badge" alt="Knowledge Graph"></a>
+  <a href="#"><img src="https://img.shields.io/badge/storage-IndexedDB-3572A5?style=for-the-badge" alt="IndexedDB"></a>
   <a href="#"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=for-the-badge&logo=gnu" alt="License"></a>
 </p>
 
@@ -37,6 +37,8 @@
 Liora 重新定义记忆的方式。不是简单的日记，不是孤立的关系图谱——而是**活的、互联的、不断生长的记忆网络**。
 
 上传一段文字、一张照片、一段录音，AI 自动解析其中的实体与关系，织成一张属于你的知识图谱。跨越时间、空间、情感的维度，帮你发现记忆之间那些隐秘却动人的联系。
+
+🔒 **隐私优先 · Local-First 架构**：你的数据全量存储在浏览器 IndexedDB 中，服务端仅作为 AI API 的无状态代理，不落盘任何用户数据。
 
 ---
 
@@ -86,7 +88,7 @@ python app.py
 |:-----|:-----|
 | 🕸️ **知识图谱** | D3.js 力导向图谱，可视化你的“思维神经元” |
 | 📝 **多模态录入** | 文字/图片/音频，AI 瞬间解析实体与隐秘关联 |
-| 🔍 **混合搜索** | FAISS 向量 + BM25 关键词，既懂语义又懂精准 |
+| 🔍 **混合搜索** | 浏览器端余弦相似度 + 关键词混合搜索，既懂语义又懂精准 |
 | 📅 **记忆探索** | 沿时间线顺藤摸瓜，还原完整故事链 |
 | 🃏 **记忆卡片** | 复古档案风格，一键导出 PNG 珍藏 |
 | 🤖 **AI 洛忆** | 懂你情绪的智能伙伴，支持 SSE 流式输出与第一人称视角代述 |
@@ -126,11 +128,11 @@ python app.py
 
 ## 🔍 3. 混合语义搜索
 
-**告别“关键词匹配不到”的焦虑。**
+**告别”关键词匹配不到”的焦虑。**
 
-- **语义理解 70%**：搜索“那个下雨天”能匹配到“窗外湿漉漉的午后”。
-- **精确命中 30%**：确保专有名词绝不跑偏。
-- **结果融合**：FAISS 与 BM25 综合打分，并标注“为什么这条记忆被找到”。
+- **语义检索**：搜索”那个下雨天”能匹配到”窗外湿漉漉的午后”。
+- **关键词匹配**：确保专有名词不丢失。
+- **结果融合**：余弦相似度 + 关键词双重打分排序，并标注”为什么这条记忆被找到”。
 
 ---
 
@@ -170,7 +172,7 @@ python app.py
 
 ---
 
-## ❻ 7.智能预测 · 第六感
+## 7. 智能预测 · 第六感
 
 **图谱有“盲区”，Liora 帮你补全。**
 
@@ -208,29 +210,31 @@ python app.py
 ## ⚙️ 技术架构
 
 ```text
-plaintext
 MemoryWeaver/
 ├── app.py                  # Flask 主应用 + SocketIO 实时通信
 ├── blueprints/             # 路由模块化
 │   ├── memory.py          # 记忆 CRUD
-│   ├── graph.py          # 图谱查询
-│   ├── stats.py          # 统计接口
-│   ├── export.py         # 导入导出
-│   ├── config.py         # 配置管理
-│   └── luoyi.py          # 洛忆聊天
-├── services/               # 核心业务服务
-│   ├── llm_service.py      # 大模型统一调度
-│   ├── graph_service.py    # NetworkX 图谱管理
-│   ├── embedding_service.py # FAISS 向量检索
-│   ├── prediction_service.py # 智能预测引擎
-│   └── export_service.py   # .loyi 导入导出
+│   ├── graph.py           # 图谱查询
+│   ├── compute.py         # AI 计算端点（嵌入、理解、搜索排名）
+│   ├── luoyi.py           # 洛忆聊天
+│   ├── config.py          # 运行时配置
+│   ├── stats.py           # 统计接口
+│   └── export.py          # 导入导出
+├── services/               # 后端服务
+│   ├── llm_service.py     # 大模型统一调度（LLM + 嵌入）
+│   ├── extraction_schema.py # AI 理解的结构化 Schema
+│   └── temporal_extractor.py # 时间信息提取
+├── static/
+│   ├── css/               # 样式模块化
+│   └── js/
+│       ├── api/           # 前端 API 客户端
+│       ├── db/            # IndexedDB + 向量搜索
+│       └── services/      # 前端业务服务（记忆、图谱）
 ├── templates/              # HTML 模板
 │   └── components/        # 可复用组件
-├── static/                 # JS/CSS/上传资源
-│   ├── css/               # 样式模块化
-│   └── js/                # 前端逻辑
-├── data/                   # 本地持久化存储
-└── Dockerfile              # Docker 容器化部署
+├── data/                   # 样例数据
+├── Dockerfile              # Docker 容器化部署
+└── docker-compose.yml      # Docker Compose 编排
 ```
 
 
