@@ -86,3 +86,32 @@ def test_extract_tool_payload_from_openai_raw_tool_calls_without_init():
     payload = service._extract_tool_payload(message)
 
     assert payload["understanding"]["description"] == "一次测试"
+
+
+def test_extraction_guidance_uses_dynamic_length_limits_without_global_caps():
+    service = object.__new__(LLMService)
+    service.extraction_max_chars = 4000
+
+    guidance = service._build_extraction_guidance('长文本' * 200)
+    prompt = service._build_tool_prompt('长文本' * 200)
+
+    assert guidance['max_entities'] == 18
+    assert guidance['max_relations'] == 25
+    assert guidance['min_entities'] == 10
+    assert guidance['min_relations'] == 15
+    assert '实体最多 18 个' in prompt
+    assert '关系最多 25 条' in prompt
+    assert '实体建议' not in prompt
+
+
+def test_build_json_prompt_uses_compact_schema_without_init():
+    service = object.__new__(LLMService)
+    service.extraction_max_chars = 4000
+    service.extraction_compact_prompt = True
+
+    prompt = service._build_json_prompt('张三和李四在北京见面。')
+
+    assert '结构字段' in prompt
+    assert 'entities[]' in prompt
+    assert 'relations[]' in prompt
+    assert 'zhang_san' not in prompt

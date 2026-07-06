@@ -42,12 +42,13 @@ class ClientMemoryService {
             // 预读文件为 Blob，可与 LLM 调用并行执行
             const fileReadPromise = file ? this._readFileAsBlob(file) : Promise.resolve(null);
 
-            // 2. 提取时间信息
-            const temporalResult = await this.computeApi.extractTemporal(memoryContent, type);
+            // 2/3. 时间信息与 LLM 理解互不依赖，并行请求减少保存等待
+            const [temporalResult, understandResult] = await Promise.all([
+                this.computeApi.extractTemporal(memoryContent, type),
+                this.computeApi.understand(memoryContent, type)
+            ]);
             const temporalInfo = temporalResult.success ? temporalResult.data?.temporal_info : {};
 
-            // 3. LLM 理解和抽取
-            const understandResult = await this.computeApi.understand(memoryContent, type);
             if (!understandResult.success) {
                 // 即使 LLM 失败，也保存基本记忆
                 console.warn('[ClientMemoryService] LLM understand failed:', understandResult.error);

@@ -10,6 +10,7 @@
 import base64
 import json
 import os
+import time
 from typing import Any, Dict, Optional
 
 import httpx
@@ -44,7 +45,9 @@ class LLMService:
 
         # 结构化抽取配置。三方聚合网关如果不支持强制 tool_choice，可设置为 auto。
         self.extraction_max_chars = int(os.getenv('LLM_EXTRACTION_MAX_CHARS', '4000'))
-        self.extraction_mode = os.getenv('LLM_EXTRACTION_MODE', 'json_first').lower()
+        self.extraction_max_output_tokens = int(os.getenv('LLM_EXTRACTION_MAX_TOKENS', '1800'))
+        self.extraction_compact_prompt = os.getenv('LLM_EXTRACTION_COMPACT_PROMPT', 'true').lower() in {'1', 'true', 'yes', 'on'}
+        self.extraction_mode = os.getenv('LLM_EXTRACTION_MODE', 'tool_first').lower()
         self.extraction_tool_choice = os.getenv('LLM_EXTRACTION_TOOL_CHOICE', 'auto')
         self.temperature = float(os.getenv('LLM_TEMPERATURE', '0.2'))
         self.request_timeout = float(os.getenv('LLM_TIMEOUT', '60'))
@@ -65,6 +68,7 @@ class LLMService:
             base_url=self.base_url,
             temperature=self.temperature,
             timeout=self.request_timeout,
+            max_tokens=self.extraction_max_output_tokens,
             max_retries=int(os.getenv('LLM_MAX_RETRIES', '1')),
             http_client=httpx.Client(trust_env=self.trust_env_proxy, timeout=self.request_timeout),
         )
@@ -89,6 +93,7 @@ class LLMService:
         logger.info(f"  模型: {self.model_name}")
         logger.info(f"  Base URL: {self.base_url}")
         logger.info(f"  结构化抽取: {self.extraction_mode} ({self.extraction_tool_choice})")
+        logger.info(f"  抽取输出上限: {self.extraction_max_output_tokens} tokens")
         logger.info(f"  环境代理: {'enabled' if self.trust_env_proxy else 'disabled'}")
 
     def _detect_provider(self) -> str:
@@ -127,15 +132,17 @@ class LLMService:
         )
 
         for mode, extractor in strategies:
+            start = time.perf_counter()
             try:
                 result = extractor(text)
                 result['success'] = True
                 result['extraction_mode'] = mode
-                self._log_extraction_result(result, mode)
+                self._log_extraction_result(result, mode, time.perf_counter() - start)
                 return result
             except Exception as e:
+                elapsed = time.perf_counter() - start
                 errors.append(f'{mode}: {e}')
-                logger.warning(f"{mode} 抽取失败: {e}")
+                logger.warning(f"{mode} 抽取失败({elapsed:.2f}s): {e}")
 
         logger.error(f"合并处理失败: {'; '.join(errors)}")
         result = default_extraction_result(text)
@@ -190,7 +197,6 @@ class LLMService:
         except json.JSONDecodeError:
             payload = json.loads(self._extract_json(content))
         result = normalize_extraction_result(payload, text)
-        self._ensure_extraction_has_graph(result, 'json')
         return result
 
     def _ensure_extraction_has_graph(self, result: Dict[str, Any], mode: str) -> None:
@@ -262,9 +268,10 @@ class LLMService:
             return '\n'.join(part for part in parts if part).strip()
         return str(content).strip()
 
-    def _log_extraction_result(self, result: Dict[str, Any], mode: str) -> None:
+    def _log_extraction_result(self, result: Dict[str, Any], mode: str, elapsed: Optional[float] = None) -> None:
+        elapsed_text = f", {elapsed:.2f}s" if elapsed is not None else ""
         logger.info(
-            f"抽取完成({mode}): {len(result.get('entities', []))} 实体, "
+            f"抽取完成({mode}{elapsed_text}): {len(result.get('entities', []))} 实体, "
             f"{len(result.get('relations', []))} 关系"
         )
 
@@ -272,36 +279,39 @@ class LLMService:
         """按内容长度动态调整抽取数量要求。"""
         text_len = len(text)
         if text_len < 100:
-            return {
+            guidance = {
                 'min_entities': 3,
                 'max_entities': 6,
                 'min_relations': 3,
                 'max_relations': 8,
                 'entity_desc': '抽取核心实体即可',
             }
-        if text_len < 300:
-            return {
+        elif text_len < 300:
+            guidance = {
                 'min_entities': 5,
                 'max_entities': 10,
                 'min_relations': 5,
                 'max_relations': 12,
                 'entity_desc': '覆盖主要人物、地点、事件',
             }
-        if text_len < 500:
-            return {
+        elif text_len < 500:
+            guidance = {
                 'min_entities': 8,
                 'max_entities': 14,
                 'min_relations': 10,
                 'max_relations': 18,
                 'entity_desc': '覆盖所有提到的人物、地点、事件、情感',
             }
-        return {
-            'min_entities': 10,
-            'max_entities': 18,
-            'min_relations': 15,
-            'max_relations': 25,
-            'entity_desc': '深度抽取，不要遗漏任何提到的人、地点、事件、情感',
-        }
+        else:
+            guidance = {
+                'min_entities': 10,
+                'max_entities': 18,
+                'min_relations': 15,
+                'max_relations': 25,
+                'entity_desc': '覆盖重要的人、地点、事件、情感',
+            }
+
+        return guidance
 
     def _build_tool_prompt(self, text: str) -> str:
         """构建 tool-use 路径的轻量提示词。"""
@@ -314,14 +324,14 @@ class LLMService:
             truncated,
             '',
             '## 抽取要求',
-            '1. 生成 description、summary、keywords、persons、locations、events、topics 和 emotion。',
+            '1. 生成简短 description、summary、keywords、persons、locations、events、topics 和 emotion。',
             (
-                f"2. 实体建议 {guidance['min_entities']}-{guidance['max_entities']} 个："
+                f"2. 实体最多 {guidance['max_entities']} 个："
                 f"{guidance['entity_desc']}。如果文本中包含孤独、喜悦、愧疚、怀念等情感，"
                 '必须将情感作为 EMOTION 类型实体。'
             ),
             (
-                f"3. 关系建议 {guidance['min_relations']}-{guidance['max_relations']} 条，"
+                f"3. 关系最多 {guidance['max_relations']} 条，"
                 '覆盖亲属、朋友、同事、地点、参与、导致、属于、共现等显式或合理隐含关系。'
             ),
             '4. 实体 type 只能使用 PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION。',
@@ -332,12 +342,23 @@ class LLMService:
     def _build_json_prompt(self, text: str) -> str:
         """构建 JSON 降级路径的提示词。"""
         tool_prompt = self._build_tool_prompt(text)
+        if self.extraction_compact_prompt:
+            return tool_prompt + '\n\n' + '\n'.join([
+                '## 输出格式',
+                '只返回合法 JSON，不要 Markdown，不要解释。',
+                '结构字段：',
+                '- understanding: {description, summary, keywords[], persons[], locations[], events[], topics[], emotion:{valence, arousal, dominant_emotion}}',
+                '- entities[]: {id, name, type(PERSON/LOCATION/EVENT/OBJECT/CONCEPT/EMOTION), description, attributes{}, aliases[]}',
+                '- relations[]: {source, target, type(中文), description, fact, confidence(0-1)}',
+                '- emotion: {valence(-1~1), arousal(0~1), dominant_emotion}',
+            ])
+
         return tool_prompt + '\n\n' + '\n'.join([
             '## 输出格式',
             '只返回合法 JSON，不要 Markdown，不要解释。结构如下：',
             '{',
             '  "understanding": {',
-            '    "description": "详细描述",',
+            '    "description": "简短描述",',
             '    "summary": "一句话概括",',
             '    "keywords": ["关键词"],',
             '    "persons": ["人物"],',
