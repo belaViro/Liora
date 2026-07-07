@@ -22,7 +22,7 @@ def compute_understand():
     输出: { understanding, entities, relations, emotion }
     """
     try:
-        data = request.json if isinstance(request.json, dict) else {}
+        data = request.get_json(silent=True) or {}
         content = data.get('content', '')
         memory_type = data.get('type', 'text')
         file_path = data.get('file_path')
@@ -42,13 +42,17 @@ def compute_understand():
         # 调用 LLM 理解和抽取
         result = llm_service.understand_and_extract(memory_data)
 
+        # 透传内部 success/error 状态
+        is_success = result.pop('success', True)
+        error = result.pop('error', None)
         return jsonify({
-            'success': True,
+            'success': is_success,
             'data': result,
             'meta': {
                 'model': llm_service.model_name,
                 'provider': llm_service.provider
-            }
+            },
+            **({'message': error} if error else {})
         })
 
     except Exception as e:

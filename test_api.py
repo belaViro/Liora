@@ -1,6 +1,4 @@
-"""
-测试硅基流动 API 连接
-"""
+"""测试 API 连接"""
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -25,9 +23,7 @@ try:
         ],
         max_tokens=50
     )
-        print(f"\n[OK] 连接成功！")
+    print(f"\n[OK] 连接成功！")
     print(f"回复: {response.choices[0].message.content}")
 except Exception as e:
-    print(f"\n[FAIL] 连接失败: {e}")0].message.content}")
-except Exception as e:
-    print(f"\n❌ 连接失败: {e}")
+    print(f"\n[FAIL] 连接失败: {e}")
