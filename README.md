@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.5-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.6-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI%2FMiniMax-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
@@ -240,6 +240,11 @@ MemoryWeaver/
 
 
 ## 📅 更新日志
+
+### v1.0.6 · 2026-07-08
+- 🎨 新增档案室工作台视觉精修样式，统一 Header、图谱工具栏、侧栏与弹窗质感
+- 🧭 优化桌面 / 平板 / 移动端布局，修复工作台轻微视口溢出
+- 📱 调整 900px 以下为抽屉式侧栏，改善平板与手机端操作体验
 
 ### v1.0.5 · 2026-07-01
 - ✨ 新增洛忆聊天 SSE 流式输出，回复生成时逐段显示

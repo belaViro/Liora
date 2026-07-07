@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.5-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.6-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI--compatible-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
@@ -201,6 +201,12 @@ Language preference is stored locally in the browser. Memory content is not auto
 ---
 
 ## Changelog
+
+### v1.0.6 · 2026-07-08
+
+- Added archive-workbench visual polish for the header, graph controls, sidebar, panels, and modals.
+- Improved desktop, tablet, and mobile layout stability by removing subtle viewport overflow.
+- Switched sub-900px layouts to a drawer-based sidebar for cleaner tablet and phone use.
 
 ### v1.0.5 · 2026-07-01
 
