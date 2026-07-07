@@ -470,3 +470,94 @@
 .pi-panel::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-muted);
 }
+
+/* ============================================
+   公告弹窗
+   ============================================ */
+.announcement-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 3000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.announcement-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.announcement-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: 400px;
+    max-width: calc(100vw - 32px);
+    background: #fff;
+    border-radius: 12px;
+    z-index: 3001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.announcement-modal.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.announcement-content {
+    padding: 28px 32px 24px;
+    text-align: center;
+}
+
+.announcement-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.announcement-icon {
+    font-size: 24px;
+}
+
+.announcement-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.announcement-body {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #555;
+    margin-bottom: 24px;
+}
+
+.announcement-body p {
+    margin: 0 0 8px;
+}
+
+.announcement-btn {
+    display: inline-block;
+    padding: 10px 36px;
+    background: #8B7355;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.announcement-btn:hover {
+    background: #6F5B42;
+}

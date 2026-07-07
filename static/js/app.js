@@ -105,6 +105,31 @@ function closeWelcomeModal() {
     localStorage.setItem('lioraWelcomeSeen', 'true');
 }
 
+// 公告弹窗初始化
+function initAnnouncementModal() {
+    const seen = localStorage.getItem('lioraAnnouncementSeen');
+    if (seen) return;
+
+    const overlay = document.getElementById('announcementOverlay');
+    const modal = document.getElementById('announcementModal');
+    if (!overlay || !modal) return;
+
+    // 等欢迎弹窗之后再显示
+    setTimeout(() => {
+        overlay.classList.add('show');
+        modal.classList.add('show');
+    }, 1200);
+}
+
+// 关闭公告弹窗
+function closeAnnouncement() {
+    const overlay = document.getElementById('announcementOverlay');
+    const modal = document.getElementById('announcementModal');
+    if (overlay) overlay.classList.remove('show');
+    if (modal) modal.classList.remove('show');
+    localStorage.setItem('lioraAnnouncementSeen', 'true');
+}
+
 // ==================== Liora 功能函数 ====================
 
 // 根据情感值获取图标
@@ -518,6 +543,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadMemories();
     loadStats();
     initWelcomeModal();
+    initAnnouncementModal();
     hidePageLoader();
 
     // 边标签开关事件

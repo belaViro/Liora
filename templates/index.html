@@ -276,6 +276,22 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- 公告弹窗 -->
+    <div class="announcement-overlay" id="announcementOverlay"></div>
+    <div class="announcement-modal" id="announcementModal">
+        <div class="announcement-content">
+            <div class="announcement-header">
+                <span class="announcement-icon">📢</span>
+                <span class="announcement-title">系统公告</span>
+            </div>
+            <div class="announcement-body">
+                <p>目前上游 LLM 流量不稳定，数据解析时间可能较长，请您耐心等待。</p>
+                <p>感谢您的理解与支持。</p>
+            </div>
+            <button class="announcement-btn" onclick="closeAnnouncement()">我知道了</button>
+        </div>
+    </div>
+
 
 
     <!-- 记忆卡片导出模态框 -->
@@ -480,7 +496,7 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/i18n.js') }}?v=2026042901"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=2026042901"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=2026070701"></script>
     <script src="{{ url_for('static', filename='js/prediction.js') }}?v=2026042901"></script>
 
 </body>
