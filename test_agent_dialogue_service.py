@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from services.agent_dialogue_service import AgentDialogueService, _trim_reply
 
@@ -12,6 +13,30 @@ class _FakeCompletions:
             choices=[SimpleNamespace(message=SimpleNamespace(content=self.content))]
         )
 
+
+
+class _SequenceCompletions:
+    def __init__(self, contents):
+        self.contents = list(contents)
+        self.max_tokens_seen = []
+
+    def create(self, **kwargs):
+        self.max_tokens_seen.append(kwargs.get('max_tokens'))
+        content = self.contents.pop(0) if self.contents else ''
+        finish_reason = 'length' if not content else 'stop'
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content), finish_reason=finish_reason)]
+        )
+
+
+class _SequenceLLMService:
+    model_name = 'fake-model'
+
+    def __init__(self, contents):
+        self.completions = _SequenceCompletions(contents)
+        self.client = SimpleNamespace(
+            chat=SimpleNamespace(completions=self.completions)
+        )
 
 class _FakeLLMService:
     model_name = 'fake-model'
@@ -44,3 +69,40 @@ def test_chat_does_not_fall_back_when_cleanup_salvages_persona_line():
     result = service._chat('system', 'user', max_tokens=180, temperature=0.7, fallback='fallback')
 
     assert result == '我那天其实是想留下来多听你说一句。'
+
+
+def test_first_round_uses_all_participants_and_later_round_uses_random_subset():
+    service = AgentDialogueService(_FakeLLMService('我会认真接住这句话。'))
+    participants = [
+        {'id': 'p1', 'name': '阿一', 'type': 'PERSON'},
+        {'id': 'p2', 'name': '阿二', 'type': 'PERSON'},
+        {'id': 'p3', 'name': '阿三', 'type': 'PERSON'},
+    ]
+    payload = {
+        'memory': {'id': 'm1', 'content': '阿一、阿二、阿三一起回忆那天的事。'},
+        'participants': participants,
+        'rounds': 2,
+        'start_round': 1,
+        'include_summary': False,
+    }
+
+    with patch('services.agent_dialogue_service.random.randint', return_value=2), \
+         patch('services.agent_dialogue_service.random.sample', side_effect=lambda items, count: items[:count]):
+        events = list(service.create_dialogue_stream(payload))
+
+    turns = [event['data']['turn'] for event in events if event['event'] == 'turn']
+    first_round_names = [turn['agent_name'] for turn in turns if turn['round'] == 1]
+    second_round_names = [turn['agent_name'] for turn in turns if turn['round'] == 2]
+
+    assert first_round_names == ['阿一', '阿二', '阿三']
+    assert second_round_names == ['阿一', '阿二']
+
+
+def test_chat_retries_empty_reply_with_larger_token_budget():
+    llm_service = _SequenceLLMService(['', '我这次直接把话说清楚。'])
+    service = AgentDialogueService(llm_service)
+
+    result = service._chat('system', 'user', max_tokens=2400, temperature=0.7, fallback='fallback')
+
+    assert result == '我这次直接把话说清楚。'
+    assert llm_service.completions.max_tokens_seen == [2400, 4800]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import uuid
 from datetime import datetime
@@ -63,7 +64,7 @@ class AgentDialogueService:
 
         for offset in range(rounds):
             round_index = start_round + offset
-            for participant in participants:
+            for participant in _participants_for_round(participants, round_index):
                 yield {
                     "event": "speaking",
                     "data": {
@@ -136,7 +137,7 @@ class AgentDialogueService:
         system_prompt = _persona_system_prompt(participant, language)
         user_prompt = _persona_user_prompt(memory, participant, public_turns, user_question, language, round_index)
         fallback = f"（{participant['name']} 这一轮生成失败）" if language == "Chinese" else f"({participant['name']} failed to generate this turn.)"
-        return self._chat(system_prompt, user_prompt, max_tokens=800, temperature=0.72, fallback=fallback)
+        return self._chat(system_prompt, user_prompt, max_tokens=2400, temperature=0.72, fallback=fallback)
 
     def _generate_luoyi_summary(
         self,
@@ -177,7 +178,7 @@ class AgentDialogueService:
                 ]
             )
             fallback = "我会把它当成一场记忆剧场：重点不是证明每个细节，而是看这些声音之间怎样互相照亮。"
-        return self._chat(system_prompt, user_prompt, max_tokens=1000, temperature=0.55, fallback=fallback)
+        return self._chat(system_prompt, user_prompt, max_tokens=3200, temperature=0.55, fallback=fallback)
 
     def _chat(self, system_prompt: str, user_prompt: str, max_tokens: int, temperature: float, fallback: str) -> str:
         try:
@@ -186,13 +187,17 @@ class AgentDialogueService:
             if cleaned:
                 return cleaned
 
-            logger.warning("agent dialogue LLM reply was empty after persona cleanup; retrying with dialogue-only prompt")
+            retry_max_tokens = min(max(max_tokens * 2, 4096), 6000)
+            logger.warning(
+                f"agent dialogue LLM reply was empty after cleanup; retrying with dialogue-only prompt "
+                f"and max_tokens={retry_max_tokens}"
+            )
             retry_system = system_prompt + (
                 "\n\n重要：上一条回答不合格。现在只输出角色对白本身，"
                 "不要解释、不要说证据、不要说你在推演、不要写角色名。"
             )
             retry_user = _dialogue_only_retry_prompt(user_prompt)
-            retry_content = self._complete_chat(retry_system, retry_user, max_tokens, min(temperature + 0.08, 0.9))
+            retry_content = self._complete_chat(retry_system, retry_user, retry_max_tokens, min(temperature + 0.08, 0.9))
             cleaned = _trim_reply(retry_content, "")
             return cleaned or fallback
         except Exception as exc:
@@ -209,8 +214,21 @@ class AgentDialogueService:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return _message_content_to_text(response.choices[0].message.content)
+        choice = response.choices[0]
+        content = _message_content_to_text(choice.message.content)
+        finish_reason = getattr(choice, "finish_reason", "")
+        if not content:
+            logger.warning(f"agent dialogue LLM returned empty content; finish_reason={finish_reason}")
+        elif finish_reason == "length":
+            logger.warning("agent dialogue LLM response hit max_tokens limit")
+        return content
 
+def _participants_for_round(participants: List[Dict[str, Any]], round_index: int) -> List[Dict[str, Any]]:
+    if round_index <= 1 or len(participants) <= 1:
+        return participants
+
+    speaker_count = random.randint(1, len(participants))
+    return random.sample(participants, speaker_count)
 def _persona_system_prompt(participant: Dict[str, Any], language: str) -> str:
     name = participant["name"]
     profile = participant.get("persona_profile") or {}
