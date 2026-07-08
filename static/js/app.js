@@ -525,6 +525,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         memoryService = new ClientMemoryService(db, computeApi, vectorSearch);
         graphService = new ClientGraphService(db, computeApi);
+        if (typeof ClientAgentDialogueService !== 'undefined') {
+            agentDialogueService = new ClientAgentDialogueService(db);
+        }
         console.log('[App] Client services initialized');
 
         // 从 IndexedDB 加载已有数据
@@ -733,7 +736,6 @@ async function showMemoryCard(memoryId, daysDiff) {
     // 获取AI评价和摘要
     const aiQuoteEl = document.getElementById('cardAIQuote');
     aiQuoteEl.textContent = "...";
-    
     modal.classList.add('show');
     
     try {
@@ -1759,6 +1761,7 @@ function showMemoryModal(memory) {
     const content = memory.content || (currentLocale() === 'en-US' ? 'No content' : '无内容');
     const understanding = memory.understanding || {};
     const entities = memory.entities || [];
+    const personEntities = entities.filter(e => e.type === 'PERSON' && !['我', '本人', '自己', '用户', '你', '他', '她', 'ta', 'me', 'i', 'myself', 'user'].includes((e.name || '').trim().toLowerCase()));
     const emotion = memory.emotion || {};
     
     // 情感颜色
@@ -1822,9 +1825,41 @@ function showMemoryModal(memory) {
         </div>
     `;
 
-    modal.classList.add('show');
-}
+    if (personEntities.length > 0) {
+        const actions = body.querySelector('.memory-modal-actions');
+        if (actions) {
+            actions.insertAdjacentHTML('afterbegin', `
+                <button class="memory-card-action-btn" onclick="startAgentDialogueForMemory('${memory.id}')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    ${currentLocale() === 'en-US' ? 'Multi-person Review' : '多人物复盘'}
+                </button>
+            `);
+        }
+        body.insertAdjacentHTML('beforeend', `
+            <div class="memory-modal-section agent-dialogue-entry">
+                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? 'Luoyi Review' : '洛忆推演'}</div>
+                <div class="agent-dialogue-hint">
+                    ${currentLocale() === 'en-US'
+                        ? 'Luoyi will host an exploratory dialogue with up to three people linked to this memory. Personas can respond to each other, while each only receives its own isolated memory context.'
+                        : '洛忆会主持最多三位相关人物进行探索性对话。人物会互相回应，但只会收到自己的隔离记忆上下文。'}
+                </div>
+                <div class="agent-dialogue-history" id="agentDialogueHistory"></div>
+                <div class="agent-dialogue-panel" id="agentDialoguePanel"></div>
+            </div>
+        `);
+    }
 
+    modal.classList.add('show');
+
+    if (personEntities.length > 0 && typeof loadAgentDialogueSessionsForMemory === 'function') {
+        loadAgentDialogueSessionsForMemory(memory.id);
+    }
+}
 // 关闭记忆弹窗
 function closeMemoryModal() {
     const modal = document.getElementById('memoryModal');

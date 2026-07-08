@@ -20,6 +20,7 @@ def register_blueprints(app: 'Flask') -> None:
     from .config import config_bp
     from .luoyi import luoyi_bp
     from .compute import compute_bp
+    from .agents import agents_bp
 
     # 注册 Blueprint
     app.register_blueprint(memory_bp)
@@ -28,5 +29,6 @@ def register_blueprints(app: 'Flask') -> None:
     app.register_blueprint(config_bp)  # /api/config 路由
     app.register_blueprint(luoyi_bp)  # /api/luoyi/* 路由
     app.register_blueprint(compute_bp)  # /api/compute/* 纯计算路由
+    app.register_blueprint(agents_bp)  # /api/agents/* 多人物复盘编排路由
 
     # 注：stats 和 export 路由已移除，数据统计和导入导出由前端 IndexedDB 处理

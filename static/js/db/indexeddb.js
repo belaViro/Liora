@@ -7,7 +7,7 @@ class MemoryWeaverDB {
     constructor() {
         this.db = null;
         this.DB_NAME = 'MemoryWeaver_db';
-        this.VERSION = 1;
+        this.VERSION = 2;
     }
 
     /**
@@ -79,6 +79,13 @@ class MemoryWeaverDB {
                 // settings store
                 if (!db.objectStoreNames.contains('settings')) {
                     db.createObjectStore('settings', { keyPath: 'key' });
+                }
+
+                // agent dialogue sessions store
+                if (!db.objectStoreNames.contains('agent_dialogue_sessions')) {
+                    const dialogueStore = db.createObjectStore('agent_dialogue_sessions', { keyPath: 'id' });
+                    dialogueStore.createIndex('memory_id', 'memory_id', { unique: false });
+                    dialogueStore.createIndex('created_at', 'created_at', { unique: false });
                 }
 
                 console.log('[DB] Database schema created');
@@ -794,6 +801,50 @@ class MemoryWeaverDB {
         return record ? record.value : defaultValue;
     }
 
+    // ==================== Agent Dialogue Sessions ====================
+
+    /**
+     * 保存多人物复盘会话
+     */
+    async saveAgentDialogueSession(session) {
+        const record = {
+            ...session,
+            created_at: session.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        return this._put('agent_dialogue_sessions', record);
+    }
+
+    /**
+     * 获取单个多人物复盘会话
+     */
+    async getAgentDialogueSession(id) {
+        return this._get('agent_dialogue_sessions', id);
+    }
+
+    /**
+     * 获取某条记忆下的复盘会话
+     */
+    async getAgentDialogueSessionsByMemory(memoryId) {
+        const sessions = await this._getAll('agent_dialogue_sessions');
+        return sessions
+            .filter(session => session.memory_id === memoryId)
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    }
+
+    /**
+     * 获取所有多人物复盘会话
+     */
+    async getAllAgentDialogueSessions() {
+        return this._getAll('agent_dialogue_sessions');
+    }
+
+    /**
+     * 删除多人物复盘会话
+     */
+    async deleteAgentDialogueSession(id) {
+        return this._delete('agent_dialogue_sessions', id);
+    }
     // ==================== Export/Import ====================
 
     /**
@@ -804,6 +855,7 @@ class MemoryWeaverDB {
         const entities = await this.getAllEntities();
         const relations = await this.getAllRelations();
         const files = await this.getAllFiles();
+        const dialogueSessions = await this.getAllAgentDialogueSessions();
 
         // 序列化的数据（Blob 转为 base64）
         const serializedFiles = [];
@@ -826,6 +878,7 @@ class MemoryWeaverDB {
             memories: memories,
             entities: entities,
             relations: relations,
+            agent_dialogue_sessions: dialogueSessions,
             files: serializedFiles
         };
     }
@@ -855,6 +908,13 @@ class MemoryWeaverDB {
             await this.saveRelations(data.relations);
         }
 
+        // 导入多人物复盘会话
+        if (data.agent_dialogue_sessions) {
+            for (const session of data.agent_dialogue_sessions) {
+                await this.saveAgentDialogueSession(session);
+            }
+        }
+
         // 导入文件
         if (data.files) {
             for (const file of data.files) {
@@ -881,6 +941,7 @@ class MemoryWeaverDB {
         await this._clear('embeddings');
         await this._clear('uploads');
         await this._clear('sync_queue');
+        await this._clear('agent_dialogue_sessions');
     }
 
     // ==================== Private helpers ====================

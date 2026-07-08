@@ -38,6 +38,10 @@ class ServiceRegistry:
     def temporal_extractor(self):
         return self._services.get('temporal_extractor')
 
+    @property
+    def agent_dialogue_service(self):
+        return self._services.get('agent_dialogue_service')
+
 
 # 全局服务注册表实例
 services = ServiceRegistry()

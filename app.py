@@ -47,10 +47,13 @@ def create_app():
     from services import services
     from services.llm_service import LLMService
     from services.temporal_extractor import TemporalExtractor
+    from services.agent_dialogue_service import AgentDialogueService
 
     # 注册服务（无状态计算服务）
     services.register('temporal_extractor', TemporalExtractor())
-    services.register('llm_service', LLMService())
+    llm_service = LLMService()
+    services.register('llm_service', llm_service)
+    services.register('agent_dialogue_service', AgentDialogueService(llm_service))
 
     # 将 services 挂载到 app 以便通过 current_app 访问
     app.services = services
