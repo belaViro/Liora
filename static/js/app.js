@@ -2912,19 +2912,12 @@ function renderGraph() {
         });
     });
     
-    // 点击空白关闭详情面板
-    svg.on('click', () => {
+    // 点击 SVG 空白处关闭详情面板，并取消由搜索、跳转、路径探索产生的聚焦高亮
+    svg.on('click', (event) => {
+        if (event.defaultPrevented) return;
         closeDetailPanel();
-        expandedSelfLoops.clear();  // 重置自环展开状态
-        highlightedPath = null;  // 清除路径高亮
-        node.attr('stroke', d => highlightedNodeIds.has(d.id) ? '#FFD700' : '#fff')
-            .attr('stroke-width', d => highlightedNodeIds.has(d.id) ? 4 : 2.5);
-        link.attr('stroke', d => {
-            if (d.isSelfLoop) return '#E91E63';
-            return edgeColorMap[d.type] || '#C0C0C0';
-        }).attr('stroke-width', d => d.isSelfLoop ? 2 : 1.5);
-        linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)');
-        linkLabels.attr('fill', d => d.isSelfLoop ? '#E91E63' : '#666');
+        expandedSelfLoops.clear();
+        clearGraphFocus();
     });
 }
 
@@ -4468,6 +4461,12 @@ function updateGraphStyles() {
             if (highlightedNodeIds.has(d.id)) return 4;
             return 2.5;
         });
+
+    // 更新节点标签，避免清除聚焦后文字仍保持高亮样式
+    g.selectAll('.nodes text')
+        .attr('font-size', d => highlightedNodeIds.has(d.id) ? '13px' : '11px')
+        .attr('fill', d => highlightedNodeIds.has(d.id) ? '#E91E63' : '#555')
+        .attr('font-weight', d => highlightedNodeIds.has(d.id) ? '600' : '400');
     
     // 更新边样式
     g.selectAll('.links path')
@@ -4487,6 +4486,19 @@ function updateGraphStyles() {
             if (d.isSelfLoop) return 2;
             return 1.5;
         });
+
+    g.selectAll('.links rect')
+        .attr('fill', 'rgba(255,255,255,0.95)');
+
+    g.selectAll('.links text')
+        .attr('fill', d => d.isSelfLoop ? '#E91E63' : '#666');
+}
+
+function clearGraphFocus() {
+    highlightedNodeIds.clear();
+    highlightedPath = null;
+    pathTargetNode = null;
+    updateGraphStyles();
 }
 
 // ==================== 有意思的功能 ====================
