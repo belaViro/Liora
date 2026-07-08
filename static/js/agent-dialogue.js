@@ -6,7 +6,8 @@ let agentDialogueRuntime = {
     memoryId: null,
     session: null,
     running: false,
-    summarized: false
+    summarized: false,
+    currentHistoryMemoryId: null
 };
 
 async function startAgentDialogueForMemory(memoryId) {
@@ -31,7 +32,8 @@ async function startAgentDialogueForMemory(memoryId) {
         memoryId,
         session: liveSession,
         running: false,
-        summarized: false
+        summarized: false,
+        currentHistoryMemoryId: memoryId
     };
 
     panel.style.display = 'block';
@@ -75,7 +77,7 @@ async function summarizeAgentDialogue() {
     });
 }
 
-async function runAgentDialogueStep({ memoryId, session, rounds, startRound, includeSummary, openingStatus }) {
+async function runAgentDialogueStep({ memoryId, session, rounds, startRound, includeSummary, openingStatus, userQuestion }) {
     if (!agentDialogueService || !memoryId || !session || agentDialogueRuntime.running) return;
 
     agentDialogueRuntime.memoryId = memoryId;
@@ -90,6 +92,7 @@ async function runAgentDialogueStep({ memoryId, session, rounds, startRound, inc
         startRound,
         includeSummary,
         history: session.turns || [],
+        question: userQuestion,
         sessionId: agentDialogueRequestSessionId(session),
         createdAt: session.created_at || null,
         onEvent: (event, payload) => handleAgentDialogueStreamEvent(event, payload)
@@ -111,12 +114,12 @@ async function runAgentDialogueStep({ memoryId, session, rounds, startRound, inc
     agentDialogueRuntime.summarized = hasAgentDialogueSummary(agentDialogueRuntime.session);
     updateAgentDialogueStatus(includeSummary
         ? (isAgentDialogueEnglish() ? 'Luoyi has summarized.' : '洛忆已总结。')
-        : (isAgentDialogueEnglish() ? 'Round complete. You can continue when ready.' : '本轮完成，可以继续下一轮。'));
+        : (isAgentDialogueEnglish() ? 'Personas have replied.' : '人物已回应。'));
     updateAgentDialogueControls();
 
     showToast(includeSummary
         ? (isAgentDialogueEnglish() ? 'Summary generated' : '总结已生成')
-        : (isAgentDialogueEnglish() ? 'Round complete' : '本轮已完成'), 'success');
+        : (isAgentDialogueEnglish() ? 'Personas replied' : '人物已回应'), 'success');
     await loadAgentDialogueSessionsForMemory(memoryId);
 }
 
@@ -170,6 +173,7 @@ function handleAgentDialogueStreamEvent(event, payload) {
 async function loadAgentDialogueSessionsForMemory(memoryId) {
     const historyEl = document.getElementById('agentDialogueHistory');
     if (!historyEl || !agentDialogueService) return;
+    agentDialogueRuntime.currentHistoryMemoryId = memoryId;
 
     try {
         const sessions = await agentDialogueService.getSessionsForMemory(memoryId);
@@ -183,10 +187,13 @@ async function loadAgentDialogueSessionsForMemory(memoryId) {
                 ${isAgentDialogueEnglish() ? 'Previous reviews' : '历史复盘'}
             </div>
             ${sessions.slice(0, 3).map(session => `
-                <button class="agent-dialogue-history-item" data-session-id="${escapeAgentDialogueHtml(session.id)}" onclick="showSavedAgentDialogueSession(this.dataset.sessionId)">
-                    <span>${formatAgentDialogueDate(session.created_at)}</span>
-                    <span>${(session.participants || []).map(p => escapeAgentDialogueHtml(p.name)).join(' / ')}</span>
-                </button>
+                <div class="agent-dialogue-history-item" data-session-id="${escapeAgentDialogueHtml(session.id)}">
+                    <button type="button" class="agent-dialogue-history-open" onclick="showSavedAgentDialogueSession(this.closest('.agent-dialogue-history-item').dataset.sessionId)">
+                        <span>${formatAgentDialogueDate(session.created_at)}</span>
+                        <span>${(session.participants || []).map(p => escapeAgentDialogueHtml(p.name)).join(' / ')}</span>
+                    </button>
+                    <button type="button" class="agent-dialogue-history-delete" title="${isAgentDialogueEnglish() ? 'Delete' : '删除'}" aria-label="${isAgentDialogueEnglish() ? 'Delete review' : '删除历史复盘'}" onclick="deleteAgentDialogueSession(event, this.closest('.agent-dialogue-history-item').dataset.sessionId)">×</button>
+                </div>
             `).join('')}
         `;
     } catch (error) {
@@ -194,6 +201,47 @@ async function loadAgentDialogueSessionsForMemory(memoryId) {
     }
 }
 
+async function deleteAgentDialogueSession(event, sessionId) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!sessionId || !db) return;
+
+    const confirmed = window.confirm(isAgentDialogueEnglish() ? 'Delete this review?' : '删除这条历史复盘？');
+    if (!confirmed) return;
+
+    const historyItem = event?.currentTarget?.closest('.agent-dialogue-history-item') || null;
+    const memoryId = agentDialogueRuntime.currentHistoryMemoryId || agentDialogueRuntime.memoryId;
+
+    try {
+        const session = await db.getAgentDialogueSession(sessionId);
+        const refreshMemoryId = session?.memory_id || memoryId;
+
+        if (historyItem) {
+            historyItem.remove();
+        }
+
+        await db.deleteAgentDialogueSession(sessionId);
+
+        if (agentDialogueRuntime.session?.id === sessionId) {
+            hideAgentDialoguePanel();
+            agentDialogueRuntime.session = null;
+            agentDialogueRuntime.summarized = false;
+        }
+
+        if (refreshMemoryId) {
+            await loadAgentDialogueSessionsForMemory(refreshMemoryId);
+        }
+        showToast(isAgentDialogueEnglish() ? 'Review deleted' : '历史复盘已删除', 'success');
+    } catch (error) {
+        console.warn('[AgentDialogue] delete history failed:', error);
+        if (memoryId) {
+            await loadAgentDialogueSessionsForMemory(memoryId);
+        }
+        showToast(error.message || (isAgentDialogueEnglish() ? 'Delete failed' : '删除失败'), 'error');
+    }
+}
 async function showSavedAgentDialogueSession(sessionId) {
     if (!agentDialogueService) return;
     const panel = document.getElementById('agentDialoguePanel');
@@ -206,7 +254,8 @@ async function showSavedAgentDialogueSession(sessionId) {
         memoryId: session.memory_id,
         session,
         running: false,
-        summarized: hasAgentDialogueSummary(session)
+        summarized: hasAgentDialogueSummary(session),
+        currentHistoryMemoryId: session.memory_id
     };
 
     panel.style.display = 'block';
@@ -249,17 +298,76 @@ function renderAgentDialogueControlsHtml(session, options = {}) {
     const hasParticipantTurns = turns.some(turn => turn.role === 'participant');
     const running = options.running ?? agentDialogueRuntime.running;
     const summarized = options.summarized ?? hasAgentDialogueSummary(session);
-    const disabled = running || !hasParticipantTurns;
-    const summaryDisabled = disabled || summarized;
+    const chatDisabled = running || !hasParticipantTurns || summarized;
+    const summaryDisabled = running || !hasParticipantTurns || summarized;
+    const placeholder = summarized
+        ? (isAgentDialogueEnglish() ? 'This review has been summarized.' : '这场复盘已经总结。')
+        : (isAgentDialogueEnglish() ? 'Join the conversation...' : '输入你的回应，参与这场对话...');
 
     return `
-        <button class="agent-dialogue-action-btn" onclick="continueAgentDialogueRound()" ${disabled ? 'disabled' : ''}>
-            ${isAgentDialogueEnglish() ? 'Continue' : '继续下一轮'}
-        </button>
-        <button class="agent-dialogue-action-btn secondary" onclick="summarizeAgentDialogue()" ${summaryDisabled ? 'disabled' : ''}>
+        <div class="agent-dialogue-chatbar">
+            <textarea id="agentDialogueUserInput" class="agent-dialogue-chat-input" rows="2" maxlength="500" placeholder="${escapeAgentDialogueHtml(placeholder)}" onkeydown="onAgentDialogueInputKeydown(event)" ${chatDisabled ? 'disabled' : ''}></textarea>
+            <button type="button" class="agent-dialogue-action-btn" onclick="sendAgentDialogueUserMessage()" ${chatDisabled ? 'disabled' : ''}>
+                ${isAgentDialogueEnglish() ? 'Send' : '发送'}
+            </button>
+        </div>
+        <button type="button" class="agent-dialogue-action-btn secondary" onclick="summarizeAgentDialogue()" ${summaryDisabled ? 'disabled' : ''}>
             ${summarized ? (isAgentDialogueEnglish() ? 'Summarized' : '已总结') : (isAgentDialogueEnglish() ? 'Luoyi Summary' : '洛忆总结')}
         </button>
     `;
+}
+
+async function sendAgentDialogueUserMessage() {
+    const session = agentDialogueRuntime.session;
+    if (!session || agentDialogueRuntime.running || hasAgentDialogueSummary(session)) return;
+
+    const input = document.getElementById('agentDialogueUserInput');
+    const content = (input?.value || '').trim();
+    if (!content) return;
+
+    const memoryId = agentDialogueRuntime.memoryId || session.memory_id;
+    if (!memoryId) return;
+
+    const round = inferNextAgentDialogueRound(session.turns || []);
+    const userTurn = {
+        id: `user_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        role: 'user',
+        agent_id: 'user',
+        agent_name: isAgentDialogueEnglish() ? 'You' : '你',
+        content,
+        round,
+        evidence_ids: [],
+        created_at: new Date().toISOString()
+    };
+
+    session.turns = mergeAgentDialogueTurns(session.turns || [], [userTurn]);
+    session.updated_at = new Date().toISOString();
+    agentDialogueRuntime.session = session;
+    appendAgentDialogueTurn(userTurn);
+    if (input) input.value = '';
+    updateAgentDialogueControls();
+
+    try {
+        await db.saveAgentDialogueSession(session);
+    } catch (error) {
+        console.warn('[AgentDialogue] save user turn failed:', error);
+    }
+
+    await runAgentDialogueStep({
+        memoryId,
+        session,
+        rounds: 1,
+        startRound: round,
+        includeSummary: false,
+        userQuestion: content,
+        openingStatus: isAgentDialogueEnglish() ? 'Personas are replying...' : '人物正在回应你...'
+    });
+}
+
+function onAgentDialogueInputKeydown(event) {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    sendAgentDialogueUserMessage();
 }
 
 function updateAgentDialogueControls() {
@@ -313,11 +421,13 @@ function updateAgentDialogueStatus(message, isError = false) {
 
 function renderAgentDialogueTurn(turn) {
     const isHost = turn.role === 'host' || turn.agent_id === 'luoyi';
+    const isUser = turn.role === 'user' || turn.agent_id === 'user';
+    const turnClass = isHost ? 'host' : (isUser ? 'user' : 'participant');
     const roundLabel = turn.round && !isHost
         ? `<span class="agent-dialogue-round">${isAgentDialogueEnglish() ? `Round ${turn.round}` : `第 ${turn.round} 轮`}</span>`
         : '';
     return `
-        <div class="agent-dialogue-turn ${isHost ? 'host' : 'participant'}" data-turn-key="${agentDialogueTurnDomKey(turn)}">
+        <div class="agent-dialogue-turn ${turnClass}" data-turn-key="${agentDialogueTurnDomKey(turn)}">
             <div class="agent-dialogue-avatar">${escapeAgentDialogueHtml((turn.agent_name || '?').slice(0, 1))}</div>
             <div class="agent-dialogue-bubble">
                 <div class="agent-dialogue-speaker">
@@ -389,7 +499,7 @@ function inferNextAgentDialogueRound(turns) {
 
 function inferLastAgentDialogueRound(turns) {
     const participantRounds = (turns || [])
-        .filter(turn => turn.role !== 'host' && turn.agent_id !== 'luoyi')
+        .filter(turn => turn.role === 'participant')
         .map(turn => Number(turn.round || 0));
     return participantRounds.length ? Math.max(...participantRounds) : 0;
 }

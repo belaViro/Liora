@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Iterator, List
@@ -135,7 +136,7 @@ class AgentDialogueService:
         system_prompt = _persona_system_prompt(participant, language)
         user_prompt = _persona_user_prompt(memory, participant, public_turns, user_question, language, round_index)
         fallback = f"（{participant['name']} 这一轮生成失败）" if language == "Chinese" else f"({participant['name']} failed to generate this turn.)"
-        return self._chat(system_prompt, user_prompt, max_tokens=180, temperature=0.72, fallback=fallback)
+        return self._chat(system_prompt, user_prompt, max_tokens=800, temperature=0.72, fallback=fallback)
 
     def _generate_luoyi_summary(
         self,
@@ -176,7 +177,7 @@ class AgentDialogueService:
                 ]
             )
             fallback = "我会把它当成一场记忆剧场：重点不是证明每个细节，而是看这些声音之间怎样互相照亮。"
-        return self._chat(system_prompt, user_prompt, max_tokens=260, temperature=0.55, fallback=fallback)
+        return self._chat(system_prompt, user_prompt, max_tokens=1000, temperature=0.55, fallback=fallback)
 
     def _chat(self, system_prompt: str, user_prompt: str, max_tokens: int, temperature: float, fallback: str) -> str:
         try:
@@ -208,7 +209,7 @@ class AgentDialogueService:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return response.choices[0].message.content or ""
+        return _message_content_to_text(response.choices[0].message.content)
 
 def _persona_system_prompt(participant: Dict[str, Any], language: str) -> str:
     name = participant["name"]
@@ -459,35 +460,120 @@ def _text(value: Any, default: str = "") -> str:
 
 def _trim_reply(value: str, fallback: str) -> str:
     text = _text(value, fallback)
-    text = text.replace("\r", "").strip().strip('"').strip("'")
+    text = _strip_outer_quotes(text.replace("\r", "").strip())
     text = _remove_meta_hedges(text)
+    text = _strip_outer_quotes(text)
     if len(text) > 180:
         punctuation = max(text.rfind("。", 0, 180), text.rfind("！", 0, 180), text.rfind("？", 0, 180), text.rfind(".", 0, 180))
         text = text[: punctuation + 1] if punctuation > 60 else text[:180].rstrip() + "..."
     return text or fallback
 
 
-
 def _remove_meta_hedges(value: str) -> str:
-    text = value
-    blocked = [
-        "我先按这段记忆推演",
-        "我能确定的线索不多",
-        "证据不足",
-        "我无法知道",
-        "只能基于",
-        "基于记忆证据",
-        "不代表真实人物",
-        "作为AI",
-        "作为一个AI",
-    ]
-    if any(phrase in text for phrase in blocked):
-        parts = [part.strip() for part in text.replace("；", "。").split("。") if part.strip()]
-        parts = [part for part in parts if not any(phrase in part for phrase in blocked)]
-        text = "。".join(parts[:2])
-        if text and not text.endswith(("。", "！", "？", ".", "!", "?")):
-            text += "。"
+    text = _text(value)
+    if not text:
+        return text
+
+    if not _contains_meta_hedge(text):
+        return text
+
+    quoted = _extract_quoted_dialogue(text)
+    if quoted:
+        return quoted
+
+    for phrase in _META_HEDGE_PHRASES:
+        text = re.sub(re.escape(phrase), "", text, flags=re.IGNORECASE)
+
+    text = _strip_dialogue_intro(text)
+    text = _strip_outer_quotes(text)
+
+    if not _contains_meta_hedge(text):
+        return text
+
+    parts = [part.strip() for part in re.findall(r"[^。！？.!?\n]+[。！？.!?]?", text) if part.strip()]
+    parts = [part for part in parts if not _contains_meta_hedge(part)]
+    text = "".join(parts[:2]).strip()
+    return _strip_dialogue_intro(text)
+
+
+_META_HEDGE_PHRASES = [
+    "我先按这段记忆推演",
+    "我能确定的线索不多",
+    "证据不足",
+    "我无法知道",
+    "只能基于",
+    "基于记忆证据",
+    "不代表真实人物",
+    "作为AI",
+    "作为一个AI",
+    "作为人工智能",
+    "based on the memory",
+    "based on the available memory",
+    "insufficient evidence",
+    "i cannot know",
+    "as an ai",
+]
+
+
+def _contains_meta_hedge(value: str) -> bool:
+    normalized = _text(value).lower()
+    return any(phrase.lower() in normalized for phrase in _META_HEDGE_PHRASES)
+
+
+def _extract_quoted_dialogue(value: str) -> str:
+    for pattern in (r"[“「『](.*?)[”」』]", r'"(.*?)"', r"'(.*?)'"):
+        matches = re.findall(pattern, value, flags=re.DOTALL)
+        for candidate in reversed(matches):
+            text = _strip_outer_quotes(candidate)
+            if text and not _contains_meta_hedge(text):
+                return text
+    return ""
+
+
+def _strip_dialogue_intro(value: str) -> str:
+    text = _text(value).strip().lstrip(" \t\n:：,，;；。.-")
+    text = re.sub(
+        r"^(?:我会说|我想说|我可以说|我的对白是|这句对白是|角色对白|对白|回复|回答|line|reply|answer)\s*[:：,，;；。.-]*\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    colon_index = max(text.rfind("："), text.rfind(":"))
+    if colon_index > 0:
+        prefix = text[:colon_index].strip()
+        if len(prefix) <= 24 and any(marker in prefix for marker in ("说", "对白", "回复", "回答", "line", "reply", "answer")):
+            text = text[colon_index + 1 :].strip()
+
+    return text.strip().lstrip(" \t\n:：,，;；。.-")
+
+
+def _strip_outer_quotes(value: str) -> str:
+    text = _text(value).strip()
+    quote_pairs = (("“", "”"), ("「", "」"), ("『", "』"), ('"', '"'), ("'", "'"))
+    changed = True
+    while changed and len(text) >= 2:
+        changed = False
+        for left, right in quote_pairs:
+            if text.startswith(left) and text.endswith(right):
+                text = text[len(left) : len(text) - len(right)].strip()
+                changed = True
     return text
+
+
+def _message_content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                parts.append(str(block.get("text") or block.get("content") or ""))
+        return "\n".join(part for part in parts if part).strip()
+    return "" if content is None else str(content)
+
 def _safe_int(value: Any, default: int, min_value: int, max_value: int) -> int:
     try:
         number = int(value)

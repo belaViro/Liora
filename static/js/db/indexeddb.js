@@ -120,7 +120,9 @@ class MemoryWeaverDB {
             const tx = this.db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             const request = store.delete(key);
-            request.onsuccess = () => resolve();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || request.error);
+            tx.onabort = () => reject(tx.error || request.error);
             request.onerror = () => reject(request.error);
         });
     }
