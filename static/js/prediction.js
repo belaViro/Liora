@@ -74,8 +74,13 @@ async function loadPredictions(node, btnElement) {
         // 调用服务器预测
         const result = await computeApi.predict(node, relatedNodes, 3);
 
-        if (result.success && result.data.predictions.length > 0) {
-            currentPredictions = result.data.predictions.map((p, idx) => ({
+        const predictions = result?.data?.predictions || [];
+        if (!result?.success) {
+            throw new Error(result?.message || tx('prediction.failed'));
+        }
+
+        if (predictions.length > 0) {
+            currentPredictions = predictions.map((p, idx) => ({
                 id: `prediction_${idx}`,
                 name: p.name,
                 type: p.type,
@@ -85,7 +90,7 @@ async function loadPredictions(node, btnElement) {
                 sourceNode: node
             }));
 
-            showPredictionPanel(result.data.predictions);
+            showPredictionPanel(predictions);
             showToast(tx('prediction.found', { count: currentPredictions.length }), 'success');
         } else {
             showToast(tx('prediction.none'), 'info');

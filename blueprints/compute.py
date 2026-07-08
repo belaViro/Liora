@@ -12,6 +12,113 @@ from loguru import logger
 
 compute_bp = Blueprint('compute', __name__, url_prefix='/api/compute')
 
+PREDICTION_TYPES = {'PERSON', 'LOCATION', 'EVENT', 'OBJECT', 'CONCEPT'}
+
+
+def _safe_int(value, default=5, min_value=1, max_value=10):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    return max(min_value, min(number, max_value))
+
+
+def _message_content_to_text(message):
+    content = getattr(message, 'content', '') or ''
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get('text') or item.get('content')
+                if text:
+                    parts.append(str(text))
+            elif item:
+                parts.append(str(item))
+        return ''.join(parts).strip()
+    return str(content).strip()
+
+
+def _extract_json_payload(text):
+    """Parse a JSON object/array from model output, including fenced JSON."""
+    text = (text or '').strip()
+    if not text:
+        raise ValueError('模型返回内容为空')
+
+    candidates = [text]
+    if '```' in text:
+        fence_parts = text.split('```')
+        for part in fence_parts[1::2]:
+            part = part.strip()
+            if part.lower().startswith('json'):
+                part = part[4:].strip()
+            if part:
+                candidates.insert(0, part)
+
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char not in '{[':
+            continue
+        try:
+            payload, _ = decoder.raw_decode(text[index:])
+            return payload
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError('未找到合法 JSON')
+
+
+def _normalize_prediction_items(payload, max_predictions):
+    if isinstance(payload, dict):
+        items = payload.get('predictions', [])
+    elif isinstance(payload, list):
+        items = payload
+    else:
+        raise ValueError('预测结果 JSON 结构必须是对象或数组')
+
+    predictions = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        name = str(item.get('name', '')).strip()
+        if not name:
+            continue
+
+        entity_type = str(item.get('type') or 'CONCEPT').strip().upper()
+        if entity_type not in PREDICTION_TYPES:
+            entity_type = 'CONCEPT'
+
+        relation_type = str(
+            item.get('relation_type') or item.get('relation') or entity_type
+        ).strip() or entity_type
+        reasoning = str(item.get('reasoning') or item.get('reason') or '').strip()
+
+        try:
+            confidence = float(item.get('confidence', 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = max(0.0, min(confidence, 1.0))
+
+        predictions.append({
+            'name': name,
+            'type': entity_type,
+            'relation_type': relation_type,
+            'confidence': confidence,
+            'reasoning': reasoning,
+        })
+
+        if len(predictions) >= max_predictions:
+            break
+
+    return predictions
 
 @compute_bp.route('/understand', methods=['POST'])
 def compute_understand():
@@ -235,93 +342,114 @@ def compute_predict():
     输出: { predictions: [...] }
     """
     try:
-        data = request.json if isinstance(request.json, dict) else {}
-        node = data.get('node', {})
+        data = request.get_json(silent=True) or {}
+        node = data.get('node', {}) if isinstance(data.get('node', {}), dict) else {}
         related_nodes = data.get('related_nodes', [])
-        max_predictions = data.get('max_predictions', 5)
+        if not isinstance(related_nodes, list):
+            related_nodes = []
+        max_predictions = _safe_int(data.get('max_predictions', 5), default=5, min_value=1, max_value=8)
         language = data.get('language', 'Chinese')
         answer_language = 'English' if str(language).lower().startswith('english') else 'Chinese'
 
         llm_service = current_app.services.llm_service
 
-        # 获取节点类型
-        node_type = node.get('type', 'ENTITY')
-        node_name = node.get('name', '')
-        node_description = node.get('description', '')
+        node_type = str(node.get('type') or 'ENTITY').upper()
+        node_name = str(node.get('name') or '').strip()
+        node_description = str(node.get('description') or '').strip()
 
-        # 构建已有关系信息
-        relations_info = []
-        for rel in related_nodes:
-            rel_type = rel.get('type', '')
-            rel_name = rel.get('name', '')
-            rel_desc = rel.get('description', '')
-            if rel_type and rel_name:
-                relations_info.append(f"- {node_name} --[{rel_type}]--> {rel_name}")
+        if not node_name:
+            return jsonify({'success': False, 'message': '节点名称不能为空'})
 
-        # 根据节点类型构建不同的预测提示
-        type_prompts = {
-            'PERSON': f"根据关于 {node_name} 的已知信息({node_description})和关系:\n" + "\n".join(relations_info) + f"\n\n预测 {node_name} 可能还认识哪些人、去哪里、做什么事情？",
-            'LOCATION': f"根据地点 {node_name} 的已知信息({node_description})和关联:\n" + "\n".join(relations_info) + f"\n\n预测这个地点可能关联哪些人物、活动或其他地点？",
-            'EVENT': f"根据事件 {node_name} 的已知信息({node_description})和参与:\n" + "\n".join(relations_info) + f"\n\n预测这个事件可能涉及哪些人物或地点？",
-            'EMOTION': f"根据情感状态 {node_name} 的描述({node_description})和关联:\n" + "\n".join(relations_info) + f"\n\n预测这种情感可能与哪些记忆或事件相关？"
-        }
+        relation_lines = []
+        for rel in related_nodes[:12]:
+            if not isinstance(rel, dict):
+                continue
+            rel_type = str(rel.get('type') or 'ENTITY').upper()
+            rel_name = str(rel.get('name') or '').strip()
+            rel_desc = str(rel.get('description') or '').strip()
+            if not rel_name:
+                continue
+            line = f"- {rel_name} ({rel_type})"
+            if rel_desc:
+                line += f": {rel_desc[:80]}"
+            relation_lines.append(line)
 
-        prompt = type_prompts.get(node_type, type_prompts['PERSON'])
-
-        language_instruction = "Use English for name, relation_type, and reasoning when possible." if answer_language == 'English' else "使用中文填写 name、relation_type 和 reasoning。"
-        system_prompt = """你是一个关系预测专家。基于已有的实体关系，预测可能的下一个关系节点。
-请返回合法的JSON数组格式:
-{
-  "predictions": [
-    {
-      "name": "预测的实体名称",
-      "type": "PERSON|LOCATION|EVENT|OBJECT|CONCEPT",
-      "relation_type": "预测的关系类型",
-      "confidence": 0.85,
-      "reasoning": "预测理由"
-    }
-  ]
-}
-""" + "\n" + language_instruction
-
-        response = llm_service.client.chat.completions.create(
-            model=llm_service.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=800
+        relations_context = "\n".join(relation_lines) if relation_lines else '- 暂无已知邻接节点'
+        language_instruction = (
+            'Use English for name, relation_type, and reasoning.'
+            if answer_language == 'English'
+            else '使用中文填写 name、relation_type 和 reasoning。'
         )
+        system_prompt = f"""你是关系预测专家。只输出一个合法 JSON 对象，不要解释，不要 Markdown，不要输出思考过程。
+JSON 格式:
+{{"predictions":[{{"name":"实体名","type":"PERSON|LOCATION|EVENT|OBJECT|CONCEPT","relation_type":"关系类型","confidence":0.85,"reasoning":"一句话预测理由"}}]}}
+要求:
+- predictions 数量最多 {max_predictions} 条
+- type 只能是 PERSON、LOCATION、EVENT、OBJECT、CONCEPT
+- confidence 必须是 0 到 1 的数字
+- reasoning 保持一句话，避免编造过度具体的隐私细节
+- {language_instruction}"""
+        prompt = f"""中心节点:
+- 名称: {node_name}
+- 类型: {node_type}
+- 描述: {node_description or '无'}
 
-        result_text = response.choices[0].message.content.strip()
+已有邻接节点:
+{relations_context}
 
-        # 解析 JSON
-        predictions = []
-        try:
-            # 尝试提取 JSON
-            json_str = result_text
-            if '```json' in result_text:
-                json_str = result_text.split('```json')[1].split('```')[0]
-            elif '```' in result_text:
-                json_str = result_text.split('```')[1].split('```')[0]
+请基于这些图谱线索预测可能缺失的关联节点。"""
 
-            result = json.loads(json_str)
-            predictions = result.get('predictions', [])[:max_predictions]
-        except Exception as e:
-            logger.warning(f"预测结果解析失败: {e}, raw: {result_text[:200]}")
+        prediction_max_tokens = int(os.getenv('LLM_PREDICTION_MAX_TOKENS', '2000'))
+        retry_max_tokens = int(os.getenv('LLM_PREDICTION_RETRY_MAX_TOKENS', '4096'))
+        token_attempts = [prediction_max_tokens]
+        if retry_max_tokens > prediction_max_tokens:
+            token_attempts.append(retry_max_tokens)
+
+        last_error = None
+        for max_tokens in token_attempts:
+            response = llm_service.client.chat.completions.create(
+                model=llm_service.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,
+                max_tokens=max_tokens
+            )
+
+            choice = response.choices[0]
+            result_text = _message_content_to_text(choice.message)
+            finish_reason = getattr(choice, 'finish_reason', None)
+
+            if not result_text:
+                last_error = f'模型返回内容为空，finish_reason={finish_reason}'
+                logger.warning(f"预测模型未返回最终内容，max_tokens={max_tokens}, finish_reason={finish_reason}")
+                continue
+
+            try:
+                payload = _extract_json_payload(result_text)
+                predictions = _normalize_prediction_items(payload, max_predictions)
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'predictions': predictions
+                    }
+                })
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"预测结果解析失败: {e}, raw: {result_text[:500]}")
 
         return jsonify({
-            'success': True,
+            'success': False,
+            'message': last_error or '预测结果解析失败',
             'data': {
-                'predictions': predictions
+                'predictions': []
             }
         })
 
     except Exception as e:
         logger.exception(f'/predict failed: {e}')
-        return jsonify({'success': False, 'message': str(e)})
-
+        return jsonify({'success': False, 'message': str(e), 'data': {'predictions': []}})
 
 @compute_bp.route('/chat', methods=['POST'])
 def compute_chat():
