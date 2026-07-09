@@ -5423,6 +5423,184 @@ function updateLuoyiMessageContent(message) {
     }
 }
 
+function getLuoyiContextTerms(message) {
+    const raw = String(message || '').toLowerCase().trim();
+    if (!raw) return [];
+
+    const terms = new Set();
+    raw.split(/[\s,，。.!！?？、;；:："“”'‘’()（）\[\]【】]+/)
+        .map(term => term.trim())
+        .filter(term => term.length >= 2)
+        .forEach(term => terms.add(term));
+
+    const compact = raw.replace(/\s+/g, '');
+    if (compact.length >= 2 && compact.length <= 24) {
+        terms.add(compact);
+    }
+
+    return Array.from(terms).slice(0, 12);
+}
+
+function scoreLuoyiMemoryForContext(memory, message, terms) {
+    if (!memory || typeof memory !== 'object') return 0;
+
+    const lowerMessage = String(message || '').toLowerCase().trim();
+    const content = `${memory.content || ''} ${memory.summary || ''}`.toLowerCase();
+    let score = 0;
+
+    if (lowerMessage && content.includes(lowerMessage)) {
+        score += 20;
+    }
+
+    for (const term of terms) {
+        if (content.includes(term)) score += 8;
+    }
+
+    const entities = memory.entities || memory.understanding?.entities || [];
+    for (const entity of entities) {
+        const name = String(entity?.name || '').toLowerCase();
+        if (name && lowerMessage.includes(name)) {
+            score += 12;
+        }
+    }
+
+    const keywords = memory.keywords || memory.understanding?.keywords || [];
+    for (const keyword of keywords) {
+        const text = String(keyword || '').toLowerCase();
+        if (text && lowerMessage.includes(text)) {
+            score += 6;
+        }
+    }
+
+    return score;
+}
+
+function normalizeLuoyiMemoryForContext(memory) {
+    const content = String(memory?.content || '');
+    const summary = memory?.summary || memory?.understanding?.summary || '';
+    const entities = (memory?.entities || memory?.understanding?.entities || [])
+        .slice(0, 20)
+        .map(entity => ({
+            id: entity.id,
+            name: entity.name,
+            type: entity.type
+        }));
+
+    return {
+        id: memory.id,
+        content: content.length > 1500 ? `${content.slice(0, 1500)}...` : content,
+        summary,
+        created_at: memory.created_at,
+        updated_at: memory.updated_at,
+        type: memory.type,
+        emotion: memory.emotion,
+        entities
+    };
+}
+
+function selectLuoyiContextMemories(memories, message) {
+    const list = Array.isArray(memories) ? memories : [];
+    const terms = getLuoyiContextTerms(message);
+    const scored = list
+        .filter(memory => memory && memory.content)
+        .map(memory => ({
+            memory,
+            score: scoreLuoyiMemoryForContext(memory, message, terms),
+            createdAt: memory.created_at || memory.updated_at || ''
+        }))
+        .sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return String(b.createdAt).localeCompare(String(a.createdAt));
+        });
+
+    const selected = [];
+    let totalChars = 0;
+    const maxChars = 26000;
+
+    for (const item of scored) {
+        const contentLength = String(item.memory.content || '').length;
+        if (item.score <= 0 && selected.length >= 30) continue;
+        if (selected.length >= 12 && totalChars + contentLength > maxChars) continue;
+
+        selected.push(normalizeLuoyiMemoryForContext(item.memory));
+        totalChars += contentLength;
+
+        if (selected.length >= 80 || totalChars >= maxChars) break;
+    }
+
+    return selected;
+}
+
+function buildLuoyiGraphSummary(entities, relations, message) {
+    const entityList = Array.isArray(entities) ? entities : [];
+    const relationList = Array.isArray(relations) ? relations : [];
+    const terms = getLuoyiContextTerms(message);
+    const lowerMessage = String(message || '').toLowerCase();
+    const degree = new Map();
+
+    for (const relation of relationList) {
+        if (relation?.source) degree.set(relation.source, (degree.get(relation.source) || 0) + 1);
+        if (relation?.target) degree.set(relation.target, (degree.get(relation.target) || 0) + 1);
+    }
+
+    const scoredEntities = entityList.map(entity => {
+        const haystack = `${entity.name || ''} ${entity.description || ''} ${(entity.aliases || []).join(' ')}`.toLowerCase();
+        let score = degree.get(entity.id) || 0;
+        if (entity.name && lowerMessage.includes(String(entity.name).toLowerCase())) score += 30;
+        for (const term of terms) {
+            if (haystack.includes(term)) score += 12;
+        }
+        return { entity, score };
+    }).sort((a, b) => b.score - a.score);
+
+    const selectedEntities = scoredEntities.slice(0, 60).map(item => item.entity);
+    const selectedIds = new Set(selectedEntities.map(entity => entity.id));
+    const nodes = selectedEntities.map(entity => ({
+        id: entity.id,
+        name: entity.name,
+        type: entity.type,
+        description: entity.description,
+        aliases: entity.aliases || []
+    }));
+
+    const edges = relationList
+        .filter(relation => selectedIds.has(relation.source) || selectedIds.has(relation.target))
+        .slice(0, 120)
+        .map(relation => ({
+            id: relation.id,
+            source: relation.source,
+            target: relation.target,
+            type: relation.type,
+            name: relation.name || relation.type,
+            description: relation.description,
+            fact: relation.fact
+        }));
+
+    return { nodes, edges };
+}
+
+async function buildLuoyiChatContext(message) {
+    if (typeof db === 'undefined' || !db) {
+        return { memories: [], graph_summary: { nodes: [], edges: [] } };
+    }
+
+    try {
+        const [memories, entities, relations] = await Promise.all([
+            typeof db.getAllMemories === 'function' ? db.getAllMemories() : Promise.resolve([]),
+            typeof db.getAllEntities === 'function' ? db.getAllEntities() : Promise.resolve([]),
+            typeof db.getAllRelations === 'function' ? db.getAllRelations() : Promise.resolve([])
+        ]);
+
+        return {
+            memories: selectLuoyiContextMemories(memories, message),
+            graph_summary: buildLuoyiGraphSummary(entities, relations, message)
+        };
+    } catch (error) {
+        console.warn('构建洛忆记忆上下文失败:', error);
+        return { memories: [], graph_summary: { nodes: [], edges: [] } };
+    }
+}
+
 /**
  * 发送消息给洛忆
  */
@@ -5445,6 +5623,7 @@ async function sendLuoyiMessage() {
     let assistantMessage = null;
 
     try {
+        const luoyiContext = await buildLuoyiChatContext(message);
         const response = await fetch('/api/luoyi/chat', {
             method: 'POST',
             headers: {
@@ -5454,6 +5633,8 @@ async function sendLuoyiMessage() {
             body: JSON.stringify({
                 message: message,
                 history: requestHistory,
+                memories: luoyiContext.memories,
+                graph_summary: luoyiContext.graph_summary,
                 language: currentAiLanguage(),
                 stream: true
             })
