@@ -54,6 +54,11 @@ The current architecture keeps user data primarily in the browser through Indexe
   <img src="Screenshots/视角模式.png" alt="Persona Mode" width="49%"/>
 </p>
 
+<p align="center">
+  <img src="Screenshots/多人物复盘.png" alt="Multi-person Review" width="49%"/>
+  <img src="Screenshots/多人物复盘推演.png" alt="Multi-person Review Simulation" width="49%"/>
+</p>
+
 ---
 
 ## Highlights
@@ -182,26 +187,32 @@ The frontend owns most user data and interaction state. The backend exposes comp
 MemoryWeaver/
 ├── app.py                         # Flask app factory and Socket.IO setup
 ├── blueprints/                    # HTTP API modules
+│   ├── agents.py                  # Multi-person review API
 │   ├── compute.py                 # AI compute endpoints
 │   ├── graph.py                   # Graph exploration endpoint
 │   ├── luoyi.py                   # Luoyi chat endpoint
-│   ├── memory.py                  # File preprocessing and AI quote endpoints
-│   └── config.py                  # Runtime config endpoint
+│   ├── memory.py                  # Memory preprocessing endpoints
+│   ├── config.py                  # Runtime config endpoint
+│   ├── stats.py                   # Statistics endpoint
+│   └── export.py                  # Import/export endpoints
 ├── services/                      # Backend computation services
 │   ├── llm_service.py             # OpenAI-compatible LLM client
 │   ├── temporal_extractor.py      # Temporal information extraction
 │   └── agent_dialogue_service.py  # Multi-person review engine
 ├── static/
 │   ├── css/                       # Modular frontend styles
-│   └── js/
-│       ├── api/compute-api.js     # Frontend compute API client
-│       ├── db/                    # IndexedDB and vector search logic
-│       ├── services/              # Client-side memory, graph, and review services
-│       ├── i18n.js                # Chinese/English UI runtime
-│       ├── app.js                 # Main frontend app
-│       ├── agent-dialogue.js      # Multi-person review UI
-│       └── prediction.js          # Smart prediction UI
-├── templates/                     # Jinja templates and reusable components
+│   ├── js/
+│   │   ├── api/                   # Frontend API clients
+│   │   ├── db/                    # IndexedDB and vector search logic
+│   │   ├── services/              # Client-side business services
+│   │   ├── app.js                 # Main frontend app
+│   │   ├── agent-dialogue.js      # Multi-person review UI
+│   │   ├── i18n.js                # Chinese/English UI runtime
+│   │   └── prediction.js          # Smart prediction UI
+│   └── logo.png
+├── templates/
+│   ├── index.html
+│   └── components/                # Reusable template components
 ├── data/                          # Sample data
 ├── Screenshots/                   # README screenshots
 ├── Dockerfile
@@ -222,16 +233,12 @@ Language preference is stored locally in the browser. Memory content is not auto
 
 ### v1.0.7 · 2026-07-09
 
-- Added the first version of **Multi-person Review**, available from memory details and the right-side review workspace.
-- Added a participant picker that detects people from the selected memory and related graph context, supports up to 5 participants, and can include "Me".
-- Added five review modes: review, confrontation, gap filling, relationship change, and counterfactual exploration.
-- Added expandable evidence / inference sections for each generated line, including source memory references, inference notes, and confidence.
-- Added structured Luoyi summaries with consensus, conflicts, gaps, and next questions that can be reused for follow-up review.
-- Added pending deposits for review output: save as review note, extract pending clues, and extract pending relations without writing model guesses directly into the confirmed graph.
-- Moved Luoyi chat into a draggable floating entry with expand/collapse behavior and SSE streaming output.
-- Improved self-loop relation handling with single self-loop deletion, bulk deletion, and clearer delete button layout.
-- Replaced the right-bottom sample archive with novel memory data for *White Night* and added a styled HTML5 confirmation dialog that explains the import is additive.
-- Fixed UI spacing around memory detail actions and centered the sample data dialog.
+- Added Multi-person Review with up to 5 participants and optional "Me".
+- Added 5 review modes: review, confrontation, gap filling, relationship change, and counterfactual.
+- Each generated line can show evidence, inference notes, and confidence.
+- Luoyi summaries now include consensus, conflicts, gaps, and next questions, with outputs saved as notes, clues, or relations.
+- Moved Luoyi chat to a draggable floating entry with expand/collapse and streaming output.
+- Improved self-loop deletion, sample data loading, action spacing, and dialog centering.
 
 ### v1.0.6 · 2026-07-08
 - Added archive-workbench visual polish for the header, graph controls, sidebar, panels, and modals.

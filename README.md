@@ -60,6 +60,11 @@ Liora 重新定义记忆的方式。不是简单的日记，不是孤立的关�
   <img src="Screenshots/视角模式.png" alt="视角模式" width="49%"/>
 </p>
 
+<p align="center">
+  <img src="Screenshots/多人物复盘.png" alt="多人物复盘" width="49%"/>
+  <img src="Screenshots/多人物复盘推演.png" alt="多人物复盘推演" width="49%"/>
+</p>
+
 ---
 
 ## 🚀 快速开始
@@ -228,30 +233,36 @@ python app.py
 MemoryWeaver/
 ├── app.py                  # Flask 主应用 + SocketIO 实时通信
 ├── blueprints/             # 路由模块化
-│   ├── memory.py          # 记忆 CRUD
-│   ├── graph.py           # 图谱查询
-│   ├── compute.py         # AI 计算端点（嵌入、理解、搜索排名）
-│   ├── luoyi.py           # 洛忆聊天
-│   ├── config.py          # 运行时配置
-│   ├── stats.py           # 统计接口
-│   └── export.py          # 导入导出
+│   ├── agents.py           # 多人物复盘接口
+│   ├── memory.py           # 记忆处理
+│   ├── graph.py            # 图谱查询
+│   ├── compute.py          # AI 计算端点
+│   ├── luoyi.py            # 洛忆聊天
+│   ├── config.py           # 运行时配置
+│   ├── stats.py            # 统计接口
+│   └── export.py           # 导入导出
 ├── services/               # 后端服务
-│   ├── llm_service.py     # 大模型统一调度（LLM + 嵌入）
-│   ├── extraction_schema.py # AI 理解的结构化 Schema
+│   ├── llm_service.py      # 大模型统一调度
+│   ├── extraction_schema.py # AI 理解结构化 Schema
 │   ├── temporal_extractor.py # 时间信息提取
 │   └── agent_dialogue_service.py # 多人物复盘推演服务
 ├── static/
-│   ├── css/               # 样式模块化
-│   └── js/
-│       ├── api/           # 前端 API 客户端
-│       ├── db/            # IndexedDB + 向量搜索
-│       ├── services/      # 前端业务服务（记忆、图谱、多人物复盘）
-│       └── agent-dialogue.js # 多人物复盘 UI
-├── templates/              # HTML 模板
-│   └── components/        # 可复用组件
-├── data/                   # 样例数据
-├── Dockerfile              # Docker 容器化部署
-└── docker-compose.yml      # Docker Compose 编排
+│   ├── css/                # 样式模块化
+│   ├── js/
+│   │   ├── api/            # 前端 API 客户端
+│   │   ├── db/             # IndexedDB + 向量搜索
+│   │   ├── services/       # 前端业务服务
+│   │   ├── app.js          # 主前端逻辑
+│   │   ├── agent-dialogue.js # 多人物复盘 UI
+│   │   ├── i18n.js         # 中英文切换
+│   │   └── prediction.js   # 智能预测 UI
+│   └── logo.png
+├── templates/
+│   ├── index.html
+│   └── components/         # 可复用组件
+├── data/                   # 示例数据
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 
@@ -259,16 +270,12 @@ MemoryWeaver/
 ## 📅 更新日志
 
 ### v1.0.7 · 2026-07-09
-- ✨ 首次新增「多人物复盘」功能：从记忆详情或右侧推演入口启动，让多位人物围绕同一段记忆展开复盘式对话。
-- 🧑‍🤝‍🧑 新增参与人物选择器：自动从当前记忆与相关图谱中识别人选，支持最多 5 位人物参与，并可选择是否加入“我”。
-- 🎛️ 新增推演模式：内置「复盘」「对质」「补全空白」「关系变化」「如果当时」五种目标，让每轮推演有明确方向。
-- 🧾 新增每句话的「依据 / 推测」折叠说明：展示关联记忆原文、推测理由与可信度，明确区分事实支持和模型推演。
-- 🧩 新增洛忆结构化总结：每轮总结拆分为共识、冲突、空白和下一步问题，支持点击问题继续追问。
-- 📌 新增复盘结果沉淀：可保存为复盘笔记，或提取为待确认线索 / 待确认关系；用户确认前不会写入正式图谱。
-- 🤖 将洛忆聊天从侧栏面板中抽出为右下角悬浮入口，支持拖拽、展开/收起和 SSE 流式输出。
-- 🔁 优化自环关系处理：自环关系详情支持单条删除和全部删除，并改善批量删除按钮布局。
-- 🧪 替换右下角「示例」数据为小说《白夜》的记忆数据，并使用样式化 HTML5 弹窗提示会追加到现有数据中。
-- 🎨 修复记忆详情中「多人物复盘」与「生成记忆卡片」按钮过近、示例加载弹窗未居中等界面细节。
+- ✨ 新增多人物复盘：最多 5 位参与者，可加入“我”
+- 🎛️ 支持 5 种推演模式：复盘、对质、补全空白、关系变化、如果当时
+- 🧾 每句话可查看依据、推测说明与可信度
+- 🧩 洛忆总结新增共识、冲突、空白、下一步问题，并可沉淀为笔记、线索或关系
+- 🤖 洛忆聊天改为右下角悬浮入口，支持拖拽、展开收起与流式输出
+- 🔧 优化自环删除、示例数据、按钮间距与弹窗居中等体验细节
 
 ### v1.0.6 · 2026-07-08
 - 🎨 新增档案室工作台视觉精修样式，统一 Header、图谱工具栏、侧栏与弹窗质感
