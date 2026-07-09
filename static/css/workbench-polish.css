@@ -265,6 +265,13 @@ select,
     padding: 6px 10px;
 }
 
+.site-icp-footer {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: rgba(251, 250, 247, 0.72);
+    box-shadow: none;
+}
+
 .toggle-label {
     color: var(--color-text-secondary);
     font-family: var(--font-sans);
@@ -655,7 +662,13 @@ select,
 
     .graph-io-buttons {
         right: 10px;
-        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(42px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .site-icp-footer {
+        bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        max-width: calc(100% - 20px);
+        background: rgba(251, 250, 247, 0.82);
     }
 
     .graph-io-buttons .control-btn {

@@ -187,6 +187,42 @@
     outline-offset: 2px;
 }
 
+.site-icp-footer {
+    position: fixed;
+    left: 50%;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+    max-width: calc(100vw - 28px);
+    padding: 3px 8px;
+    border: 0;
+    background: rgba(251, 250, 247, 0.72);
+    border-radius: 999px;
+    box-shadow: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transform: translateX(-50%);
+}
+
+.site-icp-footer a {
+    overflow: hidden;
+    color: rgba(104, 96, 87, 0.72);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.4;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.site-icp-footer a:hover {
+    color: var(--color-text-secondary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
 .sample-data-dialog {
     position: fixed;
     top: 50%;
