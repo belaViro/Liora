@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.6-FF6B6B?style=for-the-badge" alt="Version"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-v1.0.7-FF6B6B?style=for-the-badge" alt="Version"></a>
   <a href="#"><img src="https://img.shields.io/badge/python-3.8%2B-3572A5?style=for-the-badge&logo=python" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/flask-3.0%2B-000000?style=for-the-badge&logo=flask" alt="Flask"></a>
   <a href="#"><img src="https://img.shields.io/badge/llm-OpenAI--compatible-00D4AA?style=for-the-badge&logo=openai" alt="LLM"></a>
@@ -64,12 +64,27 @@ The current architecture keeps user data primarily in the browser through Indexe
 | Multimodal capture | Record text, upload images, and process audio with AI-assisted understanding |
 | Hybrid search | Combines keyword matching with client-side vector similarity |
 | AI exploration | Ask questions about selected nodes, relations, and paths |
-| Luoyi assistant | A memory-aware chat companion with emotion-sensitive SSE streaming responses |
+| Multi-person review | New in v1.0.7: evidence-aware memory review with up to 5 selected personas |
+| Luoyi assistant | A memory-aware floating chat companion with emotion-sensitive SSE streaming responses |
 | Persona mode | Let Luoyi answer from the first-person perspective of a selected person node |
 | Smart prediction | Predict likely missing entities and relations from graph context |
 | Memory cards | Export polished visual memory cards as PNG images |
 | Bilingual UI | Switch between Chinese and English UI text and AI response language |
 | Data ownership | Browser-first storage with import/export support for memory archives |
+
+---
+
+## Multi-person Review
+
+New in **v1.0.7**, Multi-person Review turns one memory into a controlled, evidence-aware replay tool instead of a simple role-play transcript.
+
+- **Participant picker**: choose up to 5 personas from people found in the current memory and related graph entities, with an optional "Me" participant.
+- **Review modes**: run the session as review, confrontation, gap filling, relationship change, or counterfactual exploration.
+- **Evidence / inference labels**: each line can expose source memory quotes, inference notes, and confidence so users can tell what is grounded and what is speculative.
+- **Structured Luoyi summary**: summaries are split into consensus, conflicts, gaps, and next questions.
+- **Pending deposits**: review output can be saved as a review note or extracted into pending clues / pending relations. Nothing is written into the formal graph until the user confirms it.
+
+This feature is designed for memory replay and hypothesis discovery. Model-generated interpretations stay separate from confirmed memory data.
 
 ---
 
@@ -144,7 +159,7 @@ Memory input
   -> AI entity and relation extraction
   -> client-side IndexedDB persistence
   -> graph rendering with D3.js
-  -> search, exploration, prediction, and Luoyi chat
+  -> search, exploration, prediction, multi-person review, and Luoyi chat
 ```
 
 The frontend owns most user data and interaction state. The backend exposes computation-focused endpoints:
@@ -155,6 +170,7 @@ The frontend owns most user data and interaction state. The backend exposes comp
 | AI quote for memory cards | `/api/memories/ai-quote` |
 | Graph exploration | `/api/graph/explore` |
 | Luoyi chat | `/api/luoyi/chat` |
+| Multi-person review | `/api/agents/*` |
 | AI compute tasks | `/api/compute/*` |
 | Runtime config | `/api/config` |
 
@@ -173,15 +189,17 @@ MemoryWeaver/
 │   └── config.py                  # Runtime config endpoint
 ├── services/                      # Backend computation services
 │   ├── llm_service.py             # OpenAI-compatible LLM client
-│   └── temporal_extractor.py      # Temporal information extraction
+│   ├── temporal_extractor.py      # Temporal information extraction
+│   └── agent_dialogue_service.py  # Multi-person review engine
 ├── static/
 │   ├── css/                       # Modular frontend styles
 │   └── js/
 │       ├── api/compute-api.js     # Frontend compute API client
 │       ├── db/                    # IndexedDB and vector search logic
-│       ├── services/              # Client-side memory and graph services
+│       ├── services/              # Client-side memory, graph, and review services
 │       ├── i18n.js                # Chinese/English UI runtime
 │       ├── app.js                 # Main frontend app
+│       ├── agent-dialogue.js      # Multi-person review UI
 │       └── prediction.js          # Smart prediction UI
 ├── templates/                     # Jinja templates and reusable components
 ├── data/                          # Sample data
@@ -202,8 +220,20 @@ Language preference is stored locally in the browser. Memory content is not auto
 
 ## Changelog
 
-### v1.0.6 · 2026-07-08
+### v1.0.7 · 2026-07-09
 
+- Added the first version of **Multi-person Review**, available from memory details and the right-side review workspace.
+- Added a participant picker that detects people from the selected memory and related graph context, supports up to 5 participants, and can include "Me".
+- Added five review modes: review, confrontation, gap filling, relationship change, and counterfactual exploration.
+- Added expandable evidence / inference sections for each generated line, including source memory references, inference notes, and confidence.
+- Added structured Luoyi summaries with consensus, conflicts, gaps, and next questions that can be reused for follow-up review.
+- Added pending deposits for review output: save as review note, extract pending clues, and extract pending relations without writing model guesses directly into the confirmed graph.
+- Moved Luoyi chat into a draggable floating entry with expand/collapse behavior and SSE streaming output.
+- Improved self-loop relation handling with single self-loop deletion, bulk deletion, and clearer delete button layout.
+- Replaced the right-bottom sample archive with novel memory data for *White Night* and added a styled HTML5 confirmation dialog that explains the import is additive.
+- Fixed UI spacing around memory detail actions and centered the sample data dialog.
+
+### v1.0.6 · 2026-07-08
 - Added archive-workbench visual polish for the header, graph controls, sidebar, panels, and modals.
 - Improved desktop, tablet, and mobile layout stability by removing subtle viewport overflow.
 - Switched sub-900px layouts to a drawer-based sidebar for cleaner tablet and phone use.
