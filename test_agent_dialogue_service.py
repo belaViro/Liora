@@ -134,3 +134,65 @@ def test_structured_persona_turn_metadata_is_preserved():
     assert turn['evidence_refs'][0]['memory_id'] == 'm1'
     assert turn['inference_notes'] == ['想把话说完是基于停留动作的推测']
     assert turn['confidence'] == 'high'
+
+
+def test_luoyi_summary_includes_structured_analysis():
+    persona_reply = '''{
+        "content": "我那天其实想把话说完。",
+        "evidence_refs": [
+            {"memory_id": "m1", "quote": "他在门口停了很久", "reason": "支撑停留和未说完"}
+        ],
+        "inference_notes": ["想把话说完是基于停留动作的推测"],
+        "confidence": "medium"
+    }'''
+    summary_reply = '''{
+        "content": "洛忆总结：这轮更像是在确认那次停留背后还有未完成的话。",
+        "analysis": {
+            "consensus": ["大家都把门口停留视为关系变化的信号"],
+            "conflicts": ["阿一觉得是想靠近，阿二的视角更像回避"],
+            "gaps": ["缺少这次事件之后两人再次互动的记忆"],
+            "next_questions": ["后来你们还有单独联系吗？"]
+        }
+    }'''
+    service = AgentDialogueService(_SequenceLLMService([persona_reply, summary_reply]))
+    payload = {
+        'memory': {'id': 'm1', 'content': '他在门口停了很久，最后还是笑着离开。'},
+        'participants': [{'id': 'p1', 'name': '阿一', 'type': 'PERSON', 'current_memory_id': 'm1'}],
+        'rounds': 1,
+        'include_summary': True,
+        'simulation_mode': 'relationship',
+    }
+
+    events = list(service.create_dialogue_stream(payload))
+    host_turn = next(event['data']['turn'] for event in events if event['event'] == 'turn' and event['data']['turn']['role'] == 'host')
+    session = next(event['data']['session'] for event in events if event['event'] == 'done')
+
+    assert session['mode'] == 'memory_review'
+    assert session['simulation_mode'] == 'relationship'
+    assert host_turn['content'] == '洛忆总结：这轮更像是在确认那次停留背后还有未完成的话。'
+    assert host_turn['analysis']['consensus'] == ['大家都把门口停留视为关系变化的信号']
+    assert host_turn['analysis']['conflicts'] == ['阿一觉得是想靠近，阿二的视角更像回避']
+    assert host_turn['analysis']['gaps'] == ['缺少这次事件之后两人再次互动的记忆']
+    assert host_turn['analysis']['next_questions'] == ['后来你们还有单独联系吗？']
+
+
+
+def test_participant_limit_allows_five_people():
+    service = AgentDialogueService(_FakeLLMService('我会认真接住这句话。'))
+    participants = [
+        {'id': f'p{index}', 'name': f'人物{index}', 'type': 'PERSON'}
+        for index in range(1, 6)
+    ]
+    payload = {
+        'memory': {'id': 'm1', 'content': '人物1、人物2、人物3、人物4、人物5一起回忆那天的事。'},
+        'participants': participants,
+        'rounds': 1,
+        'include_summary': False,
+    }
+
+    events = list(service.create_dialogue_stream(payload))
+    turns = [event['data']['turn'] for event in events if event['event'] == 'turn']
+    session = next(event['data']['session'] for event in events if event['event'] == 'done')
+
+    assert [participant['name'] for participant in session['participants']] == [f'人物{index}' for index in range(1, 6)]
+    assert [turn['agent_name'] for turn in turns] == [f'人物{index}' for index in range(1, 6)]

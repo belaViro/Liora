@@ -32,7 +32,7 @@ class ClientAgentDialogueService {
         const candidates = await this._buildParticipantCandidates(memory, { includeSelf: true });
         const defaultSelectedIds = candidates
             .filter(candidate => candidate.default_selected)
-            .slice(0, 3)
+            .slice(0, 5)
             .map(candidate => candidate.id);
 
         return { success: true, candidates, default_selected_ids: defaultSelectedIds };
@@ -235,7 +235,7 @@ class ClientAgentDialogueService {
             });
         }
 
-        return participants.slice(0, 3);
+        return participants.slice(0, 5);
     }
 
     async _buildParticipantCandidates(memory, options = {}) {
@@ -309,11 +309,11 @@ class ClientAgentDialogueService {
     _selectParticipantCandidates(candidates, selectedIds) {
         if (Array.isArray(selectedIds) && selectedIds.length > 0) {
             const byId = new Map(candidates.map(candidate => [candidate.id, candidate]));
-            return selectedIds.map(id => byId.get(id)).filter(Boolean).slice(0, 3);
+            return selectedIds.map(id => byId.get(id)).filter(Boolean).slice(0, 5);
         }
 
-        const defaults = candidates.filter(candidate => candidate.default_selected).slice(0, 3);
-        return defaults.length ? defaults : candidates.slice(0, 3);
+        const defaults = candidates.filter(candidate => candidate.default_selected).slice(0, 5);
+        return defaults.length ? defaults : candidates.slice(0, 5);
     }
 
     _buildSelfParticipant(memory, candidate) {
@@ -472,5 +472,6 @@ class ClientAgentDialogueService {
 }
 
 let agentDialogueService = null;
+
 
 

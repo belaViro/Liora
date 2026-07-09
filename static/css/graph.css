@@ -888,6 +888,34 @@ input:checked + .slider:before {
 
 
 
+
+.self-loop-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid #f3b6c9;
+    border-radius: 6px;
+    background: #fff;
+    color: #c2185b;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.self-loop-delete-btn:hover {
+    border-color: #c2185b;
+    background: #fff1f6;
+}
+
+.self-loop-delete-btn svg {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+}
+
 .detail-title {
 
     font-weight: 600;
@@ -1467,3 +1495,4 @@ input:checked + .slider:before {
     gap: 8px;
     z-index: 10;
 }
+

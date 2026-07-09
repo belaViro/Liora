@@ -7,7 +7,7 @@ class MemoryWeaverDB {
     constructor() {
         this.db = null;
         this.DB_NAME = 'MemoryWeaver_db';
-        this.VERSION = 2;
+        this.VERSION = 3;
     }
 
     /**
@@ -86,6 +86,15 @@ class MemoryWeaverDB {
                     const dialogueStore = db.createObjectStore('agent_dialogue_sessions', { keyPath: 'id' });
                     dialogueStore.createIndex('memory_id', 'memory_id', { unique: false });
                     dialogueStore.createIndex('created_at', 'created_at', { unique: false });
+                }
+                // agent dialogue pending candidates store
+                if (!db.objectStoreNames.contains('agent_dialogue_candidates')) {
+                    const candidateStore = db.createObjectStore('agent_dialogue_candidates', { keyPath: 'id' });
+                    candidateStore.createIndex('session_id', 'session_id', { unique: false });
+                    candidateStore.createIndex('memory_id', 'memory_id', { unique: false });
+                    candidateStore.createIndex('type', 'type', { unique: false });
+                    candidateStore.createIndex('status', 'status', { unique: false });
+                    candidateStore.createIndex('created_at', 'created_at', { unique: false });
                 }
 
                 console.log('[DB] Database schema created');
@@ -847,6 +856,63 @@ class MemoryWeaverDB {
     async deleteAgentDialogueSession(id) {
         return this._delete('agent_dialogue_sessions', id);
     }
+
+    // ==================== Agent Dialogue Pending Candidates ====================
+
+    /**
+     * 保存多人物复盘候选沉淀项
+     */
+    async saveAgentDialogueCandidate(candidate) {
+        const record = {
+            ...candidate,
+            status: candidate.status || 'pending',
+            created_at: candidate.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        return this._put('agent_dialogue_candidates', record);
+    }
+
+    /**
+     * 获取单个候选沉淀项
+     */
+    async getAgentDialogueCandidate(id) {
+        return this._get('agent_dialogue_candidates', id);
+    }
+
+    /**
+     * 获取某个会话下的候选沉淀项
+     */
+    async getAgentDialogueCandidatesBySession(sessionId) {
+        const candidates = await this._getAll('agent_dialogue_candidates');
+        return candidates
+            .filter(candidate => candidate.session_id === sessionId)
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    }
+
+    /**
+     * 获取某条记忆下的候选沉淀项
+     */
+    async getAgentDialogueCandidatesByMemory(memoryId) {
+        const candidates = await this._getAll('agent_dialogue_candidates');
+        return candidates
+            .filter(candidate => candidate.memory_id === memoryId)
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    }
+
+    /**
+     * 获取所有候选沉淀项
+     */
+    async getAllAgentDialogueCandidates() {
+        return this._getAll('agent_dialogue_candidates');
+    }
+
+    /**
+     * 删除候选沉淀项
+     */
+    async deleteAgentDialogueCandidate(id) {
+        return this._delete('agent_dialogue_candidates', id);
+    }
+
     // ==================== Export/Import ====================
 
     /**
@@ -858,6 +924,7 @@ class MemoryWeaverDB {
         const relations = await this.getAllRelations();
         const files = await this.getAllFiles();
         const dialogueSessions = await this.getAllAgentDialogueSessions();
+        const dialogueCandidates = await this.getAllAgentDialogueCandidates();
 
         // 序列化的数据（Blob 转为 base64）
         const serializedFiles = [];
@@ -881,6 +948,7 @@ class MemoryWeaverDB {
             entities: entities,
             relations: relations,
             agent_dialogue_sessions: dialogueSessions,
+            agent_dialogue_candidates: dialogueCandidates,
             files: serializedFiles
         };
     }
@@ -909,11 +977,17 @@ class MemoryWeaverDB {
         if (data.relations) {
             await this.saveRelations(data.relations);
         }
-
         // 导入多人物复盘会话
         if (data.agent_dialogue_sessions) {
             for (const session of data.agent_dialogue_sessions) {
                 await this.saveAgentDialogueSession(session);
+            }
+        }
+
+        // 导入多人物复盘候选沉淀项
+        if (data.agent_dialogue_candidates) {
+            for (const candidate of data.agent_dialogue_candidates) {
+                await this.saveAgentDialogueCandidate(candidate);
             }
         }
 
@@ -944,6 +1018,7 @@ class MemoryWeaverDB {
         await this._clear('uploads');
         await this._clear('sync_queue');
         await this._clear('agent_dialogue_sessions');
+        await this._clear('agent_dialogue_candidates');
     }
 
     // ==================== Private helpers ====================

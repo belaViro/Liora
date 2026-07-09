@@ -3432,8 +3432,7 @@ async function deleteAllSelfLoops(nodeName) {
             continue;
         }
         try {
-            const response = await fetch(`/api/graph/edge/${loopId}`, { method: 'DELETE' });
-            const result = await response.json();
+            const result = await graphService.deleteEdge(loopId);
             if (result.success) {
                 successCount++;
             } else {
@@ -3456,6 +3455,56 @@ async function deleteAllSelfLoops(nodeName) {
     }
 }
 
+async function deleteSingleSelfLoop(loopId) {
+    if (!loopId || !currentSelectedEdge || !currentSelectedEdge.isSelfLoopGroup) {
+        showToast(currentLocale() === 'en-US' ? 'Invalid self-loop relation.' : '无效的自环关系。', 'warning');
+        return;
+    }
+
+    const loops = currentSelectedEdge.selfLoopEdges || [];
+    const loop = loops.find(item => (item.id || item.uuid) === loopId);
+    const nodeName = currentSelectedEdge.source_name || loop?.source_name || (currentLocale() === 'en-US' ? 'this entity' : '该实体');
+    const confirmText = currentLocale() === 'en-US'
+        ? `Delete this self-loop relation for ${nodeName}?`
+        : `确定删除「${nodeName}」的这条自环关系吗？`;
+
+    if (!confirm(confirmText)) {
+        return;
+    }
+
+    try {
+        showToast(currentLocale() === 'en-US' ? 'Deleting self-loop relation...' : '正在删除这条自环关系...', 'info');
+        const result = await graphService.deleteEdge(loopId);
+        if (!result.success) {
+            showToast(result.error || tx('toast.deleteFailed'), 'error');
+            return;
+        }
+
+        const remainingLoops = loops.filter(item => (item.id || item.uuid) !== loopId);
+        showToast(currentLocale() === 'en-US' ? 'Self-loop relation deleted' : '已删除这条自环关系', 'success');
+        await loadGraphData();
+
+        if (remainingLoops.length === 0) {
+            currentSelectedEdge = null;
+            closeDetailPanel();
+            return;
+        }
+
+        currentSelectedEdge = {
+            ...currentSelectedEdge,
+            selfLoopCount: remainingLoops.length,
+            selfLoopEdges: remainingLoops
+        };
+        const content = document.getElementById('detailContent');
+        const panel = document.getElementById('detailPanel');
+        if (content && panel) {
+            renderSelfLoopDetail(currentSelectedEdge, content, panel);
+        }
+    } catch (error) {
+        console.error('删除单条自环失败:', error);
+        showToast(tx('toast.deleteFailed'), 'error');
+    }
+}
 // 查找重复实体
 function findDuplicateNodes(nodeId) {
     const currentNode = graphData.nodes.find(n => n.id === nodeId);
@@ -3938,6 +3987,9 @@ function showEdgeDetail(edgeData) {
     const content = document.getElementById('detailContent');
     const headerActions = document.getElementById('detailHeaderActions');
 
+    currentSelectedEdge = edgeData;
+    currentSelectedNode = null;
+
     title.textContent = tx('detail.edgeTitle');
     badge.style.display = 'none';
 
@@ -4104,19 +4156,18 @@ function renderSelfLoopDetail(edgeData, content, panel) {
         sortedLoops.forEach((loop, idx) => {
             const date = loop.created_at ? new Date(loop.created_at).toLocaleDateString(currentLocale()) : tx('time.unknown');
             const loopId = loop.id || loop.uuid || '';
-            const loopSource = escapeHtml(loop.source_name || edgeData.source_name || tx('detail.unknown'));
-            const loopTarget = escapeHtml(loop.target_name || edgeData.target_name || tx('detail.unknown'));
             html += `
                 <div class="timeline-item" style="align-items: flex-start;">
                     <div class="timeline-marker" style="background: #E91E63; margin-top: 4px;"></div>
                     <div class="timeline-content" style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div class="timeline-date">${date}</div>
-                            ${loopId ? `<button class="btn-header-delete" onclick="deleteEdge('${loopId}', '${loopSource}', '${loopTarget}')" title="${currentLocale() === 'en-US' ? 'Delete this self-loop' : '删除此自环'}" style="padding: 2px 6px; font-size: 11px;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                            ${loopId ? `<button class="self-loop-delete-btn" type="button" data-loop-id="${escapeHtml(loopId)}" onclick="deleteSingleSelfLoop(this.dataset.loopId)" title="${currentLocale() === 'en-US' ? 'Delete this self-loop' : '删除此条自环'}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
+                                <span>${currentLocale() === 'en-US' ? 'Delete this' : '删除此条'}</span>
                             </button>` : ''}
                         </div>
                         <div class="timeline-text" style="margin-top: 4px;">${loop.fact || loop.description || getRelationTypeName(loop.type) || (currentLocale() === 'en-US' ? 'Self reflection' : '自我反思')}</div>
@@ -4842,13 +4893,17 @@ async function exportMemories() {
         const memories = await db.getAllMemories();
         const entities = await db.getAllEntities();
         const relations = await db.getAllRelations();
+        const dialogueSessions = db.getAllAgentDialogueSessions ? await db.getAllAgentDialogueSessions() : [];
+        const dialogueCandidates = db.getAllAgentDialogueCandidates ? await db.getAllAgentDialogueCandidates() : [];
 
         const exportData = {
             version: '1.0',
             export_date: new Date().toISOString(),
             memories: memories,
             entities: entities,
-            relations: relations
+            relations: relations,
+            agent_dialogue_sessions: dialogueSessions,
+            agent_dialogue_candidates: dialogueCandidates
         };
 
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -4898,6 +4953,8 @@ async function importMemories(input) {
         const memories = data.memories || [];
         const entities = data.entities || [];
         const relations = data.relations || [];
+        const dialogueSessions = data.agent_dialogue_sessions || [];
+        const dialogueCandidates = data.agent_dialogue_candidates || [];
 
         // 批量保存记忆
         for (const memory of memories) {
@@ -4912,6 +4969,18 @@ async function importMemories(input) {
         // 批量保存关系
         for (const relation of relations) {
             await db.saveRelation(relation);
+        }
+
+        if (db.saveAgentDialogueSession) {
+            for (const session of dialogueSessions) {
+                await db.saveAgentDialogueSession(session);
+            }
+        }
+
+        if (db.saveAgentDialogueCandidate) {
+            for (const candidate of dialogueCandidates) {
+                await db.saveAgentDialogueCandidate(candidate);
+            }
         }
 
         showToast(tx('toast.imported', { count: memories.length }), 'success');

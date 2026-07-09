@@ -106,7 +106,7 @@ class AgentDialogueService:
                 "event": "speaking",
                 "data": {"role": "host", "agent_id": "luoyi", "agent_name": session["host"], "round": summary_round},
             }
-            summary = self._generate_luoyi_summary(
+            summary_result = self._generate_luoyi_summary(
                 memory=memory,
                 participants=participants,
                 turns=turns,
@@ -119,9 +119,10 @@ class AgentDialogueService:
                 "role": "host",
                 "agent_id": "luoyi",
                 "agent_name": session["host"],
-                "content": summary,
+                "content": summary_result["content"],
                 "round": summary_round,
                 "evidence_ids": [memory.get("id")] if memory.get("id") else [],
+                "analysis": summary_result["analysis"],
                 "created_at": datetime.utcnow().isoformat() + "Z",
             }
             turns.append(host_turn)
@@ -170,13 +171,13 @@ class AgentDialogueService:
         user_question: str,
         language: str,
         simulation_mode: str,
-    ) -> str:
+    ) -> Dict[str, Any]:
         names = "、".join(p["name"] for p in participants)
         mode_label = _simulation_mode_label(simulation_mode, language)
         if language == "English":
             system_prompt = (
-                "You are Luoyi, the host agent in Liora. Summarize this exploratory dialogue briefly. "
-                "Keep it useful: what each persona brought, where they echoed or contradicted each other, and the strongest memory-network thread."
+                "You are Luoyi, the host agent in Liora. Summarize this exploratory memory dialogue. "
+                "Return only a valid JSON object with content and analysis. Keep factual boundaries clear."
             )
             user_prompt = "\n\n".join(
                 [
@@ -185,14 +186,25 @@ class AgentDialogueService:
                     f"Simulation mode: {mode_label}",
                     f"Prompt: {user_question}",
                     "Dialogue:\n" + _format_public_turns(turns),
-                    "Reply in English, 70-110 words, conversational.",
+                    "Return JSON only, with this shape:",
+                    _json({
+                        "content": "70-110 words, conversational summary from Luoyi",
+                        "analysis": {
+                            "consensus": ["shared view supported by the dialogue"],
+                            "conflicts": ["different or conflicting views"],
+                            "gaps": ["missing memory evidence or unknown context"],
+                            "next_questions": ["specific follow-up question the user can answer"]
+                        }
+                    }),
+                    "Use concise English. Put uncertain points in gaps or next_questions, not as facts.",
                 ]
             )
             fallback = "I would treat this as a loose memory-theatre reading: the value is in the echoes between the voices, not in proving every detail."
         else:
             system_prompt = (
                 "你是 Liora 的主 agent 洛忆，负责主持多人物记忆推演。"
-                "请简短总结这轮对话：谁提供了什么视角，哪里互相印证或冲突，哪条记忆网络线索最值得继续问。"
+                "请输出合法 JSON，既要有简短总结，也要把共识、冲突、空白和下一步问题结构化。"
+                "不要把推测写成事实。"
             )
             user_prompt = "\n\n".join(
                 [
@@ -201,11 +213,43 @@ class AgentDialogueService:
                     f"推演模式: {mode_label}",
                     f"用户要求: {user_question}",
                     "公开对话:\n" + _format_public_turns(turns),
-                    "请用中文，70-110字，像洛忆在聊天，不要写报告。",
+                    "只返回 JSON，结构如下：",
+                    _json({
+                        "content": "洛忆的70-110字口语化总结",
+                        "analysis": {
+                            "consensus": ["对话中共同认可的判断"],
+                            "conflicts": ["不同人物视角的差异或冲突"],
+                            "gaps": ["缺少记忆证据或尚不清楚的空白"],
+                            "next_questions": ["用户可以继续回答的具体问题"]
+                        }
+                    }),
+                    "请用中文，简洁，不要写报告腔。无法确认的内容放入空白或下一步问题。",
                 ]
             )
             fallback = "我会把它当成一场记忆剧场：重点不是证明每个细节，而是看这些声音之间怎样互相照亮。"
-        return self._chat(system_prompt, user_prompt, max_tokens=3200, temperature=0.55, fallback=fallback)
+
+        try:
+            raw = self._complete_chat(system_prompt, user_prompt, max_tokens=3200, temperature=0.5)
+            parsed = _parse_luoyi_summary(raw, language)
+            if parsed["content"]:
+                return parsed
+
+            retry_raw = self._complete_chat(
+                system_prompt + _summary_retry_suffix(language),
+                user_prompt,
+                max_tokens=4096,
+                temperature=0.45,
+            )
+            parsed = _parse_luoyi_summary(retry_raw, language)
+            if parsed["content"]:
+                return parsed
+        except Exception as exc:
+            logger.warning(f"agent dialogue summary LLM call failed: {exc}")
+
+        return {
+            "content": fallback,
+            "analysis": _default_summary_analysis(language),
+        }
 
     def _chat(self, system_prompt: str, user_prompt: str, max_tokens: int, temperature: float, fallback: str) -> str:
         try:
@@ -315,6 +359,74 @@ def _default_user_question(language: str, mode: str) -> str:
     item = _SIMULATION_MODES.get(_normalize_simulation_mode(mode), _SIMULATION_MODES["review"])
     return item["en_question"] if language == "English" else item["zh_question"]
 
+
+def _summary_retry_suffix(language: str) -> str:
+    if language == "English":
+        return "\n\nThe previous answer was unusable. Return only valid JSON with content and analysis.consensus/conflicts/gaps/next_questions."
+    return "\n\n上一条回答不合格。只返回合法 JSON，必须包含 content 和 analysis.consensus/conflicts/gaps/next_questions。"
+
+
+def _parse_luoyi_summary(value: str, language: str) -> Dict[str, Any]:
+    parsed = _extract_json_object(value)
+    if isinstance(parsed, dict):
+        content = _trim_reply(_text(parsed.get("content") or parsed.get("summary") or parsed.get("reply")), "")
+        analysis_source = parsed.get("analysis") if isinstance(parsed.get("analysis"), dict) else parsed
+        return {
+            "content": content,
+            "analysis": _normalize_summary_analysis(analysis_source, language),
+        }
+
+    content = _trim_reply(value, "")
+    return {
+        "content": content,
+        "analysis": _default_summary_analysis(language),
+    }
+
+
+def _normalize_summary_analysis(value: Any, language: str) -> Dict[str, List[str]]:
+    source = value if isinstance(value, dict) else {}
+    return {
+        "consensus": _summary_text_list(source.get("consensus") or source.get("agreements"), 4),
+        "conflicts": _summary_text_list(source.get("conflicts") or source.get("tensions"), 4),
+        "gaps": _summary_text_list(source.get("gaps") or source.get("unknowns") or source.get("missing"), 4),
+        "next_questions": _summary_text_list(source.get("next_questions") or source.get("questions"), 4),
+    }
+
+
+def _summary_text_list(value: Any, limit: int) -> List[str]:
+    if isinstance(value, list):
+        items = value
+    elif _text(value):
+        items = [value]
+    else:
+        items = []
+    result = []
+    for item in items:
+        if isinstance(item, dict):
+            text = _text(item.get("text") or item.get("content") or item.get("question") or item.get("summary"))
+        else:
+            text = _text(item)
+        if text:
+            result.append(text[:180])
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _default_summary_analysis(language: str) -> Dict[str, List[str]]:
+    if language == "English":
+        return {
+            "consensus": [],
+            "conflicts": [],
+            "gaps": ["The summary could not be structured reliably."],
+            "next_questions": [],
+        }
+    return {
+        "consensus": [],
+        "conflicts": [],
+        "gaps": ["本轮总结未能可靠结构化。"],
+        "next_questions": [],
+    }
 
 def _structured_retry_suffix(language: str) -> str:
     if language == "English":
@@ -596,7 +708,7 @@ def _normalize_participants(value: Any) -> List[Dict[str, Any]]:
                 "evidence_ids": list(dict.fromkeys(evidence_ids)),
             }
         )
-        if len(participants) >= 3:
+        if len(participants) >= 5:
             break
     return participants
 
@@ -866,12 +978,5 @@ def _to_bool(value: Any) -> bool:
 
 def _answer_language(value: Any) -> str:
     return "English" if str(value).lower().startswith("english") else "Chinese"
-
-
-
-
-
-
-
 
 
