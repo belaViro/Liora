@@ -235,6 +235,12 @@
     color: var(--color-text);
 }
 
+.memory-modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 /* 记忆详情弹窗中的"生成卡片"按钮 */
 .memory-card-action-btn {
     display: inline-flex;

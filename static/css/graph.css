@@ -187,6 +187,87 @@
     outline-offset: 2px;
 }
 
+.sample-data-dialog {
+    width: min(380px, calc(100vw - 32px));
+    padding: 0;
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    box-shadow: 0 18px 48px rgba(20, 20, 20, 0.22);
+}
+
+.sample-data-dialog::backdrop {
+    background: rgba(18, 18, 18, 0.34);
+    backdrop-filter: blur(2px);
+}
+
+.sample-data-dialog-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+}
+
+.sample-data-dialog-kicker {
+    color: var(--color-memory);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+}
+
+.sample-data-dialog-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.sample-data-dialog-message {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.sample-data-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 6px;
+}
+
+.sample-data-dialog-btn {
+    min-width: 72px;
+    min-height: 34px;
+    padding: 7px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    transition: all 0.2s ease;
+}
+
+.sample-data-dialog-btn:hover {
+    border-color: var(--color-text-secondary);
+    color: var(--color-text);
+}
+
+.sample-data-dialog-btn.primary {
+    border-color: var(--color-memory);
+    background: var(--color-memory);
+    color: #fff;
+}
+
+.sample-data-dialog-btn.primary:hover {
+    border-color: #6a5b7a;
+    background: #6a5b7a;
+}
+
 
 
 /* åå·ç½®é€‰æ ¾è®°å¿µ */
@@ -883,6 +964,32 @@ input:checked + .slider:before {
     width: 14px;
 
     height: 14px;
+
+}
+
+.self-loop-delete-all-btn {
+
+    width: auto;
+
+    min-width: 82px;
+
+    padding: 0 10px;
+
+    gap: 6px;
+
+    white-space: nowrap;
+
+}
+
+
+
+.self-loop-delete-all-btn span {
+
+    margin-left: 0 !important;
+
+    font-size: 12px;
+
+    line-height: 1;
 
 }
 

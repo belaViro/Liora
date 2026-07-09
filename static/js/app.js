@@ -4014,7 +4014,7 @@ function showEdgeDetail(edgeData) {
         `;
     } else if (headerActions && edgeData.isSelfLoopGroup) {
         headerActions.innerHTML = `
-            <button class="btn-header-delete" onclick="deleteAllSelfLoops('${escapeHtml(edgeData.source_name || '')}')" title="${currentLocale() === 'en-US' ? 'Delete all self-loops' : '删除全部自环'}">
+            <button class="btn-header-delete self-loop-delete-all-btn" onclick="deleteAllSelfLoops('${escapeHtml(edgeData.source_name || '')}')" title="${currentLocale() === 'en-US' ? 'Delete all self-loops' : '删除全部自环'}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -4994,15 +4994,69 @@ async function importMemories(input) {
     }
 }
 
+function ensureSampleDataConfirmDialog() {
+    let dialog = document.getElementById('sampleDataConfirmDialog');
+    if (dialog) return dialog;
+
+    dialog = document.createElement('dialog');
+    dialog.id = 'sampleDataConfirmDialog';
+    dialog.className = 'sample-data-dialog';
+    dialog.innerHTML = `
+        <form method="dialog" class="sample-data-dialog-inner">
+            <div class="sample-data-dialog-kicker"></div>
+            <h3 class="sample-data-dialog-title"></h3>
+            <p class="sample-data-dialog-message"></p>
+            <div class="sample-data-dialog-actions">
+                <button type="submit" value="cancel" class="sample-data-dialog-btn secondary"></button>
+                <button type="submit" value="confirm" class="sample-data-dialog-btn primary"></button>
+            </div>
+        </form>
+    `;
+
+    dialog.addEventListener('click', (event) => {
+        const rect = dialog.getBoundingClientRect();
+        const clickedBackdrop = event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
+        if (clickedBackdrop) {
+            dialog.close('cancel');
+        }
+    });
+
+    document.body.appendChild(dialog);
+    return dialog;
+}
+
+function showSampleDataConfirmDialog() {
+    const message = tx('confirm.loadSample');
+    const dialog = ensureSampleDataConfirmDialog();
+    if (!dialog || typeof dialog.showModal !== 'function') {
+        return Promise.resolve(confirm(message));
+    }
+
+    dialog.querySelector('.sample-data-dialog-kicker').textContent = currentLocale() === 'en-US' ? 'Sample Archive' : '示例归档';
+    dialog.querySelector('.sample-data-dialog-title').textContent = currentLocale() === 'en-US' ? 'Load Novel Memory Data' : '加载小说记忆数据';
+    dialog.querySelector('.sample-data-dialog-message').textContent = message;
+    dialog.querySelector('.sample-data-dialog-btn.secondary').textContent = currentLocale() === 'en-US' ? 'Cancel' : '取消';
+    dialog.querySelector('.sample-data-dialog-btn.primary').textContent = currentLocale() === 'en-US' ? 'Load' : '加载';
+    dialog.returnValue = 'cancel';
+
+    return new Promise((resolve) => {
+        dialog.addEventListener('close', () => {
+            resolve(dialog.returnValue === 'confirm');
+        }, { once: true });
+        dialog.showModal();
+    });
+}
+
 // 加载示例数据
 async function loadSampleData() {
-    if (!confirm(tx('confirm.loadSample'))) {
+    const confirmed = await showSampleDataConfirmDialog();
+    if (!confirmed) {
         return;
     }
 
     showToast(tx('toast.sampleLoading'), 'info');
     try {
-        const response = await fetch('/data/memories_2026-04-16T16-56-51.loyi');
+        const response = await fetch('/data/memories_2026-04-16T16-56-51.loyi?v=2026070925', { cache: 'no-store' });
 
         if (!response.ok) {
             throw new Error(currentLocale() === 'en-US' ? 'File not found' : '文件不存在');

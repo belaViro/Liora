@@ -148,7 +148,7 @@
                 deleteNamedRelation: '确定要删除这条关系吗？\n\n{source} → {target}',
                 deleteSelfLoops: '确定要删除 {name} 的全部 {count} 条自环关系吗？此操作不可恢复。',
                 mergeNode: '确定要将 "{name}" 合并到当前实体吗？\n\n此操作不可恢复。',
-                loadSample: '确定要加载示例数据吗？这将添加示例记忆到现有数据中。'
+                loadSample: '加载小说《白夜》的记忆数据，这将添加到现有数据中。'
             },
             ai: {
                 replyLanguage: '请用中文回答。',
@@ -321,7 +321,7 @@
                 deleteNamedRelation: 'Delete this relation?\n\n{source} → {target}',
                 deleteSelfLoops: 'Delete all {count} self-loop relations for {name}? This cannot be undone.',
                 mergeNode: 'Merge "{name}" into the current entity?\n\nThis cannot be undone.',
-                loadSample: 'Load sample data? This will add sample memories to your existing data.'
+                loadSample: 'Load memory data for the novel White Night? This will add it to your existing data.'
             },
             ai: {
                 replyLanguage: 'Please answer in English.',
