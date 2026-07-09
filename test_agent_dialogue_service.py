@@ -106,3 +106,31 @@ def test_chat_retries_empty_reply_with_larger_token_budget():
 
     assert result == '我这次直接把话说清楚。'
     assert llm_service.completions.max_tokens_seen == [2400, 4800]
+
+def test_structured_persona_turn_metadata_is_preserved():
+    reply = '''{
+        "content": "我那天其实想把话说完。",
+        "evidence_refs": [
+            {"memory_id": "m1", "quote": "他在门口停了很久", "reason": "支撑停留和未说完"}
+        ],
+        "inference_notes": ["想把话说完是基于停留动作的推测"],
+        "confidence": "high"
+    }'''
+    service = AgentDialogueService(_FakeLLMService(reply))
+    payload = {
+        'memory': {'id': 'm1', 'content': '他在门口停了很久，最后还是笑着离开。'},
+        'participants': [{'id': 'p1', 'name': '阿一', 'type': 'PERSON', 'current_memory_id': 'm1'}],
+        'rounds': 1,
+        'include_summary': False,
+        'simulation_mode': 'relationship',
+    }
+
+    events = list(service.create_dialogue_stream(payload))
+    turn = next(event['data']['turn'] for event in events if event['event'] == 'turn')
+    session = next(event['data']['session'] for event in events if event['event'] == 'done')
+
+    assert session['simulation_mode'] == 'relationship'
+    assert turn['content'] == '我那天其实想把话说完。'
+    assert turn['evidence_refs'][0]['memory_id'] == 'm1'
+    assert turn['inference_notes'] == ['想把话说完是基于停留动作的推测']
+    assert turn['confidence'] == 'high'

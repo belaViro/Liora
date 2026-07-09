@@ -16,6 +16,11 @@ let graphZoom = null;               // D3 zoom 行为引用
 let highlightedPath = null;         // 路径侦探高亮的路径 {nodeIds: Set, edgeIds: Set}
 let closeDetailTimeout = null;      // 移动端详情面板关闭动画定时器
 let luoyiChatHistory = [];          // 洛忆聊天历史
+let luoyiFloatingSuppressClick = false;
+let luoyiFloatingDragState = null;
+const LUOYI_FLOATING_POSITION_KEY = 'lioraLuoyiFloatingPosition';
+let luoyiChatMessageId = 0;
+const luoyiStreamingStates = new Map();
 
 function tx(key, params = {}) {
     return window.i18n ? window.i18n.t(key, params) : key;
@@ -592,6 +597,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
+    initLuoyiFloatingDrag();
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeLuoyiFloatingPanel();
+    });
+
     // 移动端详情面板探索输入框回车发送
     const detailExploreInput = document.getElementById('detailExploreInput');
     if (detailExploreInput) {
@@ -688,6 +699,8 @@ function switchTab(tab, event, skipLoad) {
             loadStats();
         } else if (tab === 'timetravel') {
             loadTimeTravelMemories();
+        } else if (tab === 'agent-dialogue' && typeof openAgentDialogueWorkbench === 'function') {
+            openAgentDialogueWorkbench();
         }
     }
 }
@@ -1829,7 +1842,7 @@ function showMemoryModal(memory) {
         const actions = body.querySelector('.memory-modal-actions');
         if (actions) {
             actions.insertAdjacentHTML('afterbegin', `
-                <button class="memory-card-action-btn" onclick="startAgentDialogueForMemory('${memory.id}')">
+                <button class="memory-card-action-btn" onclick="closeMemoryModal(); startAgentDialogueForMemory('${memory.id}')">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                         <circle cx="9" cy="7" r="4"></circle>
@@ -1840,25 +1853,11 @@ function showMemoryModal(memory) {
                 </button>
             `);
         }
-        body.insertAdjacentHTML('beforeend', `
-            <div class="memory-modal-section agent-dialogue-entry">
-                <div class="memory-modal-section-title">${currentLocale() === 'en-US' ? 'Luoyi Review' : '洛忆推演'}</div>
-                <div class="agent-dialogue-hint">
-                    ${currentLocale() === 'en-US'
-                        ? 'Luoyi will host an exploratory dialogue with up to three people linked to this memory. Personas can respond to each other, while each only receives its own isolated memory context.'
-                        : '洛忆会主持最多三位相关人物进行探索性对话。人物会互相回应，但只会收到自己的隔离记忆上下文。'}
-                </div>
-                <div class="agent-dialogue-history" id="agentDialogueHistory"></div>
-                <div class="agent-dialogue-panel" id="agentDialoguePanel"></div>
-            </div>
-        `);
+
     }
 
     modal.classList.add('show');
 
-    if (personEntities.length > 0 && typeof loadAgentDialogueSessionsForMemory === 'function') {
-        loadAgentDialogueSessionsForMemory(memory.id);
-    }
 }
 // 关闭记忆弹窗
 function closeMemoryModal() {
@@ -4974,30 +4973,350 @@ async function loadSampleData() {
     }
 }
 
+function toggleLuoyiFloatingPanel() {
+    if (luoyiFloatingSuppressClick) {
+        luoyiFloatingSuppressClick = false;
+        return;
+    }
+
+    const shell = document.getElementById('luoyiFloatingShell');
+    const shouldOpen = !shell?.classList.contains('open');
+    setLuoyiFloatingPanelOpen(shouldOpen);
+}
+
+function openLuoyiFloatingPanel() {
+    setLuoyiFloatingPanelOpen(true);
+}
+
+function closeLuoyiFloatingPanel() {
+    setLuoyiFloatingPanelOpen(false);
+}
+
+function setLuoyiFloatingPanelOpen(open) {
+    const shell = document.getElementById('luoyiFloatingShell');
+    const panel = document.getElementById('panel-luoyi');
+    const button = document.getElementById('luoyiPetButton');
+    if (!shell || !panel) return;
+
+    shell.classList.toggle('open', !!open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+    if (open) {
+        updateLuoyiFloatingPanelPlacement();
+        renderLuoyiMessages();
+        setTimeout(() => document.getElementById('luoyiChatInput')?.focus(), 80);
+    }
+}
+function initLuoyiFloatingDrag() {
+    const shell = document.getElementById('luoyiFloatingShell');
+    const petButton = document.getElementById('luoyiPetButton');
+    const header = shell ? shell.querySelector('.luoyi-header') : null;
+    if (!shell || !petButton) return;
+
+    restoreLuoyiFloatingPosition();
+
+    [petButton, header].filter(Boolean).forEach((handle) => {
+        handle.addEventListener('pointerdown', startLuoyiFloatingDrag);
+    });
+
+    window.addEventListener('resize', () => {
+        requestAnimationFrame(() => {
+            clampLuoyiFloatingPosition();
+            updateLuoyiFloatingPanelPlacement();
+        });
+    });
+}
+
+function startLuoyiFloatingDrag(event) {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (event.target.closest('.luoyi-floating-close, textarea, input, select, a')) return;
+
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell) return;
+
+    const rect = shell.getBoundingClientRect();
+    luoyiFloatingDragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+        width: rect.width,
+        height: rect.height,
+        moved: false
+    };
+
+    shell.classList.add('drag-ready');
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.currentTarget.addEventListener('pointermove', moveLuoyiFloatingDrag);
+    event.currentTarget.addEventListener('pointerup', endLuoyiFloatingDrag, { once: true });
+    event.currentTarget.addEventListener('pointercancel', cancelLuoyiFloatingDrag, { once: true });
+}
+
+function moveLuoyiFloatingDrag(event) {
+    if (!luoyiFloatingDragState || event.pointerId !== luoyiFloatingDragState.pointerId) return;
+
+    const deltaX = event.clientX - luoyiFloatingDragState.startX;
+    const deltaY = event.clientY - luoyiFloatingDragState.startY;
+    if (!luoyiFloatingDragState.moved && Math.hypot(deltaX, deltaY) < 5) return;
+
+    luoyiFloatingDragState.moved = true;
+    luoyiFloatingSuppressClick = true;
+
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell) return;
+
+    shell.classList.add('dragging', 'is-positioned');
+    applyLuoyiFloatingPosition(
+        luoyiFloatingDragState.startLeft + deltaX,
+        luoyiFloatingDragState.startTop + deltaY,
+        luoyiFloatingDragState.width,
+        luoyiFloatingDragState.height
+    );
+    updateLuoyiFloatingPanelPlacement();
+    event.preventDefault();
+}
+
+function endLuoyiFloatingDrag(event) {
+    const didMove = luoyiFloatingDragState?.moved;
+    finishLuoyiFloatingDrag(event);
+
+    if (didMove) {
+        saveLuoyiFloatingPosition();
+        setTimeout(() => {
+            luoyiFloatingSuppressClick = false;
+        }, 180);
+    }
+}
+
+function cancelLuoyiFloatingDrag(event) {
+    finishLuoyiFloatingDrag(event);
+    luoyiFloatingSuppressClick = false;
+}
+
+function finishLuoyiFloatingDrag(event) {
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (shell) shell.classList.remove('drag-ready', 'dragging');
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    event.currentTarget.removeEventListener('pointermove', moveLuoyiFloatingDrag);
+    event.currentTarget.removeEventListener('pointerup', endLuoyiFloatingDrag);
+    event.currentTarget.removeEventListener('pointercancel', cancelLuoyiFloatingDrag);
+    luoyiFloatingDragState = null;
+}
+
+function applyLuoyiFloatingPosition(left, top, width, height) {
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell) return;
+
+    const margin = window.innerWidth <= 768 ? 12 : 16;
+    const safeWidth = width || shell.getBoundingClientRect().width;
+    const safeHeight = height || shell.getBoundingClientRect().height;
+    const maxLeft = Math.max(margin, window.innerWidth - safeWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - safeHeight - margin);
+    const clampedLeft = Math.min(Math.max(left, margin), maxLeft);
+    const clampedTop = Math.min(Math.max(top, margin), maxTop);
+
+    shell.style.left = `${Math.round(clampedLeft)}px`;
+    shell.style.top = `${Math.round(clampedTop)}px`;
+    shell.style.right = 'auto';
+    shell.style.bottom = 'auto';
+    shell.classList.add('is-positioned');
+}
+
+function saveLuoyiFloatingPosition() {
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell) return;
+
+    const rect = shell.getBoundingClientRect();
+    try {
+        localStorage.setItem(LUOYI_FLOATING_POSITION_KEY, JSON.stringify({
+            left: Math.round(rect.left),
+            top: Math.round(rect.top)
+        }));
+    } catch (error) {
+        console.warn('保存洛忆悬浮位置失败:', error);
+    }
+}
+
+function restoreLuoyiFloatingPosition() {
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell) return;
+
+    try {
+        const savedPosition = JSON.parse(localStorage.getItem(LUOYI_FLOATING_POSITION_KEY) || 'null');
+        if (!savedPosition || !Number.isFinite(savedPosition.left) || !Number.isFinite(savedPosition.top)) {
+            updateLuoyiFloatingPanelPlacement();
+            return;
+        }
+
+        applyLuoyiFloatingPosition(savedPosition.left, savedPosition.top);
+        updateLuoyiFloatingPanelPlacement();
+    } catch (error) {
+        console.warn('恢复洛忆悬浮位置失败:', error);
+        updateLuoyiFloatingPanelPlacement();
+    }
+}
+
+function clampLuoyiFloatingPosition() {
+    const shell = document.getElementById('luoyiFloatingShell');
+    if (!shell || !shell.classList.contains('is-positioned')) return;
+
+    const rect = shell.getBoundingClientRect();
+    applyLuoyiFloatingPosition(rect.left, rect.top, rect.width, rect.height);
+    saveLuoyiFloatingPosition();
+}
+
+function updateLuoyiFloatingPanelPlacement() {
+    const shell = document.getElementById('luoyiFloatingShell');
+    const panel = document.getElementById('panel-luoyi');
+    if (!shell || !panel) return;
+
+    if (window.innerWidth <= 768) {
+        shell.classList.remove('panel-align-left', 'panel-below');
+        return;
+    }
+
+    const shellRect = shell.getBoundingClientRect();
+    const panelWidth = panel.offsetWidth || 330;
+    const panelHeight = panel.offsetHeight || 500;
+    const spaceAbove = shellRect.top - 16;
+    const spaceBelow = window.innerHeight - shellRect.bottom - 16;
+
+    shell.classList.toggle('panel-align-left', shellRect.right < panelWidth + 16);
+    shell.classList.toggle('panel-below', spaceAbove < panelHeight + 62 && spaceBelow > spaceAbove);
+}
 // ==================== 洛忆聊天 ====================
 
 // 洛忆聊天历史（已在上方全局声明）
+
+function createLuoyiAssistantMessage() {
+    return {
+        role: 'assistant',
+        id: `luoyi-msg-${Date.now()}-${++luoyiChatMessageId}`,
+        content: '',
+        displayContent: '',
+        streaming: true
+    };
+}
+
+function queueLuoyiStreamingText(message, text) {
+    if (!message || !text) return;
+    ensureLuoyiMessageId(message);
+    message.content = `${message.content || ''}${text}`;
+
+    let state = luoyiStreamingStates.get(message.id);
+    if (!state) {
+        state = { buffer: '', timer: null, finishWhenIdle: false };
+        luoyiStreamingStates.set(message.id, state);
+    }
+
+    state.buffer += text;
+    if (!state.timer) {
+        state.timer = window.setInterval(() => drainLuoyiStreamingQueue(message), 18);
+    }
+}
+
+function drainLuoyiStreamingQueue(message) {
+    if (!message?.id) return;
+    const state = luoyiStreamingStates.get(message.id);
+    if (!state) return;
+
+    if (!state.buffer) {
+        window.clearInterval(state.timer);
+        state.timer = null;
+        if (state.finishWhenIdle) {
+            message.streaming = false;
+            message.displayContent = message.content || '';
+            luoyiStreamingStates.delete(message.id);
+            updateLuoyiMessageContent(message);
+        }
+        return;
+    }
+
+    const takeCount = state.buffer.length > 48 ? 4 : (state.buffer.length > 18 ? 2 : 1);
+    const nextText = state.buffer.slice(0, takeCount);
+    state.buffer = state.buffer.slice(takeCount);
+    message.displayContent = `${message.displayContent || ''}${nextText}`;
+    updateLuoyiMessageContent(message);
+}
+
+function finishLuoyiStreamingMessage(message) {
+    if (!message) return;
+    ensureLuoyiMessageId(message);
+    const state = luoyiStreamingStates.get(message.id);
+    if (state && state.buffer) {
+        state.finishWhenIdle = true;
+        return;
+    }
+
+    if (state?.timer) {
+        window.clearInterval(state.timer);
+    }
+    luoyiStreamingStates.delete(message.id);
+    message.streaming = false;
+    message.displayContent = message.content || message.displayContent || '';
+    updateLuoyiMessageContent(message);
+}
+
+function setLuoyiStreamingMessageContent(message, content) {
+    if (!message) return;
+    ensureLuoyiMessageId(message);
+    const state = luoyiStreamingStates.get(message.id);
+    if (state?.timer) {
+        window.clearInterval(state.timer);
+    }
+    luoyiStreamingStates.delete(message.id);
+    message.content = content || '';
+    message.displayContent = message.content;
+    message.streaming = false;
+    updateLuoyiMessageContent(message);
+}
+
+function ensureLuoyiMessageId(message) {
+    if (!message.id) {
+        message.id = `luoyi-msg-${Date.now()}-${++luoyiChatMessageId}`;
+    }
+}
+
+function updateLuoyiMessageContent(message) {
+    if (!message?.id) return;
+    const messageEl = document.querySelector(`[data-luoyi-message-id="${message.id}"]`);
+    const contentEl = messageEl ? messageEl.querySelector('.luoyi-message-content') : null;
+    if (!contentEl) {
+        renderLuoyiMessages();
+        return;
+    }
+
+    const visibleContent = message.displayContent ?? message.content ?? '';
+    contentEl.innerHTML = escapeHtml(visibleContent) || '&nbsp;';
+    contentEl.classList.toggle('is-streaming', !!message.streaming);
+    messageEl.classList.toggle('is-streaming', !!message.streaming);
+
+    const container = document.getElementById('luoyiChatMessages');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
 
 /**
  * 发送消息给洛忆
  */
 async function sendLuoyiMessage() {
     const input = document.getElementById('luoyiChatInput');
-    const message = input.value.trim();
+    const sendButton = document.querySelector('.luoyi-send-btn');
+    const message = input ? input.value.trim() : '';
 
-    if (!message) return;
+    if (!message || input?.dataset.sending === 'true') return;
 
-    // 添加用户消息到历史
+    input.dataset.sending = 'true';
+    if (sendButton) sendButton.disabled = true;
+
     luoyiChatHistory.push({ role: 'user', content: message });
     const requestHistory = luoyiChatHistory.slice(0, -1);
-
-    // 清空输入框
     input.value = '';
-
-    // 渲染用户消息
     renderLuoyiMessages();
-
-    // 显示洛忆正在输入
     showLuoyiTyping();
 
     let assistantMessage = null;
@@ -5024,33 +5343,28 @@ async function sendLuoyiMessage() {
             throw new Error(errorData.error || errorData.message || response.statusText);
         }
 
+        assistantMessage = createLuoyiAssistantMessage();
+        luoyiChatHistory.push(assistantMessage);
+        renderLuoyiMessages();
+
         const contentType = response.headers.get('content-type') || '';
         if (!response.body || !contentType.includes('text/event-stream')) {
             const data = await response.json();
-            if (data.success) {
-                luoyiChatHistory.push({ role: 'assistant', content: data.reply || '' });
-            } else {
-                luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.distracted', { message: data.error || '' }) });
-            }
-            renderLuoyiMessages();
+            const reply = data.success
+                ? (data.reply || data.data?.reply || '')
+                : tx('luoyi.distracted', { message: data.error || data.message || '' });
+            queueLuoyiStreamingText(assistantMessage, reply || tx('luoyi.networkIssue'));
+            finishLuoyiStreamingMessage(assistantMessage);
             return;
         }
-
-        assistantMessage = { role: 'assistant', content: '' };
-        luoyiChatHistory.push(assistantMessage);
-        renderLuoyiMessages();
 
         let streamError = '';
         await readLuoyiSseStream(response, (event, payload) => {
             if (event === 'delta') {
-                const content = payload?.content || '';
-                if (!content) return;
-                assistantMessage.content += content;
-                renderLuoyiMessages();
+                queueLuoyiStreamingText(assistantMessage, payload?.content || '');
             } else if (event === 'done') {
                 if (payload?.reply && !assistantMessage.content) {
-                    assistantMessage.content = payload.reply;
-                    renderLuoyiMessages();
+                    queueLuoyiStreamingText(assistantMessage, payload.reply);
                 }
             } else if (event === 'error') {
                 streamError = payload?.error || tx('luoyi.networkIssue');
@@ -5060,25 +5374,33 @@ async function sendLuoyiMessage() {
         if (streamError) {
             if (assistantMessage.content) {
                 showToast(streamError, 'warning');
+                finishLuoyiStreamingMessage(assistantMessage);
             } else {
-                assistantMessage.content = tx('luoyi.distracted', { message: streamError });
-                renderLuoyiMessages();
+                setLuoyiStreamingMessageContent(assistantMessage, tx('luoyi.distracted', { message: streamError }));
             }
+            return;
         }
 
         if (!assistantMessage.content) {
-            assistantMessage.content = tx('luoyi.networkIssue');
-            renderLuoyiMessages();
+            setLuoyiStreamingMessageContent(assistantMessage, tx('luoyi.networkIssue'));
+            return;
         }
+
+        finishLuoyiStreamingMessage(assistantMessage);
     } catch (err) {
         console.error('洛忆聊天失败:', err);
         hideLuoyiTyping();
         if (assistantMessage) {
-            assistantMessage.content = assistantMessage.content || tx('luoyi.networkIssue');
+            setLuoyiStreamingMessageContent(assistantMessage, assistantMessage.content || tx('luoyi.networkIssue'));
         } else {
-            luoyiChatHistory.push({ role: 'assistant', content: tx('luoyi.networkIssue') });
+            assistantMessage = createLuoyiAssistantMessage();
+            luoyiChatHistory.push(assistantMessage);
+            renderLuoyiMessages();
+            setLuoyiStreamingMessageContent(assistantMessage, tx('luoyi.networkIssue'));
         }
-        renderLuoyiMessages();
+    } finally {
+        if (input) input.dataset.sending = 'false';
+        if (sendButton) sendButton.disabled = false;
     }
 }
 
@@ -5165,7 +5487,7 @@ function renderLuoyiMessages() {
     if (!container) return;
 
     // 欢迎消息卡片
-    let html = `
+    let html = luoyiChatHistory.length ? '' : `
         <div class="luoyi-welcome-card">
             <div class="luoyi-welcome-avatar">洛</div>
             <div class="luoyi-welcome-bubble">
@@ -5174,25 +5496,26 @@ function renderLuoyiMessages() {
             </div>
         </div>
     `;
-
     // 渲染聊天历史
     for (const msg of luoyiChatHistory) {
+        const visibleContent = msg.displayContent ?? msg.content ?? '';
         if (msg.role === 'user') {
             html += `
                 <div class="luoyi-message luoyi-message-user">
-                    <div class="luoyi-message-content">${escapeHtml(msg.content)}</div>
+                    <div class="luoyi-message-content">${escapeHtml(visibleContent)}</div>
                 </div>
             `;
         } else {
+            ensureLuoyiMessageId(msg);
+            const streamingClass = msg.streaming ? ' is-streaming' : '';
             html += `
-                <div class="luoyi-message luoyi-message-luoyi">
+                <div class="luoyi-message luoyi-message-luoyi${streamingClass}" data-luoyi-message-id="${msg.id}">
                     <div class="luoyi-message-avatar">洛</div>
-                    <div class="luoyi-message-content">${escapeHtml(msg.content)}</div>
+                    <div class="luoyi-message-content${streamingClass}">${escapeHtml(visibleContent) || '&nbsp;'}</div>
                 </div>
             `;
         }
     }
-
     container.innerHTML = html;
 
     // 滚动到底部
@@ -5416,3 +5739,7 @@ function hideNodeContextMenu() {
     const menu = document.getElementById('nodeContextMenu');
     if (menu) menu.style.display = 'none';
 }
+
+
+
+

@@ -23,13 +23,28 @@ class ClientAgentDialogueService {
         return this.db.getAgentDialogueSessionsByMemory(memoryId);
     }
 
+    async getParticipantCandidates(memoryId) {
+        const memory = await this.db.getMemory(memoryId);
+        if (!memory) {
+            return { success: false, error: 'Memory not found' };
+        }
+
+        const candidates = await this._buildParticipantCandidates(memory, { includeSelf: true });
+        const defaultSelectedIds = candidates
+            .filter(candidate => candidate.default_selected)
+            .slice(0, 3)
+            .map(candidate => candidate.id);
+
+        return { success: true, candidates, default_selected_ids: defaultSelectedIds };
+    }
+
     async _buildMemoryReviewPayload(memoryId, options = {}) {
         const memory = await this.db.getMemory(memoryId);
         if (!memory) {
             return { success: false, error: 'Memory not found' };
         }
 
-        const participants = await this._buildParticipants(memory, options.participants || null);
+        const participants = await this._buildParticipants(memory, options.participants || null, options);
         if (participants.length === 0) {
             return { success: false, error: 'No person entities in this memory' };
         }
@@ -46,8 +61,9 @@ class ClientAgentDialogueService {
                 include_summary: includeSummary,
                 session_id: options.sessionId || null,
                 created_at: options.createdAt || null,
-                user_question: options.question || this._defaultQuestion(),
+                user_question: options.question || this._defaultQuestion(options.simulationMode || 'review'),
                 language: window.i18n ? window.i18n.currentAiLanguage() : 'Chinese',
+                simulation_mode: options.simulationMode || 'review',
                 stream: !!options.stream
             }
         };
@@ -183,9 +199,10 @@ class ClientAgentDialogueService {
         }
     }
 
-    async _buildParticipants(memory, selectedIds) {
-        const personEntities = this._uniquePersons(memory.entities || [], selectedIds).slice(0, 3);
-        if (personEntities.length === 0) return [];
+    async _buildParticipants(memory, selectedIds, options = {}) {
+        const candidates = await this._buildParticipantCandidates(memory, { includeSelf: options.includeSelf !== false });
+        const selectedCandidates = this._selectParticipantCandidates(candidates, selectedIds);
+        if (selectedCandidates.length === 0) return [];
 
         const [allMemories, allRelations, allEntities] = await Promise.all([
             this.db.getAllMemories(),
@@ -195,17 +212,22 @@ class ClientAgentDialogueService {
         const entityMap = new Map(allEntities.map(entity => [entity.id, entity]));
 
         const participants = [];
-        for (const memoryEntity of personEntities) {
-            const graphEntity = this._resolveGraphEntity(memoryEntity, allEntities) || memoryEntity;
+        for (const candidate of selectedCandidates) {
+            if (candidate.type === 'SELF') {
+                participants.push(this._buildSelfParticipant(memory, candidate));
+                continue;
+            }
+
+            const graphEntity = candidate.entity || candidate;
             const relatedMemories = this._findRelatedMemories(graphEntity, allMemories, memory.id);
             const relationships = this._findRelationships(graphEntity, allRelations, entityMap);
 
             participants.push({
-                id: graphEntity.id || memoryEntity.id || memoryEntity.name,
-                name: graphEntity.name || memoryEntity.name,
+                id: graphEntity.id || candidate.id || graphEntity.name,
+                name: graphEntity.name || candidate.name,
                 type: 'PERSON',
-                description: graphEntity.description || memoryEntity.description || '',
-                aliases: graphEntity.aliases || memoryEntity.aliases || [],
+                description: graphEntity.description || candidate.description || '',
+                aliases: graphEntity.aliases || candidate.aliases || [],
                 current_memory_id: memory.id,
                 related_memories: relatedMemories.map(item => this._compactMemory(item, 700)),
                 relationships,
@@ -213,9 +235,107 @@ class ClientAgentDialogueService {
             });
         }
 
-        return participants;
+        return participants.slice(0, 3);
     }
 
+    async _buildParticipantCandidates(memory, options = {}) {
+        const [allRelations, allEntities] = await Promise.all([
+            this.db.getAllRelations(),
+            this.db.getAllEntities()
+        ]);
+        const entityMap = new Map(allEntities.map(entity => [entity.id, entity]));
+        const candidates = [];
+        const seen = new Set();
+
+        const addCandidate = (entity, source, defaultSelected = false) => {
+            if (!entity || entity.type !== 'PERSON' || !entity.name) return;
+            if (this._isDisallowedPersonaName(entity.name)) return;
+            const id = entity.id || entity.name;
+            const key = String(id || entity.name).toLowerCase();
+            if (seen.has(key)) {
+                const existing = candidates.find(candidate => String(candidate.id).toLowerCase() === key);
+                if (existing) existing.default_selected = existing.default_selected || defaultSelected;
+                return;
+            }
+            seen.add(key);
+            candidates.push({
+                id,
+                name: entity.name,
+                type: 'PERSON',
+                description: entity.description || '',
+                aliases: entity.aliases || [],
+                source,
+                default_selected: !!defaultSelected,
+                entity
+            });
+        };
+
+        const memoryPersons = this._uniquePersons(memory.entities || [], null);
+        const currentGraphPeople = [];
+        for (const memoryEntity of memoryPersons) {
+            const graphEntity = this._resolveGraphEntity(memoryEntity, allEntities) || memoryEntity;
+            currentGraphPeople.push(graphEntity);
+            addCandidate(graphEntity, 'current', true);
+        }
+
+        const currentIds = new Set(currentGraphPeople.map(entity => entity.id).filter(Boolean));
+        if (currentIds.size > 0) {
+            for (const relation of allRelations) {
+                const sourceMatches = currentIds.has(relation.source);
+                const targetMatches = currentIds.has(relation.target);
+                if (!sourceMatches && !targetMatches) continue;
+                const otherId = sourceMatches ? relation.target : relation.source;
+                const otherEntity = entityMap.get(otherId);
+                addCandidate(otherEntity, 'related', false);
+            }
+        }
+
+        if (options.includeSelf) {
+            candidates.push({
+                id: 'self',
+                name: window.i18n && window.i18n.isEnglish() ? 'Me' : '我',
+                type: 'SELF',
+                description: window.i18n && window.i18n.isEnglish() ? 'The memory owner' : '记忆拥有者本人',
+                aliases: [],
+                source: 'self',
+                default_selected: false,
+                entity: null
+            });
+        }
+
+        return candidates;
+    }
+
+    _selectParticipantCandidates(candidates, selectedIds) {
+        if (Array.isArray(selectedIds) && selectedIds.length > 0) {
+            const byId = new Map(candidates.map(candidate => [candidate.id, candidate]));
+            return selectedIds.map(id => byId.get(id)).filter(Boolean).slice(0, 3);
+        }
+
+        const defaults = candidates.filter(candidate => candidate.default_selected).slice(0, 3);
+        return defaults.length ? defaults : candidates.slice(0, 3);
+    }
+
+    _buildSelfParticipant(memory, candidate) {
+        const relatedMemories = [this._compactMemory(memory, 700)];
+        return {
+            id: 'self',
+            name: candidate.name,
+            type: 'SELF',
+            description: candidate.description,
+            aliases: [],
+            current_memory_id: memory.id,
+            related_memories: relatedMemories,
+            relationships: [],
+            persona_profile: {
+                known_traits: [candidate.description].filter(Boolean),
+                speaking_style: window.i18n && window.i18n.isEnglish()
+                    ? 'first-person, reflective, restrained'
+                    : '第一人称、克制、像在复盘自己的感受',
+                relationship_to_user: candidate.description
+            }
+        };
+    }
     _uniquePersons(entities, selectedIds) {
         const selectedSet = selectedIds ? new Set(selectedIds) : null;
         const seen = new Set();
@@ -328,11 +448,29 @@ class ClientAgentDialogueService {
         };
     }
 
-    _defaultQuestion() {
-        return window.i18n && window.i18n.isEnglish()
-            ? 'Take one short turn inside this memory. Keep it conversational.'
-            : '你们就这段记忆先各说一句，像真的在场一样互相接话。';
+    _defaultQuestion(mode = 'review') {
+        const english = window.i18n && window.i18n.isEnglish();
+        const questions = {
+            review: english
+                ? 'Take one short turn inside this memory. Keep it conversational.'
+                : '你们就这段记忆先各说一句，像真的在场一样互相接话。',
+            confrontation: english
+                ? 'Take one turn around the possible misunderstanding or tension in this memory.'
+                : '围绕这段记忆里可能存在的误会或分歧，各自说一句回应。',
+            fill_gaps: english
+                ? 'Fill one likely missing feeling or motive from the available clues.'
+                : '基于已有线索，补足这段记忆里可能缺失的一点感受或动机。',
+            relationship: english
+                ? 'Take one turn about the relationship shift reflected by this memory.'
+                : '请围绕这段记忆反映出的人物关系变化，各自说一句。',
+            counterfactual: english
+                ? 'If one choice had been different then, how might you have responded?'
+                : '如果当时有一个选择不同，你们觉得自己会怎样回应？'
+        };
+        return questions[mode] || questions.review;
     }
 }
 
 let agentDialogueService = null;
+
+

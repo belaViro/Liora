@@ -34,11 +34,10 @@ class AgentDialogueService:
             raise ValueError("at least one participant is required")
 
         language = _answer_language(payload.get("language", "Chinese"))
+        simulation_mode = _normalize_simulation_mode(payload.get("simulation_mode"))
         user_question = _text(
             payload.get("user_question"),
-            "你们就这段记忆先各说一句，像真的在场一样互相接话。"
-            if language == "Chinese"
-            else "Take one short turn each on this memory, as if you are inside the scene.",
+            _default_user_question(language, simulation_mode),
         )
         prior_turns = _normalize_public_turns(payload.get("public_turns") or payload.get("history") or [])
         start_round = _safe_int(payload.get("start_round"), default=_infer_next_round(prior_turns), min_value=1, max_value=20)
@@ -50,6 +49,7 @@ class AgentDialogueService:
             "id": _text(payload.get("session_id"), f"agentdlg_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"),
             "memory_id": memory.get("id", ""),
             "mode": "memory_review",
+            "simulation_mode": simulation_mode,
             "host": "洛忆" if language == "Chinese" else "Luoyi",
             "participants": [
                 {"id": item["id"], "name": item["name"], "type": item.get("type", "PERSON")}
@@ -74,22 +74,26 @@ class AgentDialogueService:
                         "round": round_index,
                     },
                 }
-                content = self._generate_persona_turn(
+                persona_turn = self._generate_persona_turn(
                     memory=memory,
                     participant=participant,
                     public_turns=_public_turns(turns),
                     user_question=user_question,
                     language=language,
                     round_index=round_index,
+                    simulation_mode=simulation_mode,
                 )
                 turn = {
                     "id": f"turn_{uuid.uuid4().hex[:10]}",
                     "role": "participant",
                     "agent_id": participant["id"],
                     "agent_name": participant["name"],
-                    "content": content,
+                    "content": persona_turn["content"],
                     "round": round_index,
-                    "evidence_ids": participant.get("evidence_ids", []),
+                    "evidence_ids": persona_turn["evidence_ids"],
+                    "evidence_refs": persona_turn["evidence_refs"],
+                    "inference_notes": persona_turn["inference_notes"],
+                    "confidence": persona_turn["confidence"],
                     "created_at": datetime.utcnow().isoformat() + "Z",
                 }
                 turns.append(turn)
@@ -108,6 +112,7 @@ class AgentDialogueService:
                 turns=turns,
                 user_question=user_question,
                 language=language,
+                simulation_mode=simulation_mode,
             )
             host_turn = {
                 "id": f"turn_{uuid.uuid4().hex[:10]}",
@@ -133,11 +138,29 @@ class AgentDialogueService:
         user_question: str,
         language: str,
         round_index: int,
-    ) -> str:
-        system_prompt = _persona_system_prompt(participant, language)
-        user_prompt = _persona_user_prompt(memory, participant, public_turns, user_question, language, round_index)
+        simulation_mode: str,
+    ) -> Dict[str, Any]:
+        system_prompt = _persona_system_prompt(participant, language, simulation_mode)
+        user_prompt = _persona_user_prompt(memory, participant, public_turns, user_question, language, round_index, simulation_mode)
         fallback = f"（{participant['name']} 这一轮生成失败）" if language == "Chinese" else f"({participant['name']} failed to generate this turn.)"
-        return self._chat(system_prompt, user_prompt, max_tokens=2400, temperature=0.72, fallback=fallback)
+        try:
+            content = self._complete_chat(system_prompt, user_prompt, max_tokens=2400, temperature=0.72)
+            parsed = _parse_persona_turn(content, participant, memory, language)
+            if parsed["content"]:
+                return parsed
+
+            logger.warning("agent dialogue structured persona reply was empty; retrying")
+            retry_content = self._complete_chat(
+                system_prompt + _structured_retry_suffix(language),
+                user_prompt,
+                max_tokens=4096,
+                temperature=0.78,
+            )
+            parsed = _parse_persona_turn(retry_content, participant, memory, language)
+            return parsed if parsed["content"] else _fallback_persona_turn(fallback, participant, memory, language)
+        except Exception as exc:
+            logger.warning(f"agent dialogue LLM call failed: {exc}")
+            return _fallback_persona_turn(fallback, participant, memory, language)
 
     def _generate_luoyi_summary(
         self,
@@ -146,8 +169,10 @@ class AgentDialogueService:
         turns: List[Dict[str, Any]],
         user_question: str,
         language: str,
+        simulation_mode: str,
     ) -> str:
         names = "、".join(p["name"] for p in participants)
+        mode_label = _simulation_mode_label(simulation_mode, language)
         if language == "English":
             system_prompt = (
                 "You are Luoyi, the host agent in Liora. Summarize this exploratory dialogue briefly. "
@@ -157,6 +182,7 @@ class AgentDialogueService:
                 [
                     f"Memory story:\n{_memory_story(memory)}",
                     f"Participants: {names}",
+                    f"Simulation mode: {mode_label}",
                     f"Prompt: {user_question}",
                     "Dialogue:\n" + _format_public_turns(turns),
                     "Reply in English, 70-110 words, conversational.",
@@ -172,6 +198,7 @@ class AgentDialogueService:
                 [
                     f"记忆故事:\n{_memory_story(memory)}",
                     f"参与人物: {names}",
+                    f"推演模式: {mode_label}",
                     f"用户要求: {user_question}",
                     "公开对话:\n" + _format_public_turns(turns),
                     "请用中文，70-110字，像洛忆在聊天，不要写报告。",
@@ -223,41 +250,263 @@ class AgentDialogueService:
             logger.warning("agent dialogue LLM response hit max_tokens limit")
         return content
 
+_SIMULATION_MODES = {
+    "review": {
+        "zh_label": "复盘",
+        "en_label": "Review",
+        "zh_instruction": "各自回忆这段记忆中能被材料支持的感受、动作和关系线索。",
+        "en_instruction": "Recall the feelings, actions, and relationship clues supported by the memory.",
+        "zh_question": "你们就这段记忆先各说一句，像真的在场一样互相接话。",
+        "en_question": "Take one short turn inside this memory. Keep it conversational.",
+    },
+    "confrontation": {
+        "zh_label": "对质",
+        "en_label": "Confrontation",
+        "zh_instruction": "围绕说法差异、回避、误会或未说出口的部分互相回应，但不要制造新事实。",
+        "en_instruction": "Respond around differences, avoidance, misunderstanding, or unsaid parts without inventing new facts.",
+        "zh_question": "围绕这段记忆里可能存在的误会或分歧，各自说一句回应。",
+        "en_question": "Take one turn around the possible misunderstanding or tension in this memory.",
+    },
+    "fill_gaps": {
+        "zh_label": "补全空白",
+        "en_label": "Fill gaps",
+        "zh_instruction": "基于已有线索补足可能的情绪、动机或背景，并清楚把补足部分标成推测。",
+        "en_instruction": "Fill likely feelings, motives, or context from existing clues, and mark extrapolations clearly.",
+        "zh_question": "基于已有线索，补足这段记忆里可能缺失的一点感受或动机。",
+        "en_question": "Fill one likely missing feeling or motive from the available clues.",
+    },
+    "relationship": {
+        "zh_label": "关系变化",
+        "en_label": "Relationship change",
+        "zh_instruction": "关注人物之间的亲近、疏远、信任、亏欠或未完成感如何变化。",
+        "en_instruction": "Focus on how closeness, distance, trust, debt, or unfinished feelings may have shifted.",
+        "zh_question": "请围绕这段记忆反映出的人物关系变化，各自说一句。",
+        "en_question": "Take one turn about the relationship shift reflected by this memory.",
+    },
+    "counterfactual": {
+        "zh_label": "如果当时",
+        "en_label": "What if",
+        "zh_instruction": "只做轻量假设：如果当时某个选择不同，人物可能怎样回应；不要把假设写成事实。",
+        "en_instruction": "Make a light what-if: how the persona might respond if one choice had differed; do not state it as fact.",
+        "zh_question": "如果当时有一个选择不同，你们觉得自己会怎样回应？",
+        "en_question": "If one choice had been different then, how might you have responded?",
+    },
+}
+
+
+def _normalize_simulation_mode(value: Any) -> str:
+    mode = _text(value, "review").lower().strip()
+    if mode in {"memory_review", "default"}:
+        return "review"
+    return mode if mode in _SIMULATION_MODES else "review"
+
+
+def _simulation_mode_label(mode: str, language: str) -> str:
+    item = _SIMULATION_MODES.get(_normalize_simulation_mode(mode), _SIMULATION_MODES["review"])
+    return item["en_label"] if language == "English" else item["zh_label"]
+
+
+def _simulation_mode_instruction(mode: str, language: str) -> str:
+    item = _SIMULATION_MODES.get(_normalize_simulation_mode(mode), _SIMULATION_MODES["review"])
+    return item["en_instruction"] if language == "English" else item["zh_instruction"]
+
+
+def _default_user_question(language: str, mode: str) -> str:
+    item = _SIMULATION_MODES.get(_normalize_simulation_mode(mode), _SIMULATION_MODES["review"])
+    return item["en_question"] if language == "English" else item["zh_question"]
+
+
+def _structured_retry_suffix(language: str) -> str:
+    if language == "English":
+        return "\n\nThe previous answer was unusable. Return only valid JSON with content, evidence_refs, inference_notes, and confidence."
+    return "\n\n上一条回答不合格。只返回合法 JSON，必须包含 content、evidence_refs、inference_notes、confidence。"
+
+
+def _parse_persona_turn(value: str, participant: Dict[str, Any], memory: Dict[str, Any], language: str) -> Dict[str, Any]:
+    parsed = _extract_json_object(value)
+    if isinstance(parsed, dict):
+        content = _trim_reply(_text(parsed.get("content") or parsed.get("line") or parsed.get("dialogue")), "")
+        evidence_refs = _normalize_evidence_refs(parsed.get("evidence_refs"), participant, memory, language)
+        inference_notes = _normalize_inference_notes(parsed.get("inference_notes"), language)
+        confidence = _normalize_confidence(parsed.get("confidence"), evidence_refs, inference_notes)
+    else:
+        content = _trim_reply(value, "")
+        evidence_refs = _default_evidence_refs(participant, memory, language)
+        inference_notes = [_plain_text_inference_note(language)] if content else []
+        confidence = "medium" if content else "low"
+
+    evidence_ids = [ref["memory_id"] for ref in evidence_refs if ref.get("memory_id")]
+    if not evidence_ids:
+        evidence_ids = participant.get("evidence_ids", []) or ([memory.get("id")] if memory.get("id") else [])
+
+    return {
+        "content": content,
+        "evidence_refs": evidence_refs,
+        "evidence_ids": list(dict.fromkeys(evidence_ids)),
+        "inference_notes": inference_notes,
+        "confidence": confidence,
+    }
+
+
+def _extract_json_object(value: str) -> Any:
+    text = _text(value)
+    if not text:
+        return None
+
+    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.IGNORECASE | re.DOTALL)
+    candidate = fence_match.group(1).strip() if fence_match else text.strip()
+    for raw in (candidate, _slice_json_object(candidate)):
+        if not raw:
+            continue
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def _slice_json_object(value: str) -> str:
+    start = value.find("{")
+    end = value.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return ""
+    return value[start : end + 1]
+
+
+def _normalize_evidence_refs(value: Any, participant: Dict[str, Any], memory: Dict[str, Any], language: str) -> List[Dict[str, str]]:
+    refs: List[Dict[str, str]] = []
+    if isinstance(value, list):
+        for item in value[:4]:
+            if not isinstance(item, dict):
+                continue
+            memory_id = _text(item.get("memory_id") or item.get("id"))
+            quote = _text(item.get("quote") or item.get("fragment") or item.get("text"))[:160]
+            reason = _text(item.get("reason") or item.get("why"))[:160]
+            if not memory_id and memory.get("id"):
+                memory_id = memory["id"]
+            if quote or reason or memory_id:
+                refs.append(
+                    {
+                        "memory_id": memory_id,
+                        "quote": quote,
+                        "reason": reason or ("supports this line" if language == "English" else "支撑这句对白"),
+                    }
+                )
+
+    return refs[:3] if refs else _default_evidence_refs(participant, memory, language)
+
+
+def _default_evidence_refs(participant: Dict[str, Any], memory: Dict[str, Any], language: str) -> List[Dict[str, str]]:
+    refs: List[Dict[str, str]] = []
+    seen = set()
+    candidates = [memory] + [item for item in participant.get("related_memories", []) if isinstance(item, dict)]
+    for item in candidates:
+        memory_id = _text(item.get("id"))
+        key = memory_id or _text(item.get("content") or item.get("summary"))[:40]
+        if key in seen:
+            continue
+        seen.add(key)
+        quote = _text(item.get("summary") or item.get("content"))[:160]
+        if not quote and not memory_id:
+            continue
+        refs.append(
+            {
+                "memory_id": memory_id,
+                "quote": quote,
+                "reason": "current memory context" if language == "English" else "当前记忆提供场景依据",
+            }
+        )
+        if len(refs) >= 2:
+            break
+    return refs
+
+
+def _normalize_inference_notes(value: Any, language: str) -> List[str]:
+    notes: List[str] = []
+    if isinstance(value, list):
+        notes = [_text(item)[:160] for item in value if _text(item)]
+    elif _text(value):
+        notes = [_text(value)[:160]]
+    return notes[:3]
+
+
+def _plain_text_inference_note(language: str) -> str:
+    if language == "English":
+        return "The model returned plain dialogue, so the exact inferred part was not separated."
+    return "模型返回了普通对白，系统未能进一步拆分具体推测部分。"
+
+
+def _normalize_confidence(value: Any, evidence_refs: List[Dict[str, str]], inference_notes: List[str]) -> str:
+    normalized = _text(value).lower()
+    if normalized in {"high", "medium", "low"}:
+        return normalized
+    if not evidence_refs:
+        return "low"
+    return "medium" if inference_notes else "high"
+
+
+def _fallback_persona_turn(content: str, participant: Dict[str, Any], memory: Dict[str, Any], language: str) -> Dict[str, Any]:
+    evidence_refs = _default_evidence_refs(participant, memory, language)
+    evidence_ids = [ref["memory_id"] for ref in evidence_refs if ref.get("memory_id")]
+    return {
+        "content": _trim_reply(content, content),
+        "evidence_refs": evidence_refs,
+        "evidence_ids": list(dict.fromkeys(evidence_ids or participant.get("evidence_ids", []))),
+        "inference_notes": [_plain_text_inference_note(language)],
+        "confidence": "low",
+    }
+
 def _participants_for_round(participants: List[Dict[str, Any]], round_index: int) -> List[Dict[str, Any]]:
     if round_index <= 1 or len(participants) <= 1:
         return participants
 
     speaker_count = random.randint(1, len(participants))
     return random.sample(participants, speaker_count)
-def _persona_system_prompt(participant: Dict[str, Any], language: str) -> str:
+def _persona_system_prompt(participant: Dict[str, Any], language: str, simulation_mode: str) -> str:
     name = participant["name"]
     profile = participant.get("persona_profile") or {}
     style = _text(profile.get("speaking_style"), "自然、短句、像在当场接话" if language == "Chinese" else "natural, brief, like speaking in the scene")
+    mode_instruction = _simulation_mode_instruction(simulation_mode, language)
     if language == "English":
         return f"""You are roleplaying "{name}" inside one memory story.
-The memory story is your whole stage. Do not verify evidence and do not discuss uncertainty.
-Only output this character's spoken line. No role name, no narration, no analysis.
+The memory story and private fragments are your only evidence. Stay inside them.
+Mode focus: {mode_instruction}
 Speaking style: {style}
 
-Output rules:
+Return one valid JSON object only, with this shape:
+{{
+  "content": "the line this character says",
+  "evidence_refs": [{{"memory_id": "id if known", "quote": "short supporting memory fragment", "reason": "why it supports the line"}}],
+  "inference_notes": ["what part is inferred rather than directly stated"],
+  "confidence": "high|medium|low"
+}}
+
+Content rules:
 - 1 to 2 short sentences, 20-55 words.
-- Speak in first person as {name}.
-- Stay inside the given memory story.
-- You may lightly infer a feeling or motive, but do not invent hard events outside the story.
-- If there is prior public dialogue, respond to one specific previous line."""
+- Speak in first person as {name}; no role name, narration, analysis, or parentheses.
+- You may infer a feeling or motive, but do not invent hard events outside the story.
+- If there is prior public dialogue, respond to one specific previous line.
+- Keep evidence_refs and inference_notes brief."""
 
     return f"""你正在扮演记忆故事里的「{name}」。
-下面给你的“记忆故事”就是你的全部舞台，不需要证明证据，也不要讨论不确定性。
-你只能输出这个人物正在说的一句对白；不要写角色名、旁白、分析、括号说明。
+记忆故事和私有片段就是你的全部依据，只能待在这些材料里。
+推演模式：{mode_instruction}
 说话风格：{style}
 
-输出规则：
-- 1 到 2 句，20 到 55 字。
-- 用「{name}」的第一人称说话。
-- 只待在给定记忆故事里。
-- 可以轻微补足感受或动机，但不要编造故事外的硬事实。
-- 如果已有公开对话，就接住其中某一句回应。"""
+只返回一个合法 JSON 对象，结构如下：
+{{
+  "content": "这个人物说出的一句对白",
+  "evidence_refs": [{{"memory_id": "已知记忆ID", "quote": "短依据片段", "reason": "为什么支撑这句对白"}}],
+  "inference_notes": ["哪些部分是推测而非原文事实"],
+  "confidence": "high|medium|low"
+}}
 
+对白规则：
+- 1 到 2 句，20 到 55 字。
+- 用「{name}」的第一人称说话；不要写角色名、旁白、分析、括号说明。
+- 可以补足感受或动机，但不要编造故事外的硬事实。
+- 如果已有公开对话，就接住其中某一句回应。
+- evidence_refs 和 inference_notes 要短。"""
 def _persona_user_prompt(
     memory: Dict[str, Any],
     participant: Dict[str, Any],
@@ -265,39 +514,42 @@ def _persona_user_prompt(
     user_question: str,
     language: str,
     round_index: int,
+    simulation_mode: str,
 ) -> str:
     related = _format_related_memories(participant.get("related_memories", []), language)
     relationships = _format_relationships(participant.get("relationships", []), language)
     public_dialogue = _format_public_turns(public_turns)
+    mode_instruction = _simulation_mode_instruction(simulation_mode, language)
     if language == "English":
         task = "It is your turn. Say one natural line from inside the scene." if round_index <= 1 else "It is your turn. Respond to one previous line, then add one small angle."
         return "\n\n".join(
             [
-                f"Memory story:\n{_memory_story(memory)}",
+                f"Memory story:\n[id={memory.get('id') or 'current'}] {_memory_story(memory)}",
                 f"Character you play: {participant['name']}",
                 f"Character image:\n{participant.get('description') or 'Read it from the story.'}",
                 f"Private related fragments:\n{related}",
                 f"Relationship clues:\n{relationships}",
                 f"Public dialogue so far:\n{public_dialogue}",
                 f"Luoyi's prompt: {user_question}",
-                f"Task: {task} Output only the line this character says.",
+                f"Mode focus: {mode_instruction}",
+                f"Task: {task} Return JSON only. The content field must be just the spoken line.",
             ]
         )
 
     task = "轮到你了，直接从场景里说一句自然的话。" if round_index <= 1 else "轮到你了，接住上一轮某个人的一句话，再补一个小角度。"
     return "\n\n".join(
         [
-            f"记忆故事：\n{_memory_story(memory)}",
+            f"记忆故事：\n[id={memory.get('id') or 'current'}] {_memory_story(memory)}",
             f"你扮演的人物：{participant['name']}",
             f"人物形象：\n{participant.get('description') or '从故事中自行把握'}",
             f"你的私有相关片段：\n{related}",
             f"你的关系线索：\n{relationships}",
             f"目前公开对话：\n{public_dialogue}",
             f"洛忆给出的场景任务：{user_question}",
-            f"当前任务：{task} 只输出这个人物说出的对白。",
+            f"推演模式重点：{mode_instruction}",
+            f"当前任务：{task} 只返回 JSON，content 字段只能是人物对白。",
         ]
     )
-
 
 def _dialogue_only_retry_prompt(previous_prompt: str) -> str:
     return (
@@ -314,7 +566,8 @@ def _normalize_participants(value: Any) -> List[Dict[str, Any]]:
         if not isinstance(raw, dict):
             continue
         name = _text(raw.get("name"))
-        if not name or _is_disallowed_persona_name(name):
+        participant_type = _text(raw.get("type"), "PERSON")
+        if not name or (participant_type != "SELF" and _is_disallowed_persona_name(name)):
             continue
         participant_id = _text(raw.get("id"), f"person_{index}")
         related_memories = [
@@ -334,7 +587,7 @@ def _normalize_participants(value: Any) -> List[Dict[str, Any]]:
             {
                 "id": participant_id,
                 "name": name,
-                "type": _text(raw.get("type"), "PERSON"),
+                "type": participant_type,
                 "description": _text(raw.get("description")),
                 "aliases": raw.get("aliases") if isinstance(raw.get("aliases"), list) else [],
                 "related_memories": related_memories,
@@ -403,6 +656,9 @@ def _normalize_public_turns(value: Any) -> List[Dict[str, Any]]:
                 "content": content[:500],
                 "round": _safe_int(item.get("round"), default=1, min_value=1, max_value=20),
                 "evidence_ids": item.get("evidence_ids") if isinstance(item.get("evidence_ids"), list) else [],
+                "evidence_refs": item.get("evidence_refs") if isinstance(item.get("evidence_refs"), list) else [],
+                "inference_notes": item.get("inference_notes") if isinstance(item.get("inference_notes"), list) else [],
+                "confidence": _text(item.get("confidence")),
                 "created_at": _text(item.get("created_at"), datetime.utcnow().isoformat() + "Z"),
             }
         )
@@ -610,3 +866,12 @@ def _to_bool(value: Any) -> bool:
 
 def _answer_language(value: Any) -> str:
     return "English" if str(value).lower().startswith("english") else "Chinese"
+
+
+
+
+
+
+
+
+

@@ -7,11 +7,183 @@ let agentDialogueRuntime = {
     session: null,
     running: false,
     summarized: false,
-    currentHistoryMemoryId: null
+    currentHistoryMemoryId: null,
+    panelId: 'agentDialogueWorkbenchPanel',
+    historyId: 'agentDialogueWorkbenchHistory',
+    selectedMemoryId: null,
+    setupCandidates: []
 };
 
+function openAgentDialogueWorkbench(memoryId = null, options = {}) {
+    if (typeof switchTab === 'function') {
+        switchTab('agent-dialogue', null, true);
+    }
+
+    const sidebar = document.getElementById('sidebarPanel');
+    if (sidebar && window.innerWidth <= 768) {
+        sidebar.classList.add('mobile-open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    agentDialogueRuntime = {
+        ...agentDialogueRuntime,
+        panelId: 'agentDialogueWorkbenchPanel',
+        historyId: 'agentDialogueWorkbenchHistory'
+    };
+
+    if (memoryId) {
+        agentDialogueRuntime.selectedMemoryId = memoryId;
+        return;
+    }
+
+    if (!options.preserveSelection && !agentDialogueRuntime.selectedMemoryId) {
+        renderAgentDialogueWorkbenchHome();
+    } else if (agentDialogueRuntime.selectedMemoryId) {
+        renderAgentDialogueWorkbenchMemory(agentDialogueRuntime.selectedMemoryId);
+    }
+}
+
+async function renderAgentDialogueWorkbenchHome(searchTerm = '') {
+    const selectedEl = document.getElementById('agentDialogueSelectedMemory');
+    const pickerEl = document.getElementById('agentDialogueMemoryPicker');
+    const historyEl = document.getElementById('agentDialogueWorkbenchHistory');
+    const panel = document.getElementById('agentDialogueWorkbenchPanel');
+    if (!pickerEl) return;
+
+    agentDialogueRuntime.panelId = 'agentDialogueWorkbenchPanel';
+    agentDialogueRuntime.historyId = 'agentDialogueWorkbenchHistory';
+    if (selectedEl) selectedEl.innerHTML = '';
+    if (historyEl) historyEl.innerHTML = '';
+    if (panel) {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+    }
+
+    pickerEl.innerHTML = `
+        <div class="agent-workbench-search">
+            <input type="text" id="agentDialogueMemorySearch" value="${escapeAgentDialogueHtml(searchTerm)}" placeholder="${isAgentDialogueEnglish() ? 'Search memories with people...' : '搜索包含人物的记忆...'}" oninput="renderAgentDialogueWorkbenchHome(this.value)">
+        </div>
+        <div class="agent-workbench-loading">${isAgentDialogueEnglish() ? 'Loading memories...' : '正在读取记忆...'}</div>
+    `;
+
+    try {
+        const memories = await db.getAllMemories();
+        const query = String(searchTerm || '').trim().toLowerCase();
+        const candidates = memories
+            .filter(memory => agentDialogueMemoryHasPerson(memory))
+            .filter(memory => {
+                if (!query) return true;
+                const text = `${memory.content || ''} ${memory.understanding?.summary || ''} ${memory.understanding?.description || ''}`.toLowerCase();
+                return text.includes(query);
+            })
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+            .slice(0, 20);
+
+        pickerEl.innerHTML = `
+            <div class="agent-workbench-search">
+                <input type="text" id="agentDialogueMemorySearch" value="${escapeAgentDialogueHtml(searchTerm)}" placeholder="${isAgentDialogueEnglish() ? 'Search memories with people...' : '搜索包含人物的记忆...'}" oninput="renderAgentDialogueWorkbenchHome(this.value)">
+            </div>
+            ${candidates.length ? `
+                <div class="agent-workbench-list">
+                    ${candidates.map(memory => renderAgentDialogueMemoryOption(memory)).join('')}
+                </div>
+            ` : `
+                <div class="agent-workbench-empty">
+                    ${isAgentDialogueEnglish() ? 'No memories with person entities yet.' : '还没有包含人物实体的记忆。'}
+                </div>
+            `}
+        `;
+    } catch (error) {
+        console.warn('[AgentDialogue] load workbench memories failed:', error);
+        pickerEl.innerHTML = `<div class="agent-dialogue-error">${escapeAgentDialogueHtml(error.message || (isAgentDialogueEnglish() ? 'Failed to load memories.' : '读取记忆失败。'))}</div>`;
+    }
+}
+
+async function renderAgentDialogueWorkbenchMemory(memoryId) {
+    const selectedEl = document.getElementById('agentDialogueSelectedMemory');
+    const pickerEl = document.getElementById('agentDialogueMemoryPicker');
+    const historyEl = document.getElementById('agentDialogueWorkbenchHistory');
+    if (!selectedEl || !pickerEl) return;
+
+    agentDialogueRuntime.panelId = 'agentDialogueWorkbenchPanel';
+    agentDialogueRuntime.historyId = 'agentDialogueWorkbenchHistory';
+    agentDialogueRuntime.selectedMemoryId = memoryId;
+    if (historyEl) historyEl.innerHTML = '';
+
+    try {
+        const memory = await db.getMemory(memoryId);
+        if (!memory) {
+            selectedEl.innerHTML = '';
+            pickerEl.innerHTML = `<div class="agent-workbench-empty">${isAgentDialogueEnglish() ? 'Memory not found.' : '未找到这条记忆。'}</div>`;
+            return;
+        }
+
+        selectedEl.innerHTML = renderAgentDialogueSelectedMemory(memory);
+        pickerEl.innerHTML = `
+            <button type="button" class="agent-workbench-change" onclick="clearAgentDialogueWorkbenchMemory()">
+                ${isAgentDialogueEnglish() ? 'Choose another memory' : '选择其他记忆'}
+            </button>
+        `;
+        await loadAgentDialogueSessionsForMemory(memoryId);
+    } catch (error) {
+        console.warn('[AgentDialogue] render selected memory failed:', error);
+    }
+}
+
+function clearAgentDialogueWorkbenchMemory() {
+    agentDialogueRuntime.selectedMemoryId = null;
+    agentDialogueRuntime.memoryId = null;
+    agentDialogueRuntime.session = null;
+    agentDialogueRuntime.summarized = false;
+    renderAgentDialogueWorkbenchHome();
+}
+
+function renderAgentDialogueMemoryOption(memory) {
+    const title = agentDialogueMemoryTitle(memory);
+    const date = memory.created_at ? new Date(memory.created_at).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' }) : '';
+    const people = (memory.entities || []).filter(entity => entity.type === 'PERSON').slice(0, 3).map(entity => entity.name).filter(Boolean).join(' / ');
+    return `
+        <button type="button" class="agent-workbench-memory" onclick="startAgentDialogueForMemory('${escapeAgentDialogueHtml(memory.id)}')">
+            <span class="agent-workbench-memory-title">${escapeAgentDialogueHtml(title)}</span>
+            <span class="agent-workbench-memory-meta">${escapeAgentDialogueHtml([date, people].filter(Boolean).join(' · '))}</span>
+        </button>
+    `;
+}
+
+function renderAgentDialogueSelectedMemory(memory) {
+    const title = agentDialogueMemoryTitle(memory);
+    const date = memory.created_at ? new Date(memory.created_at).toLocaleString(currentLocale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    return `
+        <div class="agent-workbench-selected-card">
+            <div class="agent-workbench-selected-label">${isAgentDialogueEnglish() ? 'Selected memory' : '当前记忆'}</div>
+            <div class="agent-workbench-selected-title">${escapeAgentDialogueHtml(title)}</div>
+            <div class="agent-workbench-selected-meta">${escapeAgentDialogueHtml(date)}</div>
+        </div>
+    `;
+}
+
+function agentDialogueMemoryTitle(memory) {
+    return (memory.understanding?.summary || memory.understanding?.description || memory.content || '').slice(0, 80) || (isAgentDialogueEnglish() ? 'Untitled memory' : '未命名记忆');
+}
+
+function agentDialogueMemoryHasPerson(memory) {
+    return (memory.entities || []).some(entity => entity.type === 'PERSON' && !['我', '本人', '自己', '用户', '你', '他', '她', 'ta', 'me', 'i', 'myself', 'user'].includes((entity.name || '').trim().toLowerCase()));
+}
+
+function getAgentDialoguePanelElement() {
+    return document.getElementById(agentDialogueRuntime.panelId || 'agentDialogueWorkbenchPanel')
+        || document.getElementById('agentDialogueWorkbenchPanel')
+        || document.getElementById('agentDialoguePanel');
+}
+
+function getAgentDialogueHistoryElement() {
+    return document.getElementById(agentDialogueRuntime.historyId || 'agentDialogueWorkbenchHistory')
+        || document.getElementById('agentDialogueWorkbenchHistory')
+        || document.getElementById('agentDialogueHistory');
+}
 async function startAgentDialogueForMemory(memoryId) {
-    const panel = document.getElementById('agentDialoguePanel');
+    openAgentDialogueWorkbench(memoryId);
+    const panel = getAgentDialoguePanelElement();
     if (!panel) return;
 
     if (!agentDialogueService) {
@@ -19,16 +191,133 @@ async function startAgentDialogueForMemory(memoryId) {
         return;
     }
 
+    panel.style.display = 'block';
+    panel.innerHTML = `
+        <div class="agent-dialogue-loading">
+            ${isAgentDialogueEnglish() ? 'Loading persona options...' : '正在读取可参与人物...'}
+        </div>
+    `;
+
+    const result = await agentDialogueService.getParticipantCandidates(memoryId);
+    if (!result.success) {
+        showAgentDialogueError(panel, result.error || (isAgentDialogueEnglish() ? 'No personas available.' : '没有可参与的人物。'));
+        return;
+    }
+
+    const candidates = result.candidates || [];
+    if (!candidates.some(candidate => candidate.type === 'PERSON')) {
+        showAgentDialogueError(panel, isAgentDialogueEnglish() ? 'No person entities in this memory.' : '这条记忆里没有可推演的人物实体。');
+        return;
+    }
+
+    agentDialogueRuntime = {
+        ...agentDialogueRuntime,
+        memoryId,
+        session: null,
+        running: false,
+        summarized: false,
+        currentHistoryMemoryId: memoryId,
+        selectedMemoryId: memoryId,
+        setupCandidates: candidates
+    };
+
+    await renderAgentDialogueWorkbenchMemory(memoryId);
+    renderAgentDialogueSetup(memoryId, candidates, result.default_selected_ids || [], panel);
+}
+
+function renderAgentDialogueSetup(memoryId, candidates, defaultSelectedIds, container) {
+    const selectedIds = defaultSelectedIds.length
+        ? defaultSelectedIds
+        : candidates.filter(candidate => candidate.type === 'PERSON').slice(0, 3).map(candidate => candidate.id);
+
+    container.innerHTML = `
+        <div class="agent-dialogue-card agent-dialogue-setup-card">
+            <div class="agent-dialogue-card-header">
+                <div>
+                    <div class="agent-dialogue-title">${isAgentDialogueEnglish() ? 'Start Multi-person Review' : '开始多人物推演'}</div>
+                    <div class="agent-dialogue-subtitle">${isAgentDialogueEnglish() ? 'Choose personas and a simulation mode' : '选择参与人物和推演模式'}</div>
+                </div>
+                <button class="agent-dialogue-close" onclick="hideAgentDialoguePanel()">×</button>
+            </div>
+            <div class="agent-dialogue-setup-body">
+                <div class="agent-dialogue-setup-section">
+                    <div class="agent-dialogue-setup-label">${isAgentDialogueEnglish() ? 'Personas' : '参与人物'} <span>${isAgentDialogueEnglish() ? 'up to 3' : '最多 3 位'}</span></div>
+                    <div class="agent-dialogue-picker-list" id="agentDialogueParticipantList">
+                        ${renderAgentDialogueParticipantOptions(candidates, selectedIds)}
+                    </div>
+                    <div class="agent-dialogue-setup-hint" id="agentDialogueParticipantHint"></div>
+                </div>
+                <div class="agent-dialogue-setup-section">
+                    <div class="agent-dialogue-setup-label">${isAgentDialogueEnglish() ? 'Mode' : '推演模式'}</div>
+                    <div class="agent-dialogue-mode-grid" id="agentDialogueModeGrid">
+                        ${renderAgentDialogueModeOptions('review')}
+                    </div>
+                </div>
+                <div class="agent-dialogue-setup-actions">
+                    <button type="button" class="agent-dialogue-action-btn" onclick="confirmAgentDialogueSetup('${escapeAgentDialogueHtml(memoryId)}')">
+                        ${isAgentDialogueEnglish() ? 'Start' : '开始推演'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    onAgentDialogueParticipantToggle();
+}
+
+function renderAgentDialogueParticipantOptions(candidates, selectedIds) {
+    const selectedSet = new Set(selectedIds);
+    return candidates.map(candidate => {
+        const sourceLabel = agentDialogueCandidateSourceLabel(candidate.source);
+        const checked = selectedSet.has(candidate.id) ? 'checked' : '';
+        return `
+            <label class="agent-dialogue-persona-option ${candidate.type === 'SELF' ? 'self' : ''}">
+                <input type="checkbox" value="${escapeAgentDialogueHtml(candidate.id)}" ${checked} onchange="onAgentDialogueParticipantToggle()">
+                <span class="agent-dialogue-persona-avatar">${escapeAgentDialogueHtml((candidate.name || '?').slice(0, 1))}</span>
+                <span class="agent-dialogue-persona-main">
+                    <span class="agent-dialogue-persona-name">${escapeAgentDialogueHtml(candidate.name)}</span>
+                    <span class="agent-dialogue-persona-source">${escapeAgentDialogueHtml(sourceLabel)}</span>
+                </span>
+            </label>
+        `;
+    }).join('');
+}
+
+function renderAgentDialogueModeOptions(selectedMode) {
+    return agentDialogueModes().map(mode => `
+        <label class="agent-dialogue-mode-option">
+            <input type="radio" name="agentDialogueMode" value="${mode.id}" ${mode.id === selectedMode ? 'checked' : ''}>
+            <span>
+                <strong>${escapeAgentDialogueHtml(mode.label)}</strong>
+                <small>${escapeAgentDialogueHtml(mode.description)}</small>
+            </span>
+        </label>
+    `).join('');
+}
+
+async function confirmAgentDialogueSetup(memoryId) {
+    const participantIds = selectedAgentDialogueParticipantIds();
+    if (participantIds.length === 0) {
+        showToast(isAgentDialogueEnglish() ? 'Choose at least one persona' : '请至少选择一位人物', 'error');
+        return;
+    }
+
+    const simulationMode = selectedAgentDialogueMode();
+    const selectedCandidates = participantIds
+        .map(id => (agentDialogueRuntime.setupCandidates || []).find(candidate => candidate.id === id))
+        .filter(Boolean);
     const liveSession = {
         id: `pending_${Date.now()}`,
         memory_id: memoryId,
+        mode: 'memory_review',
+        simulation_mode: simulationMode,
         host: agentDialogueHostName(),
-        participants: [],
+        participants: selectedCandidates.map(candidate => ({ id: candidate.id, name: candidate.name, type: candidate.type })),
         turns: [],
         created_at: new Date().toISOString()
     };
 
     agentDialogueRuntime = {
+        ...agentDialogueRuntime,
         memoryId,
         session: liveSession,
         running: false,
@@ -36,8 +325,10 @@ async function startAgentDialogueForMemory(memoryId) {
         currentHistoryMemoryId: memoryId
     };
 
-    panel.style.display = 'block';
-    renderAgentDialogueSession(liveSession, panel, { streaming: true });
+    const panel = getAgentDialoguePanelElement();
+    if (panel) {
+        renderAgentDialogueSession(liveSession, panel, { streaming: true });
+    }
 
     await runAgentDialogueStep({
         memoryId,
@@ -45,10 +336,66 @@ async function startAgentDialogueForMemory(memoryId) {
         rounds: 1,
         startRound: 1,
         includeSummary: false,
+        participantIds,
+        simulationMode,
         openingStatus: isAgentDialogueEnglish() ? 'Luoyi is inviting the personas...' : '洛忆正在邀请人物入场...'
     });
 }
 
+function selectedAgentDialogueParticipantIds() {
+    return Array.from(document.querySelectorAll('#agentDialogueParticipantList input[type="checkbox"]:checked'))
+        .map(input => input.value)
+        .slice(0, 3);
+}
+
+function selectedAgentDialogueMode() {
+    const input = document.querySelector('input[name="agentDialogueMode"]:checked');
+    return input ? input.value : 'review';
+}
+
+function onAgentDialogueParticipantToggle() {
+    const inputs = Array.from(document.querySelectorAll('#agentDialogueParticipantList input[type="checkbox"]'));
+    const checked = inputs.filter(input => input.checked);
+    inputs.forEach(input => {
+        input.disabled = !input.checked && checked.length >= 3;
+    });
+    const hint = document.getElementById('agentDialogueParticipantHint');
+    if (hint) {
+        hint.textContent = isAgentDialogueEnglish()
+            ? `${checked.length}/3 selected`
+            : `已选择 ${checked.length}/3 位`;
+    }
+}
+
+function agentDialogueModes() {
+    return isAgentDialogueEnglish()
+        ? [
+            { id: 'review', label: 'Review', description: 'Recall what each persona can support from the memory.' },
+            { id: 'confrontation', label: 'Confrontation', description: 'Surface possible misunderstandings or tension.' },
+            { id: 'fill_gaps', label: 'Fill gaps', description: 'Mark likely motives or missing context as inference.' },
+            { id: 'relationship', label: 'Relationship', description: 'Focus on how the relationship may have shifted.' },
+            { id: 'counterfactual', label: 'What if', description: 'Explore one alternative choice without treating it as fact.' }
+        ]
+        : [
+            { id: 'review', label: '复盘', description: '各自回忆这段记忆里有依据的感受和线索。' },
+            { id: 'confrontation', label: '对质', description: '围绕误会、分歧或没说出口的部分回应。' },
+            { id: 'fill_gaps', label: '补全空白', description: '把可能的动机或背景标成推测。' },
+            { id: 'relationship', label: '关系变化', description: '关注亲近、疏远、信任或未完成感。' },
+            { id: 'counterfactual', label: '如果当时', description: '轻量假设另一种选择会怎样。' }
+        ];
+}
+
+function agentDialogueModeLabel(modeId) {
+    const mode = agentDialogueModes().find(item => item.id === modeId);
+    return mode ? mode.label : agentDialogueModes()[0].label;
+}
+
+function agentDialogueCandidateSourceLabel(source) {
+    if (isAgentDialogueEnglish()) {
+        return source === 'current' ? 'in this memory' : source === 'related' ? 'graph related' : 'self';
+    }
+    return source === 'current' ? '当前记忆' : source === 'related' ? '图谱相关' : '本人';
+}
 async function continueAgentDialogueRound() {
     const session = agentDialogueRuntime.session;
     if (!session || agentDialogueRuntime.running) return;
@@ -77,7 +424,7 @@ async function summarizeAgentDialogue() {
     });
 }
 
-async function runAgentDialogueStep({ memoryId, session, rounds, startRound, includeSummary, openingStatus, userQuestion }) {
+async function runAgentDialogueStep({ memoryId, session, rounds, startRound, includeSummary, openingStatus, userQuestion, participantIds, simulationMode }) {
     if (!agentDialogueService || !memoryId || !session || agentDialogueRuntime.running) return;
 
     agentDialogueRuntime.memoryId = memoryId;
@@ -86,6 +433,8 @@ async function runAgentDialogueStep({ memoryId, session, rounds, startRound, inc
     updateAgentDialogueControls();
     updateAgentDialogueStatus(openingStatus || (isAgentDialogueEnglish() ? 'Generating...' : '生成中...'));
 
+    const activeParticipantIds = participantIds || (session.participants || []).map(participant => participant.id).filter(Boolean);
+    const activeSimulationMode = simulationMode || session.simulation_mode || 'review';
     const result = await agentDialogueService.createMemoryReview(memoryId, {
         stream: true,
         rounds,
@@ -93,6 +442,8 @@ async function runAgentDialogueStep({ memoryId, session, rounds, startRound, inc
         includeSummary,
         history: session.turns || [],
         question: userQuestion,
+        participants: activeParticipantIds,
+        simulationMode: activeSimulationMode,
         sessionId: agentDialogueRequestSessionId(session),
         createdAt: session.created_at || null,
         onEvent: (event, payload) => handleAgentDialogueStreamEvent(event, payload)
@@ -150,6 +501,7 @@ function handleAgentDialogueStreamEvent(event, payload) {
         removeAgentDialogueTyping(turn);
         addAgentDialogueTurnToSession(turn);
         appendAgentDialogueTurn(turn);
+        persistAgentDialogueSessionSoon();
         updateAgentDialogueStatus(turn.role === 'host' || turn.agent_id === 'luoyi'
             ? (isAgentDialogueEnglish() ? 'Luoyi has spoken.' : '洛忆已发言。')
             : (isAgentDialogueEnglish() ? `${turn.agent_name} has spoken.` : `${turn.agent_name} 已发言。`));
@@ -171,7 +523,7 @@ function handleAgentDialogueStreamEvent(event, payload) {
 }
 
 async function loadAgentDialogueSessionsForMemory(memoryId) {
-    const historyEl = document.getElementById('agentDialogueHistory');
+    const historyEl = getAgentDialogueHistoryElement();
     if (!historyEl || !agentDialogueService) return;
     agentDialogueRuntime.currentHistoryMemoryId = memoryId;
 
@@ -244,20 +596,23 @@ async function deleteAgentDialogueSession(event, sessionId) {
 }
 async function showSavedAgentDialogueSession(sessionId) {
     if (!agentDialogueService) return;
-    const panel = document.getElementById('agentDialoguePanel');
+    const panel = getAgentDialoguePanelElement();
     if (!panel) return;
 
     const session = await db.getAgentDialogueSession(sessionId);
     if (!session) return;
 
     agentDialogueRuntime = {
+        ...agentDialogueRuntime,
         memoryId: session.memory_id,
+        selectedMemoryId: session.memory_id,
         session,
         running: false,
         summarized: hasAgentDialogueSummary(session),
         currentHistoryMemoryId: session.memory_id
     };
 
+    await renderAgentDialogueWorkbenchMemory(session.memory_id);
     panel.style.display = 'block';
     renderAgentDialogueSession(session, panel);
 }
@@ -266,12 +621,13 @@ function renderAgentDialogueSession(session, container, options = {}) {
     if (!session || !container) return;
 
     const turns = session.turns || [];
+    const modeLabel = agentDialogueModeLabel(session.simulation_mode || 'review');
     container.innerHTML = `
         <div class="agent-dialogue-card">
             <div class="agent-dialogue-card-header">
                 <div>
                     <div class="agent-dialogue-title">${isAgentDialogueEnglish() ? 'Multi-person Review' : '多人物推演'}</div>
-                    <div class="agent-dialogue-subtitle">${isAgentDialogueEnglish() ? 'Exploratory dialogue hosted by Luoyi' : '由洛忆主持的探索性对话'}</div>
+                    <div class="agent-dialogue-subtitle">${isAgentDialogueEnglish() ? 'Exploratory dialogue hosted by Luoyi' : '由洛忆主持的探索性对话'} · ${escapeAgentDialogueHtml(modeLabel)}</div>
                 </div>
                 <button class="agent-dialogue-close" onclick="hideAgentDialoguePanel()">×</button>
             </div>
@@ -370,6 +726,13 @@ function onAgentDialogueInputKeydown(event) {
     sendAgentDialogueUserMessage();
 }
 
+function persistAgentDialogueSessionSoon() {
+    const session = agentDialogueRuntime.session;
+    if (!db || !session || !session.id || session.id.startsWith('pending_')) return;
+    db.saveAgentDialogueSession(session).catch(error => {
+        console.warn('[AgentDialogue] save streamed turn failed:', error);
+    });
+}
 function updateAgentDialogueControls() {
     const controlsEl = document.getElementById('agentDialogueControls');
     if (!controlsEl) return;
@@ -435,11 +798,62 @@ function renderAgentDialogueTurn(turn) {
                     ${roundLabel}
                 </div>
                 <div class="agent-dialogue-content">${escapeAgentDialogueHtml(turn.content || '')}</div>
+                ${renderAgentDialogueTurnMeta(turn)}
             </div>
         </div>
     `;
 }
 
+function renderAgentDialogueTurnMeta(turn) {
+    const evidenceRefs = Array.isArray(turn.evidence_refs) ? turn.evidence_refs : [];
+    const inferenceNotes = Array.isArray(turn.inference_notes) ? turn.inference_notes : [];
+    if (turn.role === 'user' || (!evidenceRefs.length && !inferenceNotes.length && !turn.confidence)) {
+        return '';
+    }
+
+    const confidence = normalizeAgentDialogueConfidence(turn.confidence);
+    const evidenceHtml = evidenceRefs.length
+        ? `<div class="agent-dialogue-meta-group">
+            <div class="agent-dialogue-meta-title">${isAgentDialogueEnglish() ? 'Evidence' : '依据'}</div>
+            <ul>${evidenceRefs.map(ref => `
+                <li>
+                    <span class="agent-dialogue-memory-id">${escapeAgentDialogueHtml(ref.memory_id || (isAgentDialogueEnglish() ? 'memory' : '记忆'))}</span>
+                    ${ref.quote ? `<div>${escapeAgentDialogueHtml(ref.quote)}</div>` : ''}
+                    ${ref.reason ? `<small>${escapeAgentDialogueHtml(ref.reason)}</small>` : ''}
+                </li>
+            `).join('')}</ul>
+        </div>`
+        : '';
+    const inferenceHtml = inferenceNotes.length
+        ? `<div class="agent-dialogue-meta-group">
+            <div class="agent-dialogue-meta-title">${isAgentDialogueEnglish() ? 'Inference' : '推测'}</div>
+            <ul>${inferenceNotes.map(note => `<li>${escapeAgentDialogueHtml(note)}</li>`).join('')}</ul>
+        </div>`
+        : '';
+
+    return `
+        <details class="agent-dialogue-meta">
+            <summary>
+                <span>${isAgentDialogueEnglish() ? 'Evidence / inference' : '依据 / 推测'}</span>
+                <span class="agent-dialogue-confidence ${confidence}">${agentDialogueConfidenceLabel(confidence)}</span>
+            </summary>
+            ${evidenceHtml}
+            ${inferenceHtml}
+        </details>
+    `;
+}
+
+function normalizeAgentDialogueConfidence(value) {
+    const normalized = String(value || '').toLowerCase();
+    return ['high', 'medium', 'low'].includes(normalized) ? normalized : 'medium';
+}
+
+function agentDialogueConfidenceLabel(value) {
+    if (isAgentDialogueEnglish()) {
+        return value === 'high' ? 'High' : value === 'low' ? 'Low' : 'Medium';
+    }
+    return value === 'high' ? '高' : value === 'low' ? '低' : '中';
+}
 function renderAgentDialogueTyping(speaker) {
     const isHost = speaker.role === 'host' || speaker.agent_id === 'luoyi';
     const name = speaker.agent_name || (isHost ? agentDialogueHostName() : '?');
@@ -528,7 +942,7 @@ function sanitizeAgentDialogueDomKey(value) {
 }
 
 function hideAgentDialoguePanel() {
-    const panel = document.getElementById('agentDialoguePanel');
+    const panel = getAgentDialoguePanelElement();
     if (panel) {
         panel.style.display = 'none';
     }
@@ -569,3 +983,12 @@ function escapeAgentDialogueHtml(value) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+
+
+
+
+
+
+
+
+

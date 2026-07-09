@@ -253,7 +253,7 @@
 
 .luoyi-welcome-bubble p + p {
     color: var(--luoyi-text-muted);
-    font-size: 13px;
+    font-size: 12px;
 }
 
 /* ==================== 消息气泡 ==================== */
@@ -394,8 +394,8 @@
 }
 
 .luoyi-context-badge svg {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
 }
 
 /* ==================== 输入区域 ==================== */
@@ -512,4 +512,314 @@
         --luoyi-text-muted: #A89AA0;
         --luoyi-border: #5D4D55;
     }
+}
+
+/* ==================== 悬浮桌宠入口 ==================== */
+.luoyi-floating-shell {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 1400;
+    pointer-events: none;
+    font-family: var(--luoyi-font-body);
+}
+
+.luoyi-floating-shell .luoyi-pet-button {
+    position: relative;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 66px;
+    height: 48px;
+    padding: 6px 10px 6px 7px;
+    border: 1px solid rgba(125, 90, 106, 0.25);
+    border-radius: 999px 999px 999px 18px;
+    background: linear-gradient(145deg, #fffaf5 0%, #f4e4d6 100%);
+    color: var(--luoyi-primary-dark);
+    box-shadow: 0 9px 22px rgba(61, 50, 53, 0.18), 0 2px 8px rgba(125, 90, 106, 0.16);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.luoyi-floating-shell .luoyi-pet-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(61, 50, 53, 0.22), 0 3px 10px rgba(125, 90, 106, 0.2);
+}
+
+.luoyi-floating-shell.open .luoyi-pet-button {
+    opacity: 0.92;
+    transform: translateY(2px) scale(0.98);
+}
+.luoyi-floating-shell.drag-ready,
+.luoyi-floating-shell.dragging {
+    user-select: none;
+}
+
+.luoyi-floating-shell.dragging .luoyi-pet-button,
+.luoyi-floating-shell.dragging .luoyi-header {
+    cursor: grabbing;
+}
+
+.luoyi-floating-shell.dragging .luoyi-pet-button,
+.luoyi-floating-shell.dragging #panel-luoyi {
+    transition: none;
+}
+
+
+.luoyi-pet-face {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--luoyi-primary) 0%, var(--luoyi-primary-light) 100%);
+    color: #fff;
+    font-family: var(--luoyi-font-display);
+    font-size: 16px;
+    box-shadow: inset 0 -3px 8px rgba(0, 0, 0, 0.14);
+    animation: luoyi-pet-breathe 3.8s ease-in-out infinite;
+}
+
+.luoyi-pet-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.luoyi-pet-status {
+    position: absolute;
+    left: 32px;
+    bottom: 8px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid #fffaf5;
+    border-radius: 50%;
+    background: #67d86f;
+    box-shadow: 0 0 0 3px rgba(103, 216, 111, 0.14);
+}
+
+@keyframes luoyi-pet-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.luoyi-floating-shell #panel-luoyi {
+    position: absolute;
+    right: 0;
+    bottom: 62px;
+    width: min(330px, calc(100vw - 32px));
+    height: min(500px, calc(100vh - 112px));
+    min-height: 340px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(125, 90, 106, 0.18);
+    border-radius: 18px;
+    background: var(--luoyi-bg);
+    box-shadow: 0 24px 60px rgba(37, 35, 31, 0.28), 0 6px 20px rgba(125, 90, 106, 0.18);
+    transform: translateY(12px) scale(0.97);
+    transform-origin: right bottom;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+}
+
+.luoyi-floating-shell.open #panel-luoyi {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+}
+.luoyi-floating-shell.panel-align-left #panel-luoyi {
+    left: 0;
+    right: auto;
+    transform-origin: left bottom;
+}
+
+.luoyi-floating-shell.panel-below #panel-luoyi {
+    top: 62px;
+    bottom: auto;
+    transform-origin: right top;
+}
+
+.luoyi-floating-shell.panel-align-left.panel-below #panel-luoyi {
+    transform-origin: left top;
+}
+
+
+.luoyi-floating-shell #panel-luoyi::before,
+.luoyi-floating-shell #panel-luoyi::after {
+    display: block;
+}
+
+.luoyi-floating-shell .luoyi-header {
+    padding: 18px 18px 16px;
+    background: linear-gradient(160deg, #7D5A6A 0%, #6B4D5E 52%, #5D3D4A 100%);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.luoyi-floating-shell .luoyi-header-content {
+    align-items: center;
+}
+
+.luoyi-floating-close {
+    position: relative;
+    z-index: 2;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.luoyi-floating-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.luoyi-floating-shell .luoyi-messages {
+    min-height: 0;
+}
+
+@media (max-width: 768px) {
+    .luoyi-floating-shell {
+        right: 14px;
+        bottom: 14px;
+    }
+
+    .luoyi-floating-shell #panel-luoyi {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 72px;
+        width: auto;
+        height: min(58vh, 500px);
+        min-height: 320px;
+        transform-origin: right bottom;
+    }
+
+    .luoyi-floating-shell .luoyi-pet-button {
+        height: 46px;
+        min-width: 52px;
+        padding-right: 8px;
+    }
+
+    .luoyi-pet-label {
+        display: none;
+    }
+}
+
+/* 悬浮聊天窗紧凑布局与流式输出光标 */
+.luoyi-floating-shell .luoyi-header {
+    padding: 14px 14px 12px;
+}
+.luoyi-floating-shell .luoyi-avatar-large {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+}
+
+.luoyi-floating-shell .luoyi-title {
+    font-size: 20px;
+    margin-bottom: 2px;
+}
+
+.luoyi-floating-shell .luoyi-subtitle {
+    font-size: 11px;
+}
+
+.luoyi-floating-shell .luoyi-messages {
+    padding: 14px 12px;
+    gap: 10px;
+}
+
+.luoyi-floating-shell .luoyi-welcome-card {
+    padding: 12px;
+    gap: 10px;
+}
+
+.luoyi-floating-shell .luoyi-welcome-bubble p {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.luoyi-floating-shell .luoyi-welcome-bubble p + p {
+    font-size: 12px;
+}
+
+.luoyi-floating-shell .luoyi-message {
+    gap: 8px;
+}
+
+.luoyi-floating-shell .luoyi-message-avatar,
+.luoyi-floating-shell .luoyi-welcome-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+}
+
+.luoyi-floating-shell .luoyi-message-user .luoyi-message-content,
+.luoyi-floating-shell .luoyi-message-luoyi .luoyi-message-content {
+    max-width: 84%;
+    padding: 9px 12px;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.luoyi-floating-shell .luoyi-input-area {
+    padding: 12px;
+}
+
+.luoyi-floating-shell .luoyi-input-area::before {
+    display: none;
+}
+
+.luoyi-floating-shell .luoyi-input-wrap {
+    gap: 8px;
+}
+
+.luoyi-floating-shell .luoyi-input {
+    min-height: 38px;
+    max-height: 88px;
+    padding: 9px 12px;
+    font-size: 12px;
+}
+
+.luoyi-floating-shell .luoyi-send-btn {
+    width: 38px;
+    height: 38px;
+}
+
+.luoyi-floating-shell .luoyi-send-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.luoyi-message-content.is-streaming::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 1em;
+    margin-left: 3px;
+    vertical-align: -2px;
+    border-radius: 2px;
+    background: var(--luoyi-primary-light);
+    animation: luoyi-caret-blink 0.9s steps(2, start) infinite;
+}
+
+@keyframes luoyi-caret-blink {
+    50% { opacity: 0; }
 }
