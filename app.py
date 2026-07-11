@@ -117,4 +117,4 @@ app = create_app()
 
 if __name__ == '__main__':
     logger.info("启动 Liora 服务器...")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=int(os.getenv('PORT', '3000')), debug=False, allow_unsafe_werkzeug=True)

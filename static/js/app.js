@@ -669,6 +669,9 @@ function initSocket() {
 
 function switchTab(tab, event, skipLoad) {
     currentTab = tab;
+    if (tab === 'explore' && event) {
+        window.lioraAnalytics?.track('graph_viewed', { category: 'feature', success: true });
+    }
 
     // 更新选项卡样式
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1140,6 +1143,7 @@ async function submitMemory(event) {
         });
 
         if (result.success) {
+            window.lioraAnalytics?.track('memory_created', { category: 'feature', success: true });
             showToast(tx('toast.memorySaved'), 'success');
 
             // 清空表单
@@ -1159,9 +1163,11 @@ async function submitMemory(event) {
             }
             Promise.all(refreshTasks).catch(err => console.error('后台刷新失败:', err));
         } else {
+            window.lioraAnalytics?.track('memory_created', { category: 'feature', success: false });
             showToast(result.error || tx('toast.saveFailed'), 'error');
         }
     } catch (error) {
+        window.lioraAnalytics?.track('memory_created', { category: 'feature', success: false });
         console.error('保存记忆失败:', error);
         showToast(tx('toast.saveNetworkFailed'), 'error');
     } finally {
