@@ -54,16 +54,16 @@
                 <button onclick="clearMemorySearch()">×</button>
             </div>
             <div class="memory-list" id="memoryList"></div>
-        </div>
 
-        <!-- 记忆详情弹窗 -->
-        <div class="memory-modal" id="memoryModal">
-            <div class="memory-modal-content">
-                <div class="memory-modal-header">
-                    <span class="memory-modal-title">记忆详情</span>
-                    <button class="memory-modal-close" onclick="closeMemoryModal()">×</button>
+            <!-- 记忆详情：仅在“记忆列表”标签页内展开并保留状态 -->
+            <div class="memory-modal" id="memoryModal">
+                <div class="memory-modal-content">
+                    <div class="memory-modal-header">
+                        <span class="memory-modal-title">记忆详情</span>
+                        <button class="memory-modal-close" onclick="closeMemoryModal()">×</button>
+                    </div>
+                    <div class="memory-modal-body" id="memoryModalBody"></div>
                 </div>
-                <div class="memory-modal-body" id="memoryModalBody"></div>
             </div>
         </div>
 
@@ -282,5 +282,4 @@
         </div>
     </div>
 </div>
-
 

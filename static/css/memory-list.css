@@ -574,3 +574,83 @@
     border-radius: 50%;
 
 }
+
+/* ============================================
+   记忆详情 - 仅属于“记忆列表”标签页
+   切换标签时随父面板隐藏，返回后保留展开状态
+   ============================================ */
+.sidebar .panel-content {
+    min-height: 0;
+}
+
+.sidebar #panel-memories.active {
+    position: relative;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sidebar #panel-memories .memory-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+}
+
+.sidebar #panel-memories > .memory-modal {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: var(--color-bg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(12px);
+    transition: opacity 160ms ease, transform 180ms ease, visibility 0s linear 180ms;
+}
+
+.sidebar #panel-memories > .memory-modal.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+    transition-delay: 0s;
+}
+
+.sidebar #panel-memories > .memory-modal .memory-modal-content {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--color-bg);
+}
+
+.sidebar #panel-memories > .memory-modal .memory-modal-header {
+    flex: 0 0 auto;
+    padding: 14px 16px;
+}
+
+.sidebar #panel-memories > .memory-modal .memory-modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 18px 16px 24px;
+    overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar #panel-memories > .memory-modal {
+        transition: none;
+        transform: none;
+    }
+}
+/* 详情打开时占满“记忆列表”标签页的全部可用区域 */
+.sidebar .panel-content:has(#panel-memories.active > .memory-modal.show) {
+    padding: 0;
+}

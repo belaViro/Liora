@@ -1761,6 +1761,12 @@ async function viewMemory(memoryId) {
 
 // 显示记忆详情弹窗
 function showMemoryModal(memory) {
+    // 记忆详情始终归属于“记忆列表”标签页，不覆盖其他功能面板。
+    const memoryPanel = document.getElementById('panel-memories');
+    if (memoryPanel && !memoryPanel.classList.contains('active')) {
+        switchTab('memories', null, true);
+    }
+
     const modal = document.getElementById('memoryModal');
     const body = document.getElementById('memoryModalBody');
     
@@ -4644,6 +4650,73 @@ function findShortestPath(startId, endId) {
     return null;
 }
 
+// 统一构建探索上下文并调用后端，路径解读和记忆故事共用。
+// 不能只发送节点 ID：个人记忆保存在浏览器 IndexedDB，服务端本身没有上下文。
+async function requestGraphExploration(question, nodeData = null, edgeData = null, history = []) {
+    const context = {
+        node: nodeData || {},
+        edge: edgeData || {},
+        memories: [],
+        graph_summary: {
+            nodes: (graphData?.nodes || []).slice(0, 20).map(node => ({
+                id: node.id,
+                name: node.name,
+                type: node.type,
+                description: node.description || ''
+            })),
+            edges: (graphData?.edges || []).slice(0, 20).map(edge => ({
+                id: edge.id,
+                source: typeof edge.source === 'object' ? edge.source.id : edge.source,
+                target: typeof edge.target === 'object' ? edge.target.id : edge.target,
+                type: edge.type || edge.name || '',
+                fact: edge.fact || ''
+            }))
+        }
+    };
+
+    // 优先从 IndexedDB 补齐节点详情和关联记忆，避免故事只有节点名称、没有真实记忆依据。
+    if (nodeData?.id && graphService) {
+        try {
+            const entity = await graphService.getEntity(nodeData.id);
+            if (entity) {
+                context.node = entity;
+                context.memories = Array.isArray(entity.memories) ? entity.memories.slice(0, 8) : [];
+            }
+        } catch (error) {
+            console.warn('[Explore] Failed to load node context, using visible graph data:', error);
+        }
+    }
+
+    const response = await fetch('/api/graph/explore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            question,
+            context,
+            history,
+            language: currentAiLanguage()
+        })
+    });
+
+    let result;
+    try {
+        result = await response.json();
+    } catch (error) {
+        throw new Error(currentLocale() === 'en-US' ? 'The server returned an invalid response' : '服务器返回了无效响应');
+    }
+
+    if (!response.ok || !result?.success) {
+        throw new Error(result?.error || (currentLocale() === 'en-US' ? 'Explore request failed' : '探索请求失败'));
+    }
+
+    const answer = result?.data?.answer;
+    if (typeof answer !== 'string' || !answer.trim()) {
+        throw new Error(currentLocale() === 'en-US' ? 'The AI returned an empty response. Please retry.' : 'AI 返回了空内容，请重试');
+    }
+
+    return { ...result, data: { ...result.data, answer: answer.trim() } };
+}
+
 // 查找关系路径
 async function findRelationPath() {
     if (!currentSelectedNode || !pathTargetNode) {
@@ -4654,6 +4727,11 @@ async function findRelationPath() {
     const resultDiv = document.getElementById('pathResult');
     const btn = document.querySelector('.btn-find-path');
     
+    if (!resultDiv || !btn) {
+        showToast(currentLocale() === 'en-US' ? 'Path panel is unavailable' : '路径探索面板不可用', 'error');
+        return;
+    }
+
     btn.disabled = true;
     btn.textContent = tx('action.exploring');
     
@@ -4694,7 +4772,7 @@ async function findRelationPath() {
         pathDetails.push({
             from: fromNode?.name || path[i],
             to: toNode?.name || path[i + 1],
-            relation: edge?.name || tx('relationType.fallback')
+            relation: edge?.name || edge?.type || tx('relationType.fallback')
         });
     }
     
@@ -4705,48 +4783,33 @@ async function findRelationPath() {
     };
     renderGraph();
     
-    // 调用 AI 解读路径
-    try {
-        const response = await fetch('/api/graph/explore', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question: tx('ai.pathPrompt', { path: pathDetails.map((p, i) => `${i + 1}. ${p.from} ${p.relation} ${p.to}`).join('\n') }),
-                node: currentSelectedNode,
-                history: [],
-                language: currentAiLanguage()
-            })
-        });
-        
-        const result = await response.json();
-        
-        let html = `<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">🔍 ${currentLocale() === 'en-US' ? 'Path Result' : '侦探结果'}</div>`;
-        
-        // 显示路径步骤
-        pathDetails.forEach((step, idx) => {
-            html += `
-                <div class="path-step">
-                    <div class="path-step-num">${idx + 1}</div>
-                    <div class="path-step-text">
-                        <strong>${step.from}</strong> 
-                        <span style="color: var(--color-text-secondary);">${step.relation}</span> 
-                        <strong>${step.to}</strong>
-                    </div>
+    // 路径计算是本地能力，应先立即展示；AI 解读失败不能让整条路径“不可用”。
+    let html = `<div style="font-weight: 600; margin-bottom: 10px; color: var(--color-memory);">🔍 ${currentLocale() === 'en-US' ? 'Path Result' : '侦探结果'}</div>`;
+    pathDetails.forEach((step, idx) => {
+        html += `
+            <div class="path-step">
+                <div class="path-step-num">${idx + 1}</div>
+                <div class="path-step-text">
+                    <strong>${escapeHtml(String(step.from))}</strong>
+                    <span style="color: var(--color-text-secondary);">${escapeHtml(String(step.relation))}</span>
+                    <strong>${escapeHtml(String(step.to))}</strong>
                 </div>
-            `;
+            </div>
+        `;
+    });
+    resultDiv.innerHTML = html;
+    resultDiv.classList.add('show');
+
+    // AI 解读是增强能力：成功则追加，失败则保留已找到的本地路径。
+    try {
+        const pathQuestion = tx('ai.pathPrompt', {
+            path: pathDetails.map((p, i) => `${i + 1}. ${p.from} ${p.relation} ${p.to}`).join('\n')
         });
-        
-        // AI 解读
-        if (result.success && result.data) {
-            html += `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light); font-style: italic; color: var(--color-text-secondary);">${result.data.answer}</div>`;
-        }
-        
-        resultDiv.innerHTML = html;
-        resultDiv.classList.add('show');
-        
+        const result = await requestGraphExploration(pathQuestion, currentSelectedNode, null, []);
+        resultDiv.insertAdjacentHTML('beforeend', `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light); font-style: italic; color: var(--color-text-secondary);">${escapeHtml(result.data.answer)}</div>`);
     } catch (error) {
-        resultDiv.innerHTML = `<div style="color: #c62828;">${currentLocale() === 'en-US' ? 'Explore failed' : '探索失败'}: ${error.message}</div>`;
-        resultDiv.classList.add('show');
+        console.warn('[Explore] Path AI interpretation unavailable:', error);
+        resultDiv.insertAdjacentHTML('beforeend', `<div style="margin-top: 10px; color: var(--color-text-tertiary); font-size: 11px;">${currentLocale() === 'en-US' ? 'Path found. AI interpretation is temporarily unavailable.' : '路径已找到，AI 解读暂时不可用。'}</div>`);
     }
     
     btn.disabled = false;
@@ -4787,6 +4850,11 @@ async function generateMemoryStory(event) {
             ? currentSelectedEdge?.source_name 
             : `${currentSelectedEdge?.source_name} → ${currentSelectedEdge?.target_name}`);
     
+    if (!btn || !resultDiv) {
+        showToast(currentLocale() === 'en-US' ? 'Story panel is unavailable' : '记忆故事面板不可用', 'error');
+        return;
+    }
+
     // 清除之前的结果
     resultDiv.innerHTML = '';
     resultDiv.classList.remove('show');
@@ -4801,30 +4869,19 @@ async function generateMemoryStory(event) {
     `;
     
     try {
-        const response = await fetch('/api/graph/explore', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question: tx('ai.storyPrompt', { target: targetName }),
-                context: {
-                    node: currentSelectedNode,
-                    edge: currentSelectedEdge,
-                    memories: [],
-                    graph_summary: {}
-                },
-                history: [],
-                language: currentAiLanguage()
-            })
-        });
-        
-        const result = await response.json();
+        const result = await requestGraphExploration(
+            tx('ai.storyPrompt', { target: targetName }),
+            currentSelectedNode,
+            currentSelectedEdge,
+            []
+        );
 
         if (result.success && result.data) {
             // 将文本分段，每段用p标签包裹
             const paragraphs = result.data.answer
                 .split('\n')
                 .filter(p => p.trim())
-                .map(p => `<p>${p.trim()}</p>`)
+                .map(p => `<p>${escapeHtml(p.trim())}</p>`)
                 .join('');
             
             const html = `
@@ -6043,7 +6100,4 @@ function hideNodeContextMenu() {
     const menu = document.getElementById('nodeContextMenu');
     if (menu) menu.style.display = 'none';
 }
-
-
-
 

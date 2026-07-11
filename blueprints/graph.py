@@ -11,6 +11,78 @@ from loguru import logger
 graph_bp = Blueprint('graph', __name__, url_prefix='/api/graph')
 
 
+def _completion_text(response):
+    """Safely extract text from OpenAI-compatible completion responses."""
+    choices = getattr(response, 'choices', None) or []
+    if not choices:
+        return ''
+
+    message = getattr(choices[0], 'message', None)
+    content = getattr(message, 'content', None) if message is not None else None
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                value = item.get('text') or item.get('content')
+                if isinstance(value, str):
+                    parts.append(value)
+            else:
+                value = getattr(item, 'text', None)
+                if isinstance(value, str):
+                    parts.append(value)
+        return '\n'.join(parts).strip()
+    return ''
+
+
+def _fallback_exploration_answer(question, node_data, edge_data, memories, answer_language):
+    """Return a useful local answer when the upstream model finishes with empty content."""
+    is_english = answer_language == 'English'
+    lowered = str(question or '').lower()
+    is_story = '故事' in lowered or 'story' in lowered
+    is_path = '路径' in lowered or 'path' in lowered or '关联' in lowered
+
+    node_name = str(node_data.get('name') or ('this memory' if is_english else '这段记忆'))
+    description = str(node_data.get('description') or '').strip()
+    memory_snippets = []
+    for memory in memories[:3]:
+        if not isinstance(memory, dict):
+            continue
+        understanding = memory.get('understanding') or {}
+        summary = understanding.get('summary', '') if isinstance(understanding, dict) else ''
+        snippet = str(summary or memory.get('content') or '').strip()
+        if snippet:
+            memory_snippets.append(snippet[:160])
+
+    if is_story:
+        details = memory_snippets or ([description] if description else [])
+        if is_english:
+            if details:
+                return f'Looking back on “{node_name}”, ' + ' '.join(details) + ' This memory remains connected to the people, places, and feelings around it.'
+            return f'“{node_name}” is a marker in your memory network. Its fuller story will become clearer as you add related experiences and details.'
+        if details:
+            return f'回想起「{node_name}」，' + '；'.join(details) + '。这段经历与当时的人、地点和感受交织在一起，也因此成为记忆网络中值得珍藏的一页。'
+        return f'「{node_name}」像是记忆网络中的一个坐标。随着相关经历和细节被继续补充，属于它的故事也会逐渐清晰起来。'
+
+    if is_path:
+        if is_english:
+            return 'This path connects the two memories through the relationships shown above. Each intermediate node is a bridge that explains how their people, places, events, or themes overlap.'
+        return '这条路径通过上方列出的关系连接了两段记忆。中间节点就像桥梁，说明它们在人物、地点、事件或主题上如何产生交集。'
+
+    if edge_data:
+        relation = edge_data.get('name') or edge_data.get('type') or ('related to' if is_english else '相关')
+        source = edge_data.get('source_name') or ('the source node' if is_english else '源节点')
+        target = edge_data.get('target_name') or ('the target node' if is_english else '目标节点')
+        return f'{source} {relation} {target}.' if is_english else f'这段关系表示「{source}」通过“{relation}”与「{target}」相连。'
+
+    if is_english:
+        return f'“{node_name}” is part of your own memory network.' + (f' {description}' if description else '')
+    return f'「{node_name}」是您个人记忆网络中的一部分。' + (f' {description}' if description else '')
+
+
 @graph_bp.route('/explore', methods=['POST'])
 def explore_node():
     """
@@ -186,20 +258,49 @@ def explore_node():
 
         messages.append({"role": "user", "content": prompt})
 
-        # 调用 LLM
-        response = llm_service.client.chat.completions.create(
-            model=llm_service.model_name,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=300
-        )
+        # 调用 LLM。部分 OpenAI-compatible 网关会以 success/200 返回空 content，
+        # 尤其是在输出 token 较少或模型内部推理尚未结束时；因此做一次更大预算的重试。
+        answer = ''
+        finish_reason = None
+        for attempt in range(2):
+            attempt_messages = list(messages)
+            if attempt:
+                attempt_messages[-1] = {
+                    "role": "user",
+                    "content": prompt + "\n\n请务必直接给出最终回答，不要返回空内容。" if answer_language == 'Chinese'
+                    else prompt + "\n\nYou must provide a direct final answer and must not return empty content."
+                }
+            response = llm_service.client.chat.completions.create(
+                model=llm_service.model_name,
+                messages=attempt_messages,
+                temperature=0.7 if attempt == 0 else 0.35,
+                max_tokens=800 if attempt == 0 else 1200
+            )
+            answer = _completion_text(response)
+            choices = getattr(response, 'choices', None) or []
+            finish_reason = getattr(choices[0], 'finish_reason', None) if choices else None
+            if answer:
+                break
+            logger.warning(
+                "图谱探索模型返回空内容，准备{}；attempt={} finish_reason={} model={}",
+                "重试" if attempt == 0 else "使用本地降级回答",
+                attempt + 1,
+                finish_reason,
+                llm_service.model_name,
+            )
 
-        answer = response.choices[0].message.content
+        degraded = False
+        if not answer:
+            degraded = True
+            answer = _fallback_exploration_answer(
+                question, node_data, edge_data, memories, answer_language
+            )
 
         return jsonify({
             'success': True,
             'data': {
                 'answer': answer,
+                'degraded': degraded,
                 'timestamp': datetime.now().isoformat()
             }
         })
