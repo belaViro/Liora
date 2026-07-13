@@ -311,10 +311,12 @@
                 <div class="welcome-title">Liora · 记忆网络</div>
             </div>
             <div class="welcome-body">
-                <p class="welcome-lead">这不是一本日记，而是一座<span class="welcome-highlight">不断生长的记忆宫殿</span>。</p>
-                <p>每一段文字、每一张照片、每一段声音，都是神经元般的节点。AI 自动抽取实体、编织关系，让你的记忆从碎片变成网络。</p>
-                <p>在这里，<span class="welcome-highlight">遗忘是一种选择，而非命运</span>。跨时间、跨空间、跨情感，Liora 帮你发现那些隐秘却动人的联系。</p>
-                <p class="welcome-closing">从「记得」到「联想」，从「记录」到「预知」。<br>欢迎来到你的<span class="welcome-highlight">第二大脑</span>。</p>
+                <p class="welcome-lead">记录多模态记忆，构建属于你的<span class="welcome-highlight">个人记忆网络。</span></p>
+                <p>你可以输入文字、上传图片或音频，Liora 会利用 AI 自动解析内容，提取人物、地点、事件、时间与情感，并将零散记录整理为相互关联的记忆节点。</p>
+                <p>通过知识图谱、时间线和混合搜索，你可以回顾重要经历、发现记忆之间的隐藏联系，并与 AI 助手「洛忆」围绕已有记忆进行交流和探索。</p>
+                <p><span class="welcome-highlight">多人物复盘与推演模式</span>支持复盘、对质、补全空白、关系变化和“如果当时”等目标。每段推演都会区分记忆依据与模型推测，帮助你发现不同视角、潜在冲突和待确认线索，同时避免推演内容直接写入正式记忆。</p>
+                <p>Liora 还支持记忆关系预测以及 .loyi 数据导入与导出，让你的记忆可以持续积累、自由迁移，并始终由你掌控。</p>
+                <p class="welcome-closing"><span class="welcome-highlight">从记录一段经历开始</span>，逐步构建你的第二大脑。</p>
             </div>
             <button class="welcome-close-btn" onclick="closeWelcomeModal()">开启记忆之旅</button>
         </div>
@@ -337,8 +339,8 @@
                 <p>感谢您的理解与支持。</p>
             </div>
             <div class="announcement-actions">
-                <button class="announcement-btn announcement-btn-secondary" onclick="loadSampleDataFromAnnouncement()">加载示例数据</button>
-                <button class="announcement-btn" onclick="closeAnnouncement()">我知道了</button>
+                <button class="announcement-btn" onclick="loadSampleDataFromAnnouncement()">加载示例数据</button>
+                <button class="announcement-btn announcement-btn-secondary" onclick="closeAnnouncement()">我知道了</button>
             </div>
         </div>
     </div>
@@ -549,7 +551,7 @@
     <footer class="site-icp-footer" aria-label="ICP备案信息">
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">冀ICP备2026024959号-1</a>
     </footer>
-    <script src="{{ url_for('static', filename='js/i18n.js') }}?v=2026070925"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v=2026071302"></script>
     <script src="{{ url_for('static', filename='js/analytics.js') }}?v=2026071102"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v=2026071301"></script>
     <script src="{{ url_for('static', filename='js/agent-dialogue.js') }}?v=2026070921"></script>
