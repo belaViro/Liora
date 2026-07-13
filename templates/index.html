@@ -548,8 +548,13 @@
         </div>
     </div>
 
-    <footer class="site-icp-footer" aria-label="ICP备案信息">
+    <footer class="site-icp-footer" aria-label="ICP备案和公安备案信息">
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">冀ICP备2026024959号-1</a>
+        <span class="site-icp-separator" aria-hidden="true"> | </span>
+        <a href="https://beian.mps.gov.cn/#/query/webSearch?code=13098302131402" rel="noreferrer" target="_blank">
+            <svg class="beian-icon" width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2L3 5.5V9c0 4.2 2.9 8.1 7 9 4.1-.9 7-4.8 7-9V5.5L10 2zm0 1.8L15.5 7V9c0 3.5-2.2 6.7-5.5 7.5V3.8z"/></svg>
+            冀公网安备13098302131402号
+        </a>
     </footer>
     <script src="{{ url_for('static', filename='js/i18n.js') }}?v=2026071302"></script>
     <script src="{{ url_for('static', filename='js/analytics.js') }}?v=2026071102"></script>

@@ -223,6 +223,19 @@
     text-decoration: underline;
     text-underline-offset: 3px;
 }
+
+.site-icp-separator {
+    color: rgba(104, 96, 87, 0.4);
+    font-size: 11px;
+    margin: 0 2px;
+    user-select: none;
+}
+
+.beian-icon {
+    vertical-align: -2px;
+    margin-right: 2px;
+    opacity: 0.6;
+}
 .sample-data-dialog {
     position: fixed;
     top: 50%;
