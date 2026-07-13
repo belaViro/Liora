@@ -561,3 +561,31 @@
 .announcement-btn:hover {
     background: #6F5B42;
 }
+
+.announcement-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.announcement-btn-secondary {
+    background: transparent;
+    color: #8B7355;
+    border: 1px solid #8B7355;
+}
+
+.announcement-btn-secondary:hover {
+    background: #F5F0E8;
+    color: #6F5B42;
+}
+
+@media (max-width: 420px) {
+    .announcement-actions {
+        flex-direction: column-reverse;
+    }
+
+    .announcement-actions .announcement-btn {
+        width: 100%;
+    }
+}

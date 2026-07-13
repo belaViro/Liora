@@ -135,6 +135,12 @@ function closeAnnouncement() {
     localStorage.setItem('lioraAnnouncementSeen', 'true');
 }
 
+// 从系统公告直接加载示例数据，避免再次弹出确认框
+async function loadSampleDataFromAnnouncement() {
+    closeAnnouncement();
+    await loadSampleData({ skipConfirmation: true });
+}
+
 // ==================== Liora 功能函数 ====================
 
 // 根据情感值获取图标
@@ -5111,10 +5117,14 @@ function showSampleDataConfirmDialog() {
 }
 
 // 加载示例数据
-async function loadSampleData() {
-    const confirmed = await showSampleDataConfirmDialog();
-    if (!confirmed) {
-        return;
+async function loadSampleData(options = {}) {
+    const { skipConfirmation = false } = options;
+
+    if (!skipConfirmation) {
+        const confirmed = await showSampleDataConfirmDialog();
+        if (!confirmed) {
+            return;
+        }
     }
 
     showToast(tx('toast.sampleLoading'), 'info');

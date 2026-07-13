@@ -16,7 +16,7 @@
     <link rel="preload" href="{{ url_for('static', filename='css/base.css') }}" as="style">
     <link rel="preload" href="{{ url_for('static', filename='css/layout.css') }}" as="style">
     <link rel="preload" href="{{ url_for('static', filename='js/d3.min.js') }}" as="script">
-    <link rel="preload" href="{{ url_for('static', filename='js/app.js') }}?v=2026071102" as="script">
+    <link rel="preload" href="{{ url_for('static', filename='js/app.js') }}?v=2026071301" as="script">
 
     <!-- Fonts: 数字花园风格（display=swap 避免阻塞渲染） -->
     <!-- 使用国内镜像加速，避免 Google Fonts 被墙导致白屏 -->
@@ -56,10 +56,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prediction.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/luoyi-chat.css') }}?v=2026070919">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/agent-dialogue.css') }}?v=2026070920">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/product-info.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/product-info.css') }}?v=2026071301">
     <!-- responsive.css 必须最后加载，确保媒体查询能覆盖前面所有样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/workbench-polish.css') }}?v=2026071003">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workbench-polish.css') }}?v=2026071301">
 
 
 </head>
@@ -336,7 +336,10 @@
                 <p>目前上游 LLM 流量不稳定，数据解析时间可能较长，请您耐心等待。</p>
                 <p>感谢您的理解与支持。</p>
             </div>
-            <button class="announcement-btn" onclick="closeAnnouncement()">我知道了</button>
+            <div class="announcement-actions">
+                <button class="announcement-btn announcement-btn-secondary" onclick="loadSampleDataFromAnnouncement()">加载示例数据</button>
+                <button class="announcement-btn" onclick="closeAnnouncement()">我知道了</button>
+            </div>
         </div>
     </div>
 
@@ -548,12 +551,10 @@
     </footer>
     <script src="{{ url_for('static', filename='js/i18n.js') }}?v=2026070925"></script>
     <script src="{{ url_for('static', filename='js/analytics.js') }}?v=2026071102"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=2026071103"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=2026071301"></script>
     <script src="{{ url_for('static', filename='js/agent-dialogue.js') }}?v=2026070921"></script>
     <script src="{{ url_for('static', filename='js/prediction.js') }}?v=2026070801"></script>
 
 </body>
 
 </html>
-
-

@@ -415,10 +415,22 @@ select,
 .btn-find-path:hover,
 .btn-story:hover,
 .welcome-close-btn:hover,
-.announcement-btn:hover {
+.announcement-btn:not(.announcement-btn-secondary):hover {
     background: var(--color-memory-dark);
     border-color: var(--color-memory-dark);
     color: #fff;
+}
+
+.announcement-btn-secondary {
+    background: transparent;
+    border-color: var(--color-memory);
+    color: var(--color-memory);
+}
+
+.announcement-btn-secondary:hover {
+    background: var(--color-memory-light);
+    border-color: var(--color-memory-dark);
+    color: var(--color-memory-dark);
 }
 
 .quick-tag,
